@@ -1,0 +1,108 @@
+.container {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: #fff;
+}
+
+.video {
+    width: 100%;
+    height: auto;
+    display: flex;
+    justify-content: center;
+}
+
+.video>video {
+    width: 1236px !important;
+    height: auto !important;
+}
+
+.info_video {
+    padding: 20px 0px;
+    border-bottom: 1px solid #00000021;
+    margin-top: 29px;
+    margin-bottom: 20px;
+}
+
+.video_title {
+    color: #1F2029;
+    font-size: 25px;
+    font-style: normal;
+    font-weight: 500;
+    line-height: normal;
+    font-family: Poppins;
+    margin-bottom: unset;
+}
+
+.video_date {
+    color: #6c757d;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #00000021;
+    font-size: 15px;
+}
+
+.video_description {}
+
+.video_author {
+    color: #696974;
+    font-size: 16px;
+    font-style: normal;
+    font-weight: 700;
+    font-family: Poppins;
+    line-height: normal;
+}
+
+.tab_buttons {
+    border-bottom-left-radius: 5px;
+    border-bottom-right-radius: 5px;
+    padding-top: unset;
+}
+
+.tab_buttons>button {
+    background-color: transparent;
+    padding: 0;
+    margin: 0;
+    font-size: 16px;
+    margin-right: 90px;
+    margin-bottom: 20px;
+}
+
+.tab_buttons>button:focus {}
+
+.tab_active {
+    color: #000;
+    font-family: Poppins;
+    font-size: 14px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: normal;
+    border: unset;
+    border-bottom: 2px solid #000;
+}
+
+.tab_inactive {
+    color: #92929C;
+    font-family: Poppins;
+    font-size: 14px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: normal;
+    border: unset;
+}
+
+.underVideo {
+    display: flex;
+    width: 1236px;
+    background-color: #fff;
+}
+
+.groupTab {
+    display: flex;
+    flex-direction: column;
+}
+
+.video_tags {
+    font-weight: 300;
+    margin: 0 3px !important;
+}

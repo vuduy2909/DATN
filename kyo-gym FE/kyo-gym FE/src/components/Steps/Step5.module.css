@@ -1,0 +1,96 @@
+.groupCard {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: var(--color-yellow-white);
+    padding: 83px;
+}
+
+.loadSteps {
+    display: flex;
+    align-items: center;
+    gap: 10px; /* Thêm khoảng cách giữa các phần tử */
+    overflow: hidden; /* Ngăn không cho tràn */
+    justify-content: center; /* Căn giữa */
+    width: 100%; /* Đảm bảo full width */
+}
+
+.lineStepNon {
+    width: 50px; /* Giảm chiều rộng của đường nối */
+    height: 6px;
+    border-radius: 40px;
+    margin: 0 5px; /* Giảm margin */
+    background: var(--neutral-300, #EFF0F6);
+}
+
+.lineStepFull {
+    width: 50px; /* Giảm chiều rộng của đường nối */
+    height: 6px;
+    border-radius: 40px;
+    margin: 0 5px; /* Giảm margin */
+    background: #CF4044;
+}
+
+
+.wrapCard {
+    width: 42rem;
+    padding: 40px 0px;
+    background-color: #fff;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.wrapCard>h4 {
+    font-style: normal;
+    font-weight: 500;
+    font-size: 22px;
+    letter-spacing: -0.0183197em;
+    line-height: 30px;
+    color: var(--neutral-600, #6F6C90);
+    margin: 40px 0px;
+}
+
+.line {
+    width: 80%;
+    height: 1px;
+    background: #D9DBE9;
+    margin-top: 20px;
+}
+
+.stepCircle {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.stepNumber {
+    position: absolute;
+    color: #fff;
+    font-size: 18px;
+    font-style: normal;
+    font-weight: 400;
+    margin-bottom: unset;
+}
+
+.stepNumberNon {
+    color: #000;
+    position: absolute;
+    font-size: 18px;
+    font-style: normal;
+    font-weight: 400;
+    margin-bottom: unset;
+}
+
+.btnGroup {
+    display: flex;
+    justify-content: space-between;
+    width: 90%;
+}
+
+.formContainer {
+    width: 80%;
+    padding: 20px;
+} 

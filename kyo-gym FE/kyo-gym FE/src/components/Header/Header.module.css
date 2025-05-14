@@ -1,0 +1,62 @@
+.kyoRoundLogo1 {
+    width: 130px;
+    height: 160px;
+}
+
+.appBar {
+    box-shadow: unset;
+    background-color: #37383c !important;
+}
+
+.container {
+    border-radius: 11px;
+    margin-top: 20px;
+    padding-left: 10px !important;
+    padding-right: 57px !important;
+    max-width: 1393px !important;
+    margin-top: unset;
+    background-color: #37383c !important;
+}
+
+.menuItem {
+    margin-left: 40px;
+}
+
+.menuItem:hover {}
+
+.menuItemText {
+    font-size: 17px !important;
+    margin: 0 8px !important;
+    line-height: 0.1 !important;
+
+}
+
+.menuItemText>a>p {
+    padding: 6px 0px;
+    color: #ffffff !important;
+    transition: all 2s ease !important;
+    transition-delay: 1s;
+}
+
+.menuItemText>a>p:hover {
+    border-bottom: 1px solid;
+}
+
+.SearchIconWrapper {
+    padding: 0px 12px;
+    height: 100%;
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.Search {
+    position: relative;
+    border-radius: 4px;
+    background-color: rgba(255, 255, 255, 0.15);
+    margin-right: 8px;
+    margin-left: 0;
+    color: #ffffff;
+    background-color: #f0ece838;
+}

@@ -1,0 +1,50 @@
+.tab_container {
+    border-radius: 16px !important;
+    width: 100% !important;
+    overflow-x: auto !important;
+}
+
+.table {
+    table-layout: fixed;
+    width: 100%;
+}
+
+.descriptionCell {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.instructionsCell {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.targetCell {
+    min-width: 150px;
+    white-space: normal;
+}
+
+.bodyPartCell {
+    min-width: 150px;
+    white-space: normal;
+}
+
+.idCell {
+    width: 50px;
+}
+
+.nameCell {
+    width: 150px;
+}
+
+.equipmentCell {
+    width: 100px;
+}
+
+.actionCell {
+    width: 100px;
+}
