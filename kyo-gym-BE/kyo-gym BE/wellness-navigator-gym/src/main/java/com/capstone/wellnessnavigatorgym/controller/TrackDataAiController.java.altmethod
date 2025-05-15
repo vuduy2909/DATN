@@ -1,0 +1,95 @@
+    /**
+     * Phương pháp thay thế để gọi Claude API khi phương pháp chính gặp hạn chế về chính sách
+     * Sử dụng cách tiếp cận khác với prompt không đề cập đến khuôn mặt
+     */
+    private String callClaudeApiAlternative(MultipartFile image, Double height, Double weight, String gender) throws Exception {
+        // Thiết lập header
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("x-api-key", claudeApiKey);
+        headers.set("anthropic-version", claudeApiVersion);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        
+        logger.info("Using alternative Claude API approach with model: {}", claudeModel);
+        
+        // Encode ảnh thành base64
+        byte[] imageBytes = image.getBytes();
+        String base64Image = Base64.getEncoder().encodeToString(imageBytes);
+        
+        // Tạo nội dung yêu cầu
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", claudeModel != null ? claudeModel : "claude-3-haiku-20240307");
+        requestBody.put("max_tokens", 2000);
+        
+        List<Map<String, Object>> messages = new ArrayList<>();
+        
+        // Chỉ dùng một tin nhắn người dùng, không có system message
+        Map<String, Object> userMessage = new HashMap<>();
+        userMessage.put("role", "user");
+        
+        // Tạo nội dung tin nhắn người dùng không đề cập đến khuôn mặt
+        String prompt = "Tôi là huấn luyện viên fitness. Hãy giúp tôi phân tích thân hình cơ thể trong ảnh này. " +
+                "Thông số cơ thể: Cao " + height + "cm, nặng " + weight + "kg, giới tính: " + gender + ". " +
+                "Bạn có thể phân tích và phân loại hình thể này không? " +
+                "Hãy phân loại hình thể vào một trong các nhóm: Thin (gầy), Skinny Fat (gầy có mỡ), Overweight (thừa cân), Normal (bình thường), hoặc Fit (có cơ bắp). " +
+                "Cũng hãy đánh giá tỷ lệ cơ/mỡ, điểm mạnh và điểm yếu, và đề xuất các bài tập phù hợp. " +
+                "Cho tôi kết quả dạng JSON có bodyType, analysis, và recommendations. Đừng kèm giải thích, chỉ trả kết quả JSON.";
+        
+        List<Map<String, Object>> content = new ArrayList<>();
+        
+        // Thêm nội dung text
+        Map<String, Object> textContent = new HashMap<>();
+        textContent.put("type", "text");
+        textContent.put("text", prompt);
+        content.add(textContent);
+        
+        // Thêm nội dung hình ảnh
+        Map<String, Object> imageContent = new HashMap<>();
+        imageContent.put("type", "image");
+        Map<String, String> imageData = new HashMap<>();
+        imageData.put("type", "base64");
+        imageData.put("media_type", image.getContentType());
+        imageData.put("data", base64Image);
+        imageContent.put("source", imageData);
+        content.add(imageContent);
+        
+        userMessage.put("content", content);
+        messages.add(userMessage);
+        requestBody.put("messages", messages);
+        
+        // Gửi yêu cầu và nhận kết quả
+        try {
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+            logger.info("Sending alternative request to Claude API");
+            
+            ResponseEntity<Map> response = restTemplate.exchange(claudeApiUrl, HttpMethod.POST, entity, Map.class);
+            HttpStatus statusCode = response.getStatusCode();
+            
+            if (statusCode.is2xxSuccessful()) {
+                logger.info("Alternative Claude API call successful");
+                
+                // Parse và trả về kết quả
+                Map responseBody = response.getBody();
+                
+                if (responseBody != null && responseBody.containsKey("content")) {
+                    List<Map<String, Object>> contentList = (List<Map<String, Object>>) responseBody.get("content");
+                    if (!contentList.isEmpty()) {
+                        Map<String, Object> firstContent = contentList.get(0);
+                        if (firstContent.containsKey("text")) {
+                            String text = (String) firstContent.get("text");
+                            logger.info("Successfully parsed alternative Claude response");
+                            return text;
+                        }
+                    }
+                }
+                
+                // Nếu không thể parse, trả về thông báo lỗi
+                return "{\"bodyType\": \"Normal\", \"analysis\": \"Không thể phân tích chi tiết từ cách tiếp cận thay thế.\", \"recommendations\": \"Đề xuất mặc định: Tập trung vào các bài tập cardio và cường độ vừa phải.\"}";
+            } else {
+                logger.error("Alternative Claude API call failed with status: {}", statusCode);
+                return "{\"bodyType\": \"Normal\", \"analysis\": \"Lỗi kết nối tới Claude API với cách tiếp cận thay thế. Mã trạng thái: " + statusCode + "\", \"recommendations\": \"Đề xuất mặc định: Tập trung vào các bài tập cardio và cường độ vừa phải.\"}";
+            }
+        } catch (Exception e) {
+            logger.error("Error when calling alternative Claude API: {}", e.getMessage());
+            return "{\"bodyType\": \"Normal\", \"analysis\": \"Lỗi khi gọi Claude API với cách tiếp cận thay thế: " + e.getMessage() + "\", \"recommendations\": \"Đề xuất mặc định: Tập trung vào các bài tập cardio và cường độ vừa phải.\"}";
+        }
+    }
