@@ -10,4 +10,6 @@ public interface ICustomerCourseService {
     void save(CustomerCourse customerCourse);
 
     void saveRecommendedCourses(Course courses, Integer customerId);
+
+    List<CustomerCourse> findByCustomerId(Integer customerId);
 }

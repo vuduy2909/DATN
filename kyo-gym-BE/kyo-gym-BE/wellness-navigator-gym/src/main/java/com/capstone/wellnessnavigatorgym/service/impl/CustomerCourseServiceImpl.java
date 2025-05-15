@@ -37,4 +37,9 @@ public class CustomerCourseServiceImpl implements ICustomerCourseService {
             customerCourseRepository.save(customerCourse);
         }
     }
+
+    @Override
+    public List<CustomerCourse> findByCustomerId(Integer customerId) {
+        return customerCourseRepository.findByCustomer_CustomerId(customerId);
+    }
 }

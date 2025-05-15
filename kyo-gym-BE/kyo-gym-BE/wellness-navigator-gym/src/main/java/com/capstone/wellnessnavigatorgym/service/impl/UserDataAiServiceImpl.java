@@ -8,6 +8,7 @@ import lombok.SneakyThrows;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -33,5 +34,10 @@ public class UserDataAiServiceImpl implements IUserDataAiService {
             return userDataAi.get();
         }
         throw new NotFoundById("Could not find any AI user data with code: " + id);
+    }
+
+    @Override
+    public List<UserDataAi> findByCustomerId(Integer customerId) {
+        return userDataAiRepository.findByCustomer_CustomerId(customerId);
     }
 }
