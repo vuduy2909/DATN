@@ -2,7 +2,7 @@
     display: flex;
     flex-wrap: wrap;
     padding-left: 20px;
-    justify-content: center;
+    justify-content: flex-start;
     gap: 15px;
 }
 
@@ -11,7 +11,7 @@
     padding: 0.75rem;
     margin: 0;
     background-color: #fff;
-    width: 18rem !important;
+    width: 16.5rem !important;
     border-radius: 8px;
     background: #FFF;
     box-shadow: 3px 3px 8px 0px rgba(197, 205, 236, 0.60);
@@ -137,14 +137,14 @@
 
 @media screen and (max-width: 1400px) {
     .collection_card {
-        width: 16rem !important;
+        width: 15.5rem !important;
     }
 }
 
 @media screen and (max-width: 992px) {
     .collection {
         padding-left: 10px;
-        justify-content: center;
+        justify-content: flex-start;
     }
     
     .collection_card {
@@ -156,4 +156,20 @@
     .collection_card {
         width: 100% !important;
     }
+}
+
+/* Add loading container styles */
+.loading_container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 300px;
+    width: 100%;
+}
+
+.loading_container p {
+    margin-top: 16px;
+    color: #CF4044;
+    font-weight: 500;
 }

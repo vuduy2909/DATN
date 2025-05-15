@@ -5,18 +5,53 @@ const UserFormService = {
   // Gửi dữ liệu form 7 bước và nhận đề xuất khóa học
   submitFormData: async (formData) => {
     try {
+      console.log('UserFormService: Preparing to submit form data:', formData);
+      
+      // Kiểm tra các trường bắt buộc
+      const requiredFields = ['activity_level', 'age', 'gender', 'customerId'];
+      const missingFields = requiredFields.filter(field => !formData[field]);
+      
+      if (missingFields.length > 0) {
+        console.error('UserFormService: Missing required fields:', missingFields);
+        throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+      }
+      
       // Lấy token từ localStorage (hoặc vị trí lưu trữ khác)
       const token = localStorage.getItem('token');
       const headers = {};
       
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
+        console.log('UserFormService: Token found and included in headers');
+      } else {
+        console.warn('UserFormService: No token found in localStorage');
       }
       
-      const response = await request.post('/track-data-ai/process-form-data', formData, { headers });
+      // Sửa endpoint API để trùng với endpoint trong collectionService
+      console.log('UserFormService: Sending POST request to /track-data-ai/recommend-course');
+      const response = await request.post('/track-data-ai/recommend-course', formData, { headers });
+      console.log('UserFormService: Received response:', JSON.stringify(response));
+      
+      // Kiểm tra xem phản hồi có dữ liệu khóa học không
+      if (response && response.recommendedCourses) {
+        console.log('UserFormService: Recommended courses received:', response.recommendedCourses.length);
+      } else {
+        console.warn('UserFormService: No recommended courses in response');
+      }
+      
       return response;
     } catch (error) {
-      console.error('Error submitting form data:', error);
+      console.error('UserFormService: Error submitting form data:', error);
+      if (error.response) {
+        console.error('UserFormService: Response data:', error.response.data);
+        console.error('UserFormService: Response status:', error.response.status);
+        console.error('UserFormService: Response headers:', error.response.headers);
+        
+        // Nếu nhận được phản hồi lỗi nhưng có dữ liệu, vẫn trả về để UI xử lý
+        if (error.response.data) {
+          return error.response.data;
+        }
+      }
       throw error;
     }
   },

@@ -89,8 +89,6 @@
 
 }
 
-.selectedCard>p,
-.selectedCard>h3,
 .selectedCard {
     background: var(--color-red-body);
     color: #fff !important;
@@ -144,6 +142,10 @@
     right: 115px;
 }
 
+.popup {
+    padding: 10px;
+}
+
 .popupContent {
     position: relative;
     overflow: auto;
@@ -174,15 +176,42 @@
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 10px;
 }
 
 .popupDay {
-    margin: 10px;
-    padding: 10px;
-    color: #000;
+    margin: 5px;
+    padding: 10px 20px;
+    background-color: #e74c3c;
+    color: #fff;
+    text-decoration: none;
+    border-radius: 5px;
+    font-weight: bold;
+    text-align: center;
+    min-width: 80px;
+    transition: all 0.3s ease;
+}
+
+.popupDay:hover {
+    background-color: #c0392b;
+    transform: scale(1.05);
 }
 
 .disabledCard {
     opacity: 0.5;
     pointer-events: none;
+}
+
+.reviewPopup {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.reviewButtons {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
 }

@@ -9,6 +9,7 @@ import com.capstone.wellnessnavigatorgym.dto.tree.UserFormDataDTO;
 import com.capstone.wellnessnavigatorgym.entity.*;
 import com.capstone.wellnessnavigatorgym.service.*;
 import com.capstone.wellnessnavigatorgym.utils.BuildDecisionTree;
+import com.capstone.wellnessnavigatorgym.utils.XMLGenerator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
@@ -23,6 +24,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.InputStreamReader;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -67,6 +69,9 @@ public class TrackDataAiController {
     @Value("${claude.api.model:claude-3-5-haiku-20240307}")
     private String claudeModel;
 
+    // Đường dẫn file XML - Sửa lại đường dẫn nhất quán
+    private static final String XML_FILE_PATH = "D:/DA-CNPM-FINAL/CODE/kyo-gym-BE/kyo-gym-BE/wellness-navigator-gym/src/main/resources/static/DataTraining.xml";
+
     @GetMapping("/{id}")
     public ResponseEntity<TrackDataAi> getTrackDataAiById(@PathVariable Integer id) {
         return new ResponseEntity<>(trackDataAiService.findTrackDataAiById(id), HttpStatus.OK);
@@ -101,10 +106,15 @@ public class TrackDataAiController {
             List<Course> courses = courseService.findAll();
             buildDecisionTree = new BuildDecisionTree(trackDataAis);
             buildDecisionTree.setCourses(courses);
-            TreeNode decisionTree = buildDecisionTree.buildDecisionTree();
-
-            // Import cây quyết định từ file (điều chỉnh đường dẫn tùy theo hệ thống của bạn)
-            buildDecisionTree.importTreeFromXml("D:\\DuyTan_University\\Project_Capstone_1\\CAPSTONE1-KyoGYM\\C1SE.32-Capstone1-BE\\wellness-navigator-gym\\src\\main\\resources\\static\\DataTraining1.xml");
+            
+            // Build và xuất cây quyết định mới
+            TreeNode decisionTree = buildDecisionTree.buildAndExportDecisionTree(XML_FILE_PATH);
+            
+            if (decisionTree == null) {
+                logger.error("Failed to build decision tree");
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new RecommendationDTO(null, "Failed to build decision tree"));
+            }
 
             // Tạo map dữ liệu người dùng
             Map<String, Object> userData = extractUserDataFromTrackDataAi(userDataDTO);
@@ -120,9 +130,14 @@ public class TrackDataAiController {
             // Lưu khóa học đề xuất cho người dùng
             customerCourseService.saveRecommendedCourses(recommendations, userDataDTO.getCustomerId());
 
-            return ResponseEntity.ok(new RecommendationDTO(recommendations, "Course recommendations generated successfully based on form data"));
+            if (recommendations == null) {
+                logger.warn("No suitable course recommendation found for the user");
+                return ResponseEntity.ok(new RecommendationDTO(null, "No suitable course recommendation found"));
+            }
+
+            return ResponseEntity.ok(new RecommendationDTO(recommendations, "Course recommendations generated successfully"));
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Error processing form data: " + e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new RecommendationDTO(null, "Error processing form data: " + e.getMessage()));
         }
@@ -188,72 +203,125 @@ public class TrackDataAiController {
 
     @PostMapping("/recommend-course")
     public ResponseEntity<RecommendationDTO> recommendCourse(@RequestBody UserDataDTO userDataDTO) {
-        // Lấy danh sách thuộc tính và kiểm tra chúng
-        List<String> attributeNames = getAttributeNames();
-        if (attributeNames == null || attributeNames.isEmpty()) {
-            return ResponseEntity.badRequest().body(new RecommendationDTO(null, "Attribute names are missing or invalid"));
+        try {
+            logger.info("Received recommendation request for user ID: " + userDataDTO.getCustomerId());
+            
+            // Lấy danh sách thuộc tính và kiểm tra chúng
+            List<String> attributeNames = getAttributeNames();
+            if (attributeNames == null || attributeNames.isEmpty()) {
+                return ResponseEntity.badRequest().body(new RecommendationDTO(null, "Attribute names are missing or invalid"));
+            }
+            
+            // Lấy dữ liệu
+            List<TrackDataAi> trackDataAis = trackDataAiService.getAllTrackDataAi();
+            if (trackDataAis.isEmpty()) {
+                return ResponseEntity.badRequest().body(new RecommendationDTO(null, "No matching track data found with the given filters"));
+            }
+
+            // Kiểm tra nếu file XML tồn tại, thì đọc từ file, nếu không thì xây dựng và lưu lại
+            File xmlFile = new File(XML_FILE_PATH);
+            TreeNode decisionTree;
+            
+            if (xmlFile.exists()) {
+                logger.info("Loading decision tree from existing XML file: " + XML_FILE_PATH);
+                decisionTree = buildDecisionTree.importTreeFromXml(XML_FILE_PATH);
+                
+                // Kiểm tra nếu import thất bại, xây dựng lại cây
+                if (decisionTree == null) {
+                    logger.warn("Failed to import decision tree from XML. Building new one.");
+                    List<Course> courses = courseService.findAll();
+                    buildDecisionTree = new BuildDecisionTree(trackDataAis);
+                    buildDecisionTree.setCourses(courses);
+                    decisionTree = buildDecisionTree.buildAndExportDecisionTree(XML_FILE_PATH);
+                }
+            } else {
+                logger.info("Building new decision tree and exporting to XML");
+                // Tải cây quyết định
+                List<Course> courses = courseService.findAll();
+                buildDecisionTree = new BuildDecisionTree(trackDataAis);
+                buildDecisionTree.setCourses(courses);
+                decisionTree = buildDecisionTree.buildAndExportDecisionTree(XML_FILE_PATH);
+            }
+
+            if (decisionTree == null) {
+                logger.warn("Failed to load or build decision tree");
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new RecommendationDTO(null, "Failed to load or build decision tree"));
+            }
+
+            // Tạo map dữ liệu người dùng từ UserDataDTO
+            Map<String, Object> userData = extractUserDataFromTrackDataAi(userDataDTO);
+            
+            // Duyệt qua cây quyết định và tìm đề xuất
+            Course recommendations = buildDecisionTree.traverseDecisionTree(decisionTree, userData);
+
+            if (recommendations == null) {
+                logger.warn("No suitable course recommendation found for the user");
+                return ResponseEntity.ok(new RecommendationDTO(null, "No suitable course recommendation found"));
+            }
+
+            Customer customer = customerService.findById(userDataDTO.getCustomerId());
+            if (customer == null) {
+                return ResponseEntity.badRequest().body(new RecommendationDTO(null, "Customer not found"));
+            }
+
+            // Lưu dữ liệu người dùng
+            UserDataAi userDataAi = createUserDataAiFromDTO(userDataDTO, customer);
+            userDataAiService.saveUserDataAi(userDataAi);
+
+            // Lưu khóa học đề xuất
+            logger.info("Saving recommended course " + recommendations.getCourseId() + " for user " + userDataDTO.getCustomerId());
+            customerCourseService.saveRecommendedCourses(recommendations, userDataDTO.getCustomerId());
+
+            return ResponseEntity.ok(new RecommendationDTO(recommendations, "Course recommendations generated successfully"));
+        } catch (Exception e) {
+            logger.error("Error in recommendation process: " + e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new RecommendationDTO(null, "Error in recommendation process: " + e.getMessage()));
         }
-        // Lấy dữ liệu và xây dựng cây quyết định
-        List<TrackDataAi> trackDataAis = trackDataAiService.getAllTrackDataAi();
-        if (trackDataAis.isEmpty()) {
-            return ResponseEntity.badRequest().body(new RecommendationDTO(null, "No matching track data found with the given filters"));
-        }
-
-        // Tải cây quyết định
-        List<Course> courses = courseService.findAll();
-        buildDecisionTree = new BuildDecisionTree(trackDataAis);
-        buildDecisionTree.setCourses(courses);
-        TreeNode decisionTree = buildDecisionTree.buildDecisionTree();
-
-        // Xuất cây ra file XML
-        //buildDecisionTree.exportTreeToXml(decisionTree, "D:\\DuyTan_University\\Project_Capstone_1\\CAPSTONE1-KyoGYM\\C1SE.32-Capstone1-BE\\wellness-navigator-gym\\src\\main\\resources\\static\\DataTraining1.xml");
-        //return null;
-        buildDecisionTree.importTreeFromXml("D:\\DuyTan_University\\Project_Capstone_1\\CAPSTONE1-KyoGYM\\C1SE.32-Capstone1-BE\\wellness-navigator-gym\\src\\main\\resources\\static\\DataTraining1.xml");
-
-        // Tạo map dữ liệu người dùng từ TrackDataAi
-        Map<String, Object> userData = extractUserDataFromTrackDataAi(userDataDTO);
-
-        // Duyệt qua cây quyết định và tìm đề xuất
-        Course recommendations = buildDecisionTree.traverseDecisionTree(decisionTree, userData);
-
-        Customer customer = customerService.findById(userDataDTO.getCustomerId());
-        UserDataAi userDataAi = createUserDataAiFromDTO(userDataDTO, customer);
-        userDataAiService.saveUserDataAi(userDataAi);
-
-        customerCourseService.saveRecommendedCourses(recommendations, userDataDTO.getCustomerId());
-
-        return ResponseEntity.ok(new RecommendationDTO(recommendations, "Course recommendations generated successfully"));
     }
 
     private Map<String, Object> extractUserDataFromTrackDataAi(UserDataDTO userDataDTO) {
         Map<String, Object> userData = new HashMap<>();
+        // Các trường cơ bản
         userData.put("activity_level", userDataDTO.getActivity_level());
         userData.put("age", userDataDTO.getAge());
         userData.put("gender", userDataDTO.getGender());
         userData.put("bmi", userDataDTO.getBmi());
         userData.put("training_goals", userDataDTO.getTraining_goals());
         userData.put("training_history", userDataDTO.getTraining_history());
-
-        // Thêm các trường mới vào map
-        userData.put("height", userDataDTO.getHeight());
-        userData.put("weight", userDataDTO.getWeight());
-        userData.put("bodyType", userDataDTO.getBodyType());
-        userData.put("occupation", userDataDTO.getOccupation());
-        userData.put("workEnvironment", userDataDTO.getWorkEnvironment());
-        userData.put("healthIssues", userDataDTO.getHealthIssues());
-        userData.put("chestSize", userDataDTO.getChestSize());
-        userData.put("waistSize", userDataDTO.getWaistSize());
-
+        
+        // Các trường mới - đảm bảo tên trường nhất quán với BuildDecisionTree
+        if (userDataDTO.getHeight() != null) userData.put("height", userDataDTO.getHeight());
+        if (userDataDTO.getWeight() != null) userData.put("weight", userDataDTO.getWeight());
+        if (userDataDTO.getBodyType() != null) userData.put("body_type", userDataDTO.getBodyType());
+        if (userDataDTO.getOccupation() != null) userData.put("occupation", userDataDTO.getOccupation());
+        if (userDataDTO.getWorkEnvironment() != null) userData.put("work_environment", userDataDTO.getWorkEnvironment());
+        if (userDataDTO.getHealthIssues() != null) userData.put("health_issues", userDataDTO.getHealthIssues());
+        if (userDataDTO.getChestSize() != null) userData.put("bust", userDataDTO.getChestSize());
+        if (userDataDTO.getWaistSize() != null) userData.put("waist", userDataDTO.getWaistSize());
+        
         return userData;
     }
 
     private List<String> getAttributeNames() {
-        // Cập nhật danh sách thuộc tính bao gồm các trường mới
+        // Lấy tất cả các thuộc tính, sau đó lọc chỉ giữ lại thuộc tính hợp lệ
         return Arrays.asList(
-                "activity_level", "age", "gender", "bmi", "training_goals", "training_history",
-                "height", "weight", "bodyType", "occupation", "workEnvironment", "healthIssues",
-                "chestSize", "waistSize"
-        );
+            "activity_level",
+            "age",
+            "gender", 
+            "bmi",
+            "training_goals",
+            "training_history",
+            "height",
+            "weight", 
+            "body_type",
+            "occupation",
+            "work_environment",
+            "health_issues",
+            "bust",
+            "waist"
+        ).stream().filter(TrackDataAi::isValidAttribute).collect(Collectors.toList());
     }
 
     @PutMapping("/update-effectiveness/{userDataAiId}")
@@ -338,10 +406,11 @@ public class TrackDataAiController {
     public ResponseEntity<ImageAnalysisResponseDTO> analyzeImage(@RequestParam("image") MultipartFile image,
                                                                  @RequestParam("height") Double height,
                                                                  @RequestParam("weight") Double weight,
-                                                                 @RequestParam("gender") String gender) {
+                                                                 @RequestParam("gender") String gender,
+                                                                 @RequestParam(value = "customerId", required = false) Integer customerId) {
         try {
-            logger.info("Starting image analysis - height: {}, weight: {}, gender: {}, image name: {}, size: {}",
-                    height, weight, gender, image.getOriginalFilename(), image.getSize());
+            logger.info("Starting image analysis - height: {}, weight: {}, gender: {}, image name: {}, size: {}, customerId: {}",
+                    height, weight, gender, image.getOriginalFilename(), image.getSize(), customerId);
 
             // Kiểm tra nếu ảnh không có hoặc rỗng
             if (image == null || image.isEmpty() || image.getSize() == 0) {
@@ -421,19 +490,59 @@ public class TrackDataAiController {
                     // Nếu kết quả thay thế hoạt động, sử dụng nó
                     if (!altResult.getBodyType().equals("Unknown")) {
                         logger.info("Alternative prompt succeeded with body type: {}", altResult.getBodyType());
-                        return ResponseEntity.ok(altResult);
+                        response = altResult; // Sử dụng kết quả thay thế
                     }
                 } catch (Exception ex) {
                     logger.error("Alternative prompt also failed: {}", ex.getMessage());
                 }
 
-                // Nếu các cách tiếp cận thay thế đều thất bại, trả về lỗi chuẩn
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                        .body(new ImageAnalysisResponseDTO("Unknown",
-                                "Không thể phân tích ảnh vì chính sách Claude AI. Hãy chọn ảnh không có khuôn mặt.",
-                                "Vui lòng sử dụng ảnh chỉ hiển thị cơ thể (không có mặt) hoặc chọn loại cơ thể thủ công."));
+                // Nếu vẫn là "Unknown", trả về lỗi chuẩn
+                if (response.getBodyType().equals("Unknown")) {
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                            .body(new ImageAnalysisResponseDTO("Unknown",
+                                    "Không thể phân tích ảnh vì chính sách Claude AI. Hãy chọn ảnh không có khuôn mặt.",
+                                    "Vui lòng sử dụng ảnh chỉ hiển thị cơ thể (không có mặt) hoặc chọn loại cơ thể thủ công."));
+                }
             }
 
+            // Nếu có customerId, lưu kết quả và đề xuất khóa học
+            if (customerId != null) {
+                try {
+                    // Tạo UserDataDTO từ kết quả phân tích
+                    UserDataDTO userDataDTO = new UserDataDTO();
+                    userDataDTO.setHeight(height);
+                    userDataDTO.setWeight(weight);
+                    userDataDTO.setGender(gender);
+                    userDataDTO.setCustomerId(customerId);
+                    
+                    // Tính BMI
+                    double heightInMeters = height / 100.0;
+                    double bmi = weight / (heightInMeters * heightInMeters);
+                    userDataDTO.setBmi(Math.round(bmi * 10.0) / 10.0);
+                    
+                    // Sử dụng bodyType từ phân tích ảnh
+                    userDataDTO.setBodyType(response.getBodyType());
+                    
+                    // Thiết lập các giá trị mặc định cho các trường bắt buộc
+                    userDataDTO.setActivity_level("Moderate");  // Giá trị mặc định
+                    userDataDTO.setAge(30);  // Giá trị mặc định
+                    userDataDTO.setTraining_goals("Weight Management");  // Giá trị mặc định
+                    userDataDTO.setTraining_history("Beginner");  // Giá trị mặc định
+                    
+                    // Lưu dữ liệu và đề xuất khóa học
+                    logger.info("Attempting to recommend courses based on image analysis for customer ID: {}", customerId);
+                    RecommendationDTO recommendation = recommendCourse(userDataDTO).getBody();
+                    
+                    if (recommendation != null && recommendation.getRecommendedCourses() != null) {
+                        logger.info("Successfully recommended course: {}", recommendation.getRecommendedCourses().getCourseName());
+                    } else {
+                        logger.warn("No course was recommended based on image analysis");
+                    }
+                } catch (Exception e) {
+                    logger.error("Error recommending courses after image analysis: {}", e.getMessage(), e);
+                }
+            }
+                
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             logger.error("Failed to analyze image: {}", e.getMessage(), e);
@@ -663,60 +772,25 @@ public class TrackDataAiController {
         logger.info("Parsing Claude response: {}", claudeResponse);
         ObjectMapper objectMapper = new ObjectMapper();
 
-        // Kiểm tra nếu phản hồi chứa thông báo lỗi về chính sách Claude
-        if (claudeResponse.contains("không thể phân tích") ||
-                claudeResponse.contains("không được yêu cầu nhận dạng") ||
-                claudeResponse.contains("không thể nhận xét") ||
-                claudeResponse.contains("face-blind") ||
-                claudeResponse.contains("Xin lỗi")) {
-
-            logger.warn("Claude policy restriction detected in response: {}", claudeResponse);
-            ImageAnalysisResponseDTO policyRestriction = new ImageAnalysisResponseDTO();
-            policyRestriction.setBodyType("Unknown");
-            policyRestriction.setAnalysis("Không thể phân tích chi tiết từ AI. Phần hồi gốc: " + claudeResponse);
-            policyRestriction.setRecommendations("Vui lòng chọn một ảnh khác không có khuôn mặt hoặc chọn loại cơ thể thủ công từ danh sách.");
-            return policyRestriction;
-        }
-
         try {
-            // Tìm và trích xuất JSON từ phản hồi của Claude
+            // Tìm vị trí JSON đầu tiên trong chuỗi trả về
             int startIndex = claudeResponse.indexOf("{");
             int endIndex = claudeResponse.lastIndexOf("}") + 1;
-
             if (startIndex >= 0 && endIndex > startIndex) {
-                // Trích xuất phần JSON từ văn bản
                 String jsonPart = claudeResponse.substring(startIndex, endIndex);
-                logger.info("Extracted JSON part: {}", jsonPart);
 
+                // Thử parse trực tiếp
                 try {
-                    // Sử dụng Jackson để parse JSON trực tiếp thành DTO
                     return objectMapper.readValue(jsonPart, ImageAnalysisResponseDTO.class);
                 } catch (Exception e) {
                     logger.error("Could not parse JSON to ImageAnalysisResponseDTO: {}", e.getMessage());
-
                     // Nếu không thể parse trực tiếp, thử parse thành JsonNode
                     try {
                         JsonNode jsonNode = objectMapper.readTree(jsonPart);
                         ImageAnalysisResponseDTO result = new ImageAnalysisResponseDTO();
-
-                        if (jsonNode.has("bodyType")) {
-                            result.setBodyType(jsonNode.get("bodyType").asText());
-                        } else {
-                            result.setBodyType("Normal");
-                        }
-
-                        if (jsonNode.has("analysis")) {
-                            result.setAnalysis(jsonNode.get("analysis").asText());
-                        } else {
-                            result.setAnalysis("Không tìm thấy phân tích trong phản hồi.");
-                        }
-
-                        if (jsonNode.has("recommendations")) {
-                            result.setRecommendations(jsonNode.get("recommendations").asText());
-                        } else {
-                            result.setRecommendations("Không tìm thấy đề xuất trong phản hồi.");
-                        }
-
+                        result.setBodyType(jsonNode.has("bodyType") ? jsonNode.get("bodyType").asText() : "Normal");
+                        result.setAnalysis(jsonNode.has("analysis") ? jsonNode.get("analysis").asText() : "Không tìm thấy phân tích trong phản hồi.");
+                        result.setRecommendations(jsonNode.has("recommendations") ? jsonNode.get("recommendations").asText() : "Không tìm thấy đề xuất trong phản hồi.");
                         return result;
                     } catch (Exception ex) {
                         logger.error("Error parsing with JsonNode: {}", ex.getMessage());
@@ -730,8 +804,9 @@ public class TrackDataAiController {
         // Nếu không thể parse, trả về kết quả mặc định với toàn bộ phản hồi
         ImageAnalysisResponseDTO fallback = new ImageAnalysisResponseDTO();
         fallback.setBodyType("Normal");
-        fallback.setAnalysis("Không thể phân tích chi tiết từ AI. Phản hồi gốc: " + claudeResponse);
+        fallback.setAnalysis("Không thể phân tích chi tiết từ AI. (Không tách được JSON từ phản hồi)");
         fallback.setRecommendations("Đề xuất mặc định: Tập trung vào các bài tập cardio và cường độ vừa phải.");
+        logger.error("Claude response (for debug): {}", claudeResponse);
         return fallback;
     }
 
@@ -834,6 +909,77 @@ public class TrackDataAiController {
         } catch (Exception e) {
             logger.error("Error when calling alternative Claude API: {}", e.getMessage());
             return "{\"bodyType\": \"Normal\", \"analysis\": \"Lỗi khi gọi Claude API với cách tiếp cận thay thế: " + e.getMessage() + "\", \"recommendations\": \"Đề xuất mặc định: Tập trung vào các bài tập cardio và cường độ vừa phải.\"}";
+        }
+    }
+
+    @GetMapping("/rebuild-decision-tree")
+    public ResponseEntity<?> rebuildDecisionTree() {
+        try {
+            // Lấy tất cả dữ liệu huấn luyện
+            List<TrackDataAi> trackDataAis = trackDataAiService.getAllTrackDataAi();
+            if (trackDataAis.isEmpty()) {
+                return ResponseEntity.badRequest().body("No training data available");
+            }
+            
+            logger.info("Rebuilding decision tree with {} training records", trackDataAis.size());
+            
+            // Lấy danh sách khóa học
+            List<Course> courses = courseService.findAll();
+            
+            // Xây dựng cây quyết định mới
+            buildDecisionTree = new BuildDecisionTree(trackDataAis);
+            buildDecisionTree.setCourses(courses);
+            
+            // Xây dựng và xuất ra file XML
+            TreeNode root = buildDecisionTree.buildAndExportDecisionTree(XML_FILE_PATH);
+            
+            if (root == null) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body("Failed to rebuild decision tree");
+            }
+            
+            return ResponseEntity.ok("Decision tree rebuilt successfully and exported to " + XML_FILE_PATH);
+        } catch (Exception e) {
+            logger.error("Error rebuilding decision tree: " + e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error rebuilding decision tree: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/generate-enhanced-xml")
+    public ResponseEntity<String> generateEnhancedXML() {
+        try {
+            List<TrackDataAi> trackDataList = trackDataAiService.getAllTrackDataAi();
+            boolean success = XMLGenerator.generateEnhancedXML(trackDataList, XML_FILE_PATH);
+            
+            if (success) {
+                return ResponseEntity.ok("Enhanced XML file generated successfully at: " + XML_FILE_PATH);
+            } else {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body("Failed to generate enhanced XML file. Check server logs for details.");
+            }
+        } catch (Exception e) {
+            logger.error("Error generating enhanced XML: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error generating enhanced XML: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/validate-xml")
+    public ResponseEntity<String> validateXML() {
+        try {
+            boolean valid = XMLGenerator.validateAndFixXML(XML_FILE_PATH);
+            
+            if (valid) {
+                return ResponseEntity.ok("XML file is valid and accessible at: " + XML_FILE_PATH);
+            } else {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body("XML file is invalid or missing. Check server logs for details.");
+            }
+        } catch (Exception e) {
+            logger.error("Error validating XML: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error validating XML: " + e.getMessage());
         }
     }
 }

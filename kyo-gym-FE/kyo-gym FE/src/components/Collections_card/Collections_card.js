@@ -6,6 +6,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { collectionService } from "../../service/collectionService";
 import { faStar } from "@fortawesome/free-solid-svg-icons";
 import Button from "@mui/material/Button";
+import { CircularProgress } from "@mui/material";
 
 const CollectionCard = ({ id, title, image, duration }) => {
   const renderRating = () => {
@@ -64,15 +65,19 @@ const CollectionCard = ({ id, title, image, duration }) => {
   );
 };
 
-const Collections_card = ({ selectedCategory, recommendedCourses }) => {
+const Collections_card = ({ selectedCategory, recommendedCourses, loading }) => {
   const [dataCourse, setDataCourse] = useState([]);
+  const [loadingCourses, setLoadingCourses] = useState(true);
 
   const getCardsFunction = async () => {
     try {
+      setLoadingCourses(true);
       const cards = await collectionService.getCards();
       setDataCourse(cards);
     } catch (error) {
       console.error(error);
+    } finally {
+      setLoadingCourses(false);
     }
   };
 
@@ -92,6 +97,17 @@ const Collections_card = ({ selectedCategory, recommendedCourses }) => {
     }
   });
 
+  if (loading || loadingCourses) {
+    return (
+      <div className={styles.loading_container}>
+        <CircularProgress color="error" />
+        <p>Đang tải khóa học...</p>
+      </div>
+    );
+  }
+
+  const isRecommendWithNoData = selectedCategory === "Recommend" && filteredCards.length === 0;
+
   return (
     <div className={styles.collection}>
       {filteredCards.length > 0 ? (
@@ -109,8 +125,7 @@ const Collections_card = ({ selectedCategory, recommendedCourses }) => {
         <div className={styles.bn_left}>
           <div className={styles.bn_left_1}>
             <p className={styles.typo}>
-              <span className={styles.typo_red}>No</span> recommended courses
-              found
+              <span className={styles.typo_red}>No</span> {isRecommendWithNoData ? "recommended" : ""} courses found
             </p>
             <p className={styles.typo_des}>
               <Button variant="contained" className={styles.bn_left_btn}>

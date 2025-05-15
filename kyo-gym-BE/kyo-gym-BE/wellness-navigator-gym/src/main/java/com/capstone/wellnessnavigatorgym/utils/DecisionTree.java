@@ -21,6 +21,10 @@ public class DecisionTree {
     }
 
     public double calculateInformationGain(String attributeName) {
+        if (!TrackDataAi.isValidAttribute(attributeName)) {
+            System.out.println("Invalid attribute: " + attributeName);
+            return 0;
+        }
         return informationGainCache.computeIfAbsent(attributeName, this::computeInformationGain);
     }
 
@@ -40,7 +44,13 @@ public class DecisionTree {
     }
 
     public Map<Object, List<TrackDataAi>> getSubsetsByAttributeValue(String attributeName) {
-        return trackDataAiData.stream().collect(Collectors.groupingBy(e -> e.getAttributeValue(attributeName)));
+        if (!TrackDataAi.isValidAttribute(attributeName)) {
+            System.out.println("Invalid attribute: " + attributeName);
+            return Collections.emptyMap();
+        }
+        return trackDataAiData.stream()
+                .filter(e -> e.getAttributeValue(attributeName) != null)
+                .collect(Collectors.groupingBy(e -> e.getAttributeValue(attributeName)));
     }
 
     private double calculateEntropyForWholeDataSet() {
@@ -73,6 +83,10 @@ public class DecisionTree {
     }
 
     public double calculateSplitInfo(String attributeName) {
+        if (!TrackDataAi.isValidAttribute(attributeName)) {
+            System.out.println("Invalid attribute: " + attributeName);
+            return 0;
+        }
         double totalSize = trackDataAiData.size();
         if (totalSize == 0) return 0;
 
@@ -87,6 +101,10 @@ public class DecisionTree {
     }
 
     public double calculateGainRatio(String attributeName) {
+        if (!TrackDataAi.isValidAttribute(attributeName)) {
+            System.out.println("Invalid attribute: " + attributeName);
+            return 0;
+        }
         double informationGain = calculateInformationGain(attributeName);
         double splitInfo = calculateSplitInfo(attributeName);
 

@@ -10,4 +10,5 @@ import lombok.NoArgsConstructor;
 public class DayDto {
     private Integer dayId;
     private String dayName;
+    private Boolean status;
 }

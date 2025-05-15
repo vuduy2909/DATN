@@ -46,3 +46,5 @@ build/
 # ====== OS-specific ======
 .DS_Store
 Thumbs.db
+# Ignore SQL dump files
+*.sql

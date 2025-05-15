@@ -77,15 +77,18 @@ const Question = () => {
         if (Object.values(formData).every(value => value !== '')) {
             try {
                 const survey = await collectionService.postRecommend(formData);
-                setSubmitSurveyResponse(survey.recommendedCourses);
-                if (submitSurveyResponse || survey) {
+                if (survey && survey.recommendedCourses && survey.recommendedCourses.length > 0) {
+                    setSubmitSurveyResponse(survey.recommendedCourses);
                     navigate('/collections');
+                } else {
+                    alert(survey?.message || 'Không có khóa học phù hợp!');
                 }
             } catch (error) {
                 console.log(error);
+                alert('Có lỗi xảy ra khi gửi dữ liệu!');
             }
         } else {
-            console.log('Please fill out all fields before submitting.');
+            console.log('Thiếu thông tin, không gửi request!');
         }
     };
 

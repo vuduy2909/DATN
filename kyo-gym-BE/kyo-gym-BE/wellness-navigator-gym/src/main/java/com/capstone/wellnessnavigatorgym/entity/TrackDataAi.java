@@ -17,7 +17,13 @@ public class TrackDataAi {
     private String activity_level;
     private Integer age;
     private String gender;
+    private Double height;
+    private Double weight;
+    private Double waist_circumference;
+    private Double chest_circumference;
     private Double bmi;
+    private String occupation;
+    private String work_environment;
     private String training_goals;
     private String training_history;
     private Boolean effective;
@@ -49,19 +55,54 @@ public class TrackDataAi {
                 return getAge();
             case "gender":
                 return getGender();
+            case "height":
+                return getHeight();
+            case "weight":
+                return getWeight();
+            case "waist_circumference":
+                return getWaist_circumference();
+            case "chest_circumference":
+                return getChest_circumference();
             case "bmi":
                 return getBmi();
+            case "occupation":
+                return getOccupation();
+            case "work_environment":
+                return getWork_environment();
             case "training_goals":
                 return getTraining_goals();
             case "training_history":
                 return getTraining_history();
             case "course_id":
-                return this.course != null ? this.course.getCourseId() : null; // Trả về course_id nếu course không null
+                return this.course != null ? this.course.getCourseId() : null;
             case "effective":
                 return getEffective();
             default:
                 System.out.println("Invalid attribute: " + attributeName);
-                return null; // Hoặc bạn có thể ném một ngoại lệ
+                return null;
+        }
+    }
+
+    public static boolean isValidAttribute(String attributeName) {
+        switch (attributeName) {
+            case "track_data_ai_id":
+            case "activity_level":
+            case "age":
+            case "gender":
+            case "height":
+            case "weight":
+            case "waist_circumference":
+            case "chest_circumference":
+            case "bmi":
+            case "occupation":
+            case "work_environment":
+            case "training_goals":
+            case "training_history":
+            case "course_id":
+            case "effective":
+                return true;
+            default:
+                return false;
         }
     }
 }

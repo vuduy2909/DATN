@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import styles from './Step6.module.css'; // Re-use CSS từ Step6
 import Button from '@mui/material/Button';
-import { Paper, Typography, Box, List, ListItem, ListItemText, Divider, Chip } from '@mui/material';
+import { Paper, Typography, Box, List, ListItem, ListItemText, Divider, Chip, Alert } from '@mui/material';
 
-const Step7 = ({ formData, handlePrevious }) => {
+const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendationResult, loading, error }) => {
     const [analysisComplete, setAnalysisComplete] = useState(false);
     const [bodyAnalysis, setBodyAnalysis] = useState('');
     const [goalFeedback, setGoalFeedback] = useState('');
@@ -16,6 +16,15 @@ const Step7 = ({ formData, handlePrevious }) => {
             setAnalysisComplete(true);
         }, 1500);
     }, []);
+
+    // Effect to handle API recommendation results when they arrive
+    useEffect(() => {
+        if (recommendationResult && recommendationResult.recommendedCourses) {
+            console.log('Received recommendation results:', recommendationResult);
+            // Use the real recommendations from the API if available
+            setAnalysisComplete(true);
+        }
+    }, [recommendationResult]);
 
     const analyzeUserData = () => {
         // Phân tích hình thể dựa trên BMI và body type
@@ -52,7 +61,20 @@ const Step7 = ({ formData, handlePrevious }) => {
         
         setGoalFeedback(goalCompatibility);
         
-        // Đề xuất khóa học dựa trên mục tiêu, tần suất và tình trạng sức khỏe
+        // If we have recommendations from the API, use those
+        if (recommendationResult && recommendationResult.recommendedCourses) {
+            // Process real recommendations
+            setRecommendedCourses(recommendationResult.recommendedCourses.map(course => ({
+                type: course.courseType?.courseTypeName || "General",
+                title: course.courseName,
+                description: course.description || "Personalized recommendation based on your profile",
+                intensity: course.level || "Medium",
+                compatibility: "Recommended for your profile"
+            })));
+            return;
+        }
+        
+        // Otherwise, generate mock recommendations
         const courseRecommendations = [];
         
         if (formData.trainingGoal === "Giảm cân tổng thể" || formData.trainingGoal === "Giảm mỡ, giữ cơ") {
@@ -126,6 +148,9 @@ const Step7 = ({ formData, handlePrevious }) => {
         setRecommendedCourses(courseRecommendations);
     };
 
+    // Show message if we have real recommendations from the API
+    const hasApiRecommendations = !!(recommendationResult && recommendationResult.recommendedCourses && recommendationResult.recommendedCourses.length > 0);
+
     return (
         <div className={styles.groupCard}>
             <div className={styles.wrapCard}>
@@ -182,6 +207,19 @@ const Step7 = ({ formData, handlePrevious }) => {
                 <div className={styles.line}></div>
                 <h4>7. Phân tích và đề xuất chương trình</h4>
                 
+                {loading && (
+                    <Box sx={{ textAlign: 'center', py: 4 }}>
+                        <Typography variant="h6">Đang xử lý dữ liệu và tạo đề xuất...</Typography>
+                        <div className={styles.loadingSpinner}></div>
+                    </Box>
+                )}
+                
+                {error && (
+                    <Alert severity="error" sx={{ my: 2 }}>
+                        {error}
+                    </Alert>
+                )}
+                
                 {!analysisComplete ? (
                     <Box sx={{ textAlign: 'center', py: 4 }}>
                         <Typography variant="h6">Đang phân tích dữ liệu...</Typography>
@@ -189,6 +227,12 @@ const Step7 = ({ formData, handlePrevious }) => {
                     </Box>
                 ) : (
                     <Box sx={{ mt: 3 }}>
+                        {hasApiRecommendations && (
+                            <Alert severity="success" sx={{ mb: 3 }}>
+                                Đã phân tích dữ liệu và tạo đề xuất khóa học phù hợp với thông tin của bạn!
+                            </Alert>
+                        )}
+                        
                         <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
                             <Typography variant="h6" color="error" gutterBottom>
                                 Phân tích hình thể
@@ -265,9 +309,9 @@ const Step7 = ({ formData, handlePrevious }) => {
                         variant="contained"
                         sx={{ marginTop: 10, borderRadius: 55, color: '#fff', backgroundColor: '#CF4044' }}
                         color="error"
-                        href="/courses"
+                        onClick={handleGoToCollections}
                     >
-                        Xem tất cả khóa học
+                        Xem khóa học đề xuất
                     </Button>
                 </div>
             </div>

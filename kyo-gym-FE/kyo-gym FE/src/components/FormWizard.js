@@ -62,18 +62,63 @@ const FormWizard = () => {
       setLoading(true);
       setError('');
       
-      // Gọi API để gửi dữ liệu và nhận đề xuất
-      const result = await UserFormService.submitFormData(formData);
+      // Đảm bảo customerId đã được set
+      if (!formData.customerId) {
+        console.error('Missing customerId in form data');
+        setError('Missing customer ID. Please ensure you are logged in.');
+        return;
+      }
       
+      // Đảm bảo đúng tên trường với backend (chestSize -> bust, waistSize -> waist)
+      const apiFormData = {
+        activity_level: formData.trainingFrequency,
+        age: formData.age,
+        gender: formData.gender,
+        height: formData.height,
+        weight: formData.weight,
+        bmi: formData.weight / Math.pow(formData.height/100, 2), // Tính BMI
+        training_goals: formData.trainingGoal,
+        training_history: formData.desiredFrequency,
+        occupation: formData.occupation,
+        work_environment: formData.workEnvironment,
+        health_issues: formData.healthIssues ? formData.healthIssues.join(',') : '',
+        bust: formData.chestSize, // Đổi tên từ chestSize sang bust
+        waist: formData.waistSize, // Đổi tên từ waistSize sang waist
+        customerId: formData.customerId
+      };
+      
+      console.log('Submitting converted form data:', apiFormData);
+      
+      // Gọi API để gửi dữ liệu và nhận đề xuất
+      const result = await UserFormService.submitFormData(apiFormData);
+      console.log('API response:', result);
+      
+      // Lưu kết quả vào state
       setRecommendationResult(result);
-      // Chuyển đến bước cuối để hiển thị kết quả
-      setActiveStep(6); // Bước 7 (index 6)
+      
+      // Set flag đã có đề xuất vào localStorage
+      localStorage.setItem('hasRecommendation', 'true');
+      localStorage.setItem('selectedCategory', 'Recommend');
+      
+      // Hiển thị step cuối với kết quả đề xuất
+      handleNext();
     } catch (err) {
       console.error('Error submitting form:', err);
       setError(err.message || 'Có lỗi xảy ra khi gửi dữ liệu. Vui lòng thử lại sau.');
     } finally {
       setLoading(false);
     }
+  };
+
+  // Xử lý chuyển hướng sang trang Collections sau khi xem kết quả đề xuất
+  const handleGoToCollections = () => {
+    console.log('Navigating to collections');
+    // Đảm bảo trang Collections sẽ hiển thị tab Recommend
+    localStorage.setItem('hasRecommendation', 'true');
+    localStorage.setItem('selectedCategory', 'Recommend');
+    
+    // Sử dụng window.location.href để tải lại trang thay vì navigate
+    window.location.href = '/collections';
   };
 
   // Hiển thị bước hiện tại
@@ -96,6 +141,7 @@ const FormWizard = () => {
                 formData={formData} 
                 recommendationResult={recommendationResult} 
                 handlePrevious={handleBack}
+                handleGoToCollections={handleGoToCollections}
                 loading={loading}
                 error={error}
                />;

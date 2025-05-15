@@ -3,7 +3,11 @@ import styles from "./Sidebar.module.css";
 import { request } from "../../utils/axiosInstance";
 
 const Sidebar = ({ onCategoryChange, isRecommend }) => {
-  const [selected, setSelected] = useState("All");
+  // Initialize from localStorage if available, otherwise use "All"
+  const [selected, setSelected] = useState(() => {
+    return localStorage.getItem('selectedCategory') || "All";
+  });
+  
   const [categories, setCategories] = useState([
     "Recommend", 
     "All"
@@ -25,8 +29,16 @@ const Sidebar = ({ onCategoryChange, isRecommend }) => {
     fetchCourseTypes();
   }, []);
 
+  // Separate useEffect for handling the initial selection
+  useEffect(() => {
+    // Trigger category change with the initial selected value
+    onCategoryChange(selected);
+  }, [onCategoryChange, selected]);
+
   const handleClick = (itemName) => {
     setSelected(itemName);
+    // Save to localStorage for persistence
+    localStorage.setItem('selectedCategory', itemName);
   };
 
   return (
