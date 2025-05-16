@@ -52,7 +52,7 @@ const CollectionCard = ({ id, title, image, duration }) => {
           viewBox="0 0 414 2"
           fill="none"
         >
-          <path d="M0 1H413.5" stroke="#6A6B6C" stroke-width="0.5" />
+          <path d="M0 1H413.5" stroke="#6A6B6C" strokeWidth="0.5" />
         </svg>
         <div className={styles.footer}>
           <p className={styles.collection_duration}>Duration: {duration}</p>
@@ -68,14 +68,44 @@ const CollectionCard = ({ id, title, image, duration }) => {
 const Collections_card = ({ selectedCategory, recommendedCourses, loading }) => {
   const [dataCourse, setDataCourse] = useState([]);
   const [loadingCourses, setLoadingCourses] = useState(true);
+  const [error, setError] = useState(null);
 
   const getCardsFunction = async () => {
     try {
       setLoadingCourses(true);
+      setError(null);
+      console.log("Starting to fetch courses...");
       const cards = await collectionService.getCards();
+      console.log("API Response:", cards);
+      
+      if (!cards) {
+        console.error("No cards data received from API");
+        setError("No courses data received");
+        return;
+      }
+      
+      if (!Array.isArray(cards)) {
+        console.error("Received data is not an array:", cards);
+        setError("Invalid courses data format");
+        return;
+      }
+
+      if (cards.length === 0) {
+        console.log("Received empty courses array");
+        setError("No courses available");
+        return;
+      }
+
+      console.log("Successfully loaded", cards.length, "courses");
       setDataCourse(cards);
     } catch (error) {
-      console.error(error);
+      console.error("Error details:", {
+        message: error.message,
+        stack: error.stack,
+        response: error.response
+      });
+      setError(error.message || "Error loading courses");
+      setDataCourse([]);
     } finally {
       setLoadingCourses(false);
     }
@@ -86,22 +116,45 @@ const Collections_card = ({ selectedCategory, recommendedCourses, loading }) => 
   }, []);
 
   const filteredCards = dataCourse.filter((course) => {
+    console.log("Filtering course:", course);
     if (selectedCategory === "Recommend") {
-      return recommendedCourses.some(
+      const isRecommended = recommendedCourses.some(
         (recommendedCourse) => recommendedCourse.courseId === course.courseId
       );
+      console.log("Is course recommended?", isRecommended);
+      return isRecommended;
     } else if (selectedCategory === "All") {
       return true;
     } else {
-      return course.courseType.courseTypeName === selectedCategory;
+      const matches = course.courseType.courseTypeName === selectedCategory;
+      console.log("Category match?", matches, "for", course.courseType.courseTypeName);
+      return matches;
     }
   });
+
+  console.log("Filtered cards:", filteredCards.length, "out of", dataCourse.length);
 
   if (loading || loadingCourses) {
     return (
       <div className={styles.loading_container}>
         <CircularProgress color="error" />
         <p>Đang tải khóa học...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={styles.error_container}>
+        <p className={styles.error_message}>{error}</p>
+        <Button 
+          variant="contained" 
+          color="error" 
+          onClick={getCardsFunction}
+          style={{ marginTop: '10px' }}
+        >
+          Thử lại
+        </Button>
       </div>
     );
   }

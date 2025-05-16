@@ -9,9 +9,6 @@ import { collectionService } from "../service/collectionService";
 
 const Workout = () => {
     const { courseId, dayId } = useParams();
-    const displayDayId = parseInt(dayId) || 1;
-    // We'll always use day 1 for API calls until the backend is fixed
-    const apiDayId = 1;
 
     const [selectedVideo, setSelectedVideo] = useState(null);
     const [videos, setVideos] = useState([]);
@@ -21,10 +18,8 @@ const Workout = () => {
         const getExercisesOfCourse = async () => {
             try {
                 setLoading(true);
-                console.log(`Fetching exercises for course ${courseId}, display day ${displayDayId}, API day ${apiDayId}`);
-                
-                // Use apiDayId (1) for all requests until backend is fixed
-                const exercises = await collectionService.getDetailDay(courseId, apiDayId);
+                console.log(`Fetching exercises for course ${courseId}, day ${dayId}`);
+                const exercises = await collectionService.getDetailDay(courseId, dayId);
                 console.log("Exercises fetched:", exercises);
                 
                 if (Array.isArray(exercises) && exercises.length > 0) {
@@ -47,22 +42,19 @@ const Workout = () => {
         if (courseId && dayId) {
             getExercisesOfCourse();
         }
-    }, [courseId, dayId, apiDayId, displayDayId]);
+    }, [courseId, dayId]);
 
     return (
         <div>
             <Header />
             <List_Day />
-            <div style={{ marginTop: '20px', textAlign: 'center', padding: '10px', backgroundColor: '#f8d7da', color: '#721c24', borderRadius: '5px', maxWidth: '800px', margin: '80px auto 0' }}>
-                <strong>Note:</strong> This is a temporary display. The backend needs to be updated to provide unique day IDs and content.
-            </div>
             {loading ? (
                 <div style={{ 
                     display: 'flex', 
                     justifyContent: 'center', 
                     alignItems: 'center', 
                     height: '300px',
-                    marginTop: '20px' 
+                    marginTop: '100px' 
                 }}>
                     Loading exercises...
                 </div>
@@ -80,13 +72,12 @@ const Workout = () => {
                         justifyContent: 'center', 
                         alignItems: 'center', 
                         height: '300px',
-                        marginTop: '20px' 
+                        marginTop: '100px' 
                     }}>
                         No exercises found for this day.
                     </div>
                 )
             )}
-            {/* <Related /> */}
             <Footer />
         </div>
     )

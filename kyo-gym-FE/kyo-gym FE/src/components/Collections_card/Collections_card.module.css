@@ -173,3 +173,57 @@
     color: #CF4044;
     font-weight: 500;
 }
+
+.error_container {
+    width: 100%;
+    height: 400px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    text-align: center;
+}
+
+.error_message {
+    color: #dc3545;
+    font-size: 18px;
+    margin-bottom: 20px;
+}
+
+.bn_left {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 400px;
+}
+
+.bn_left_1 {
+    text-align: center;
+}
+
+.typo {
+    font-size: 24px;
+    margin-bottom: 20px;
+}
+
+.typo_red {
+    color: var(--color-red-body);
+}
+
+.typo_des {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.bn_left_btn {
+    background-color: var(--color-red-body) !important;
+    margin-bottom: 10px !important;
+}
+
+.link {
+    text-decoration: none;
+}

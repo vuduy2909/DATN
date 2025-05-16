@@ -28,6 +28,8 @@ import java.io.File;
 import java.io.InputStreamReader;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping("/api/v1/track-data-ai")
@@ -35,6 +37,13 @@ import java.util.stream.Collectors;
 public class TrackDataAiController {
 
     private static final Logger logger = LoggerFactory.getLogger(TrackDataAiController.class);
+    private static final int MAX_RETRIES = 5;  // Increased from 3 to 5
+    private static final int INITIAL_BACKOFF_MS = 2000;  // Increased initial backoff to 2 seconds
+    private static final double BACKOFF_MULTIPLIER = 2.0;
+    private static final int MAX_BACKOFF_MS = 32000;  // 32 seconds maximum backoff
+    private static final Object claudeApiLock = new Object();
+    private static long lastCallTimestamp = 0;
+    private static final long MIN_CALL_INTERVAL_MS = 3000;  // Increased to 3 seconds minimum between calls
 
     @Autowired
     private ITrackDataAiService trackDataAiService;
@@ -418,92 +427,34 @@ public class TrackDataAiController {
                 return ResponseEntity.badRequest()
                         .body(new ImageAnalysisResponseDTO("Unknown",
                                 "Không có ảnh hoặc ảnh rỗng",
-                                "Vui lòng tải lên ảnh rõ nét hoặc chọn loại cơ thể thủ công."));
+                                "Vui lòng tải lên ảnh rõ nét để nhận được phân tích chi tiết nhất."));
             }
 
-            // Thử gọi Claude API với tối đa 3 lần nếu có lỗi
-            String claudeResponse = null;
-            Exception lastException = null;
-            int maxRetries = 3;
+            // Gọi Claude API với phương thức chính
+            String claudeResponse = callClaudeApi(image, height, weight, gender);
 
-            for (int attempt = 1; attempt <= maxRetries; attempt++) {
-                try {
-                    logger.info("Attempt {} to call Claude API", attempt);
-                    claudeResponse = callClaudeApi(image, height, weight, gender);
-
-                    // Nếu có kết quả (không null) và không chứa thông báo lỗi, thì dừng lại
-                    // Trường hợp nếu Claude từ chối phân tích, vẫn xử lý bình thường
-                    if (claudeResponse != null) {
-                        if (!claudeResponse.contains("Lỗi kết nối") &&
-                                !claudeResponse.contains("Lỗi xác thực") &&
-                                !claudeResponse.contains("Vượt quá giới hạn")) {
-                            break;
-                        }
-                    }
-
-                    // Nếu có lỗi, chờ trước khi thử lại
-                    Thread.sleep(1000 * attempt); // 1s, 2s, 3s delay giữa các lần thử
-                } catch (Exception e) {
-                    lastException = e;
-                    logger.error("Error calling Claude API - attempt {}: {}", attempt, e.getMessage());
-                    if (attempt < maxRetries) {
-                        Thread.sleep(1000 * attempt);
-                    }
-                }
-            }
-
-            // Kiểm tra kết quả cuối cùng
-            if (claudeResponse == null) {
-                // Nếu sau các lần thử vẫn không có kết quả
-                throw new RuntimeException("Không thể kết nối với Claude API sau " + maxRetries + " lần thử", lastException);
-            }
-
-            // Kiểm tra các lỗi dịch vụ
-            if (claudeResponse.contains("Lỗi kết nối") ||
-                    claudeResponse.contains("Lỗi xác thực") ||
-                    claudeResponse.contains("Vượt quá giới hạn") ||
-                    claudeResponse.contains("Dịch vụ Claude API hiện không khả dụng")) {
-                // Trả về lỗi từ Claude API
-                logger.warn("Claude API service error: {}", claudeResponse);
+            // Nếu không nhận được phản hồi hoặc có lỗi
+            if (claudeResponse == null || 
+                claudeResponse.contains("Lỗi kết nối") ||
+                claudeResponse.contains("Lỗi xác thực") ||
+                claudeResponse.contains("Vượt quá giới hạn") ||
+                claudeResponse.contains("Overloaded")) {
+                
+                String errorMessage = "Hệ thống AI đang quá tải. Vui lòng thử lại sau 1-2 phút.";
+                logger.warn("Claude API service error: {}", errorMessage);
                 return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                         .body(new ImageAnalysisResponseDTO("Unknown",
-                                "Lỗi không xác định (503): " + claudeResponse,
-                                "Vui lòng thử lại sau hoặc chọn loại cơ thể thủ công."));
+                                errorMessage,
+                                "Để có kết quả phân tích tốt nhất:\n" +
+                                "1. Sử dụng ảnh toàn thân hoặc nửa người\n" +
+                                "2. Ảnh rõ nét, đủ sáng\n" +
+                                "3. Trang phục gọn gàng để thấy rõ hình dáng cơ thể\n" +
+                                "4. Tránh ảnh có khuôn mặt để được phân tích nhanh hơn"));
             }
 
             // Parse kết quả từ Claude
             ImageAnalysisResponseDTO response = parseClaudeResponse(claudeResponse);
             logger.info("Successfully analyzed image. Body type: {}", response.getBodyType());
-
-            // Kiểm tra nếu Claude từ chối phân tích vì chính sách, thông báo cho người dùng
-            if (response.getBodyType().equals("Unknown") &&
-                    (response.getAnalysis().contains("không thể phân tích") ||
-                            response.getAnalysis().contains("Xin lỗi") ||
-                            response.getAnalysis().contains("khuôn mặt"))) {
-
-                // Thử gọi API với prompt thay thế khác (không đề cập đến khuôn mặt)
-                logger.info("Retrying with alternative prompt due to policy restriction");
-                try {
-                    String altResponse = callClaudeApiAlternative(image, height, weight, gender);
-                    ImageAnalysisResponseDTO altResult = parseClaudeResponse(altResponse);
-
-                    // Nếu kết quả thay thế hoạt động, sử dụng nó
-                    if (!altResult.getBodyType().equals("Unknown")) {
-                        logger.info("Alternative prompt succeeded with body type: {}", altResult.getBodyType());
-                        response = altResult; // Sử dụng kết quả thay thế
-                    }
-                } catch (Exception ex) {
-                    logger.error("Alternative prompt also failed: {}", ex.getMessage());
-                }
-
-                // Nếu vẫn là "Unknown", trả về lỗi chuẩn
-                if (response.getBodyType().equals("Unknown")) {
-                    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                            .body(new ImageAnalysisResponseDTO("Unknown",
-                                    "Không thể phân tích ảnh vì chính sách Claude AI. Hãy chọn ảnh không có khuôn mặt.",
-                                    "Vui lòng sử dụng ảnh chỉ hiển thị cơ thể (không có mặt) hoặc chọn loại cơ thể thủ công."));
-                }
-            }
 
             // Nếu có customerId, lưu kết quả và đề xuất khóa học
             if (customerId != null) {
@@ -520,14 +471,13 @@ public class TrackDataAiController {
                     double bmi = weight / (heightInMeters * heightInMeters);
                     userDataDTO.setBmi(Math.round(bmi * 10.0) / 10.0);
                     
-                    // Sử dụng bodyType từ phân tích ảnh
                     userDataDTO.setBodyType(response.getBodyType());
                     
-                    // Thiết lập các giá trị mặc định cho các trường bắt buộc
-                    userDataDTO.setActivity_level("Moderate");  // Giá trị mặc định
-                    userDataDTO.setAge(30);  // Giá trị mặc định
-                    userDataDTO.setTraining_goals("Weight Management");  // Giá trị mặc định
-                    userDataDTO.setTraining_history("Beginner");  // Giá trị mặc định
+                    // Thiết lập các giá trị mặc định
+                    userDataDTO.setActivity_level("Moderate");
+                    userDataDTO.setAge(30);
+                    userDataDTO.setTraining_goals("Weight Management");
+                    userDataDTO.setTraining_history("Beginner");
                     
                     // Lưu dữ liệu và đề xuất khóa học
                     logger.info("Attempting to recommend courses based on image analysis for customer ID: {}", customerId);
@@ -549,11 +499,113 @@ public class TrackDataAiController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new ImageAnalysisResponseDTO("Unknown",
                             "Không thể phân tích hình ảnh: " + e.getMessage(),
-                            "Vui lòng tải lên ảnh khác hoặc chọn loại cơ thể thủ công."));
+                            "Để có kết quả phân tích tốt nhất:\n" +
+                            "1. Sử dụng ảnh toàn thân hoặc nửa người\n" +
+                            "2. Ảnh rõ nét, đủ sáng\n" +
+                            "3. Trang phục gọn gàng để thấy rõ hình dáng cơ thể\n" +
+                            "4. Tránh ảnh có khuôn mặt để được phân tích nhanh hơn"));
         }
     }
 
     private String callClaudeApi(MultipartFile image, Double height, Double weight, String gender) throws Exception {
+        int retryCount = 0;
+        long backoffMs = INITIAL_BACKOFF_MS;
+        Exception lastException = null;
+
+        while (retryCount < MAX_RETRIES) {
+            try {
+                // Rate limiting check with increased interval
+                synchronized (claudeApiLock) {
+                    long currentTime = System.currentTimeMillis();
+                    long timeSinceLastCall = currentTime - lastCallTimestamp;
+                    if (timeSinceLastCall < MIN_CALL_INTERVAL_MS) {
+                        Thread.sleep(MIN_CALL_INTERVAL_MS - timeSinceLastCall);
+                    }
+                    lastCallTimestamp = System.currentTimeMillis();
+                }
+
+                logger.info("Attempt {} to call Claude API", retryCount + 1);
+                
+                // Make the API call using existing code
+                ResponseEntity<Map> response = makeClaudeApiCall(image, height, weight, gender);
+                
+                if (response.getStatusCode().is2xxSuccessful()) {
+                    logger.info("Claude API call successful on attempt {}", retryCount + 1);
+                    Map responseBody = response.getBody();
+                    if (responseBody != null && responseBody.containsKey("content")) {
+                        List<Map<String, Object>> contentList = (List<Map<String, Object>>) responseBody.get("content");
+                        if (!contentList.isEmpty()) {
+                            Map<String, Object> firstContent = contentList.get(0);
+                            if (firstContent.containsKey("text")) {
+                                return (String) firstContent.get("text");
+                            }
+                        }
+                    }
+                    throw new RuntimeException("Invalid response format from Claude API");
+                }
+            } catch (Exception e) {
+                lastException = e;
+                logger.error("Error on attempt {}: {}", retryCount + 1, e.getMessage());
+
+                // Check if we should retry based on the error type
+                boolean shouldRetry = false;
+                if (e instanceof org.springframework.web.client.HttpServerErrorException) {
+                    org.springframework.web.client.HttpServerErrorException serverError = 
+                        (org.springframework.web.client.HttpServerErrorException) e;
+                    
+                    // Retry on 5xx errors and specifically 529
+                    if (serverError.getStatusCode().is5xxServerError() || 
+                        serverError.getRawStatusCode() == 529) {
+                        shouldRetry = true;
+                        logger.warn("Server error ({}), implementing exponential backoff", 
+                            serverError.getRawStatusCode());
+                    }
+                } else if (e instanceof org.springframework.web.client.ResourceAccessException) {
+                    // Retry on network errors
+                    shouldRetry = true;
+                    logger.warn("Network error, will retry");
+                }
+
+                if (!shouldRetry || retryCount >= MAX_RETRIES - 1) {
+                    break;
+                }
+
+                // Calculate backoff time with jitter
+                long jitter = (long) (Math.random() * 1000); // Add up to 1 second of random jitter
+                long actualBackoff = Math.min(backoffMs + jitter, MAX_BACKOFF_MS);
+                logger.info("Backing off for {} ms before retry attempt {}", actualBackoff, retryCount + 2);
+                Thread.sleep(actualBackoff);
+                
+                backoffMs = Math.min((long) (backoffMs * BACKOFF_MULTIPLIER), MAX_BACKOFF_MS);
+                retryCount++;
+            }
+        }
+
+        // If we've exhausted all retries, return a user-friendly error message
+        logger.error("Failed to call Claude API after {} attempts", MAX_RETRIES);
+        if (lastException != null) {
+            if (lastException instanceof org.springframework.web.client.HttpServerErrorException) {
+                org.springframework.web.client.HttpServerErrorException serverError = 
+                    (org.springframework.web.client.HttpServerErrorException) lastException;
+                
+                if (serverError.getRawStatusCode() == 529) {
+                    return "{\"bodyType\": \"Unknown\", " +
+                           "\"analysis\": \"Xin lỗi, hệ thống AI đang quá tải. Vui lòng thử lại sau 1-2 phút hoặc chọn loại cơ thể thủ công.\", " +
+                           "\"recommendations\": \"Vui lòng thử lại sau khi hệ thống ít tải hơn.\"}";
+                }
+            }
+            
+            return "{\"bodyType\": \"Unknown\", " +
+                   "\"analysis\": \"Có lỗi khi kết nối với hệ thống AI. Chi tiết lỗi: " + lastException.getMessage() + "\", " +
+                   "\"recommendations\": \"Vui lòng thử lại sau hoặc chọn loại cơ thể thủ công.\"}";
+        }
+
+        return "{\"bodyType\": \"Unknown\", " +
+               "\"analysis\": \"Không thể kết nối với hệ thống AI sau nhiều lần thử.\", " +
+               "\"recommendations\": \"Vui lòng thử lại sau hoặc chọn loại cơ thể thủ công.\"}";
+    }
+
+    private ResponseEntity<Map> makeClaudeApiCall(MultipartFile image, Double height, Double weight, String gender) throws Exception {
         // Thiết lập header
         HttpHeaders headers = new HttpHeaders();
         headers.set("x-api-key", claudeApiKey);
@@ -568,13 +620,7 @@ public class TrackDataAiController {
         byte[] imageBytes = image.getBytes();
         String base64Image = Base64.getEncoder().encodeToString(imageBytes);
 
-        // Tạo nội dung yêu cầu
-        Map<String, Object> requestBody = new HashMap<>();
-        // Sử dụng model được cấu hình hoặc dùng giá trị mặc định
-        requestBody.put("model", claudeModel != null ? claudeModel : "claude-3-haiku-20240307");
-        requestBody.put("max_tokens", 1000);
-
-        // Tạo nội dung system message - ĐÃ CẢI TIẾN THEO HƯỚNG MỚI
+        // Tạo nội dung system message
         String systemPrompt = "Bạn là một huấn luyện viên thể hình chuyên nghiệp, có khả năng phân tích hình thể khách quan dựa trên hình ảnh và các thông số. " + 
                 "Khi đánh giá ảnh cơ thể, bạn CHỈ tập trung vào hình dạng cơ thể, phân bố cơ-mỡ, và cấu trúc cơ bắp. " + 
                 "Đây là một ứng dụng fitness nên bạn cần đưa ra phân tích chuyên nghiệp, chi tiết và hữu ích. " +
@@ -584,230 +630,190 @@ public class TrackDataAiController {
                 "Hãy phân tích thật kỹ tỷ lệ mỡ/cơ trong hình ảnh. Đặc biệt chú ý tới phần bụng, hông, ngực và tay để phân loại chính xác. " +
                 "Hãy thật cẩn thận khi phân loại hình thể, đặc biệt là phân biệt giữa 'Normal' và 'Skinny Fat': " +
                 "- Normal: Cơ thể cân đối, ít mỡ bụng, có đường nét cơ bắp khá rõ ràng. " +
-                "- Skinny Fat: Cân nặng có vẻ bình thường nhưng có mỡ bụng, cơ bắp ít và không rõ nét. " +
-                
-                "Khi đánh giá ảnh cơ thể, hãy phân tích chi tiết các yếu tố sau:\n\n" +
-                "1. Tỷ lệ cơ-mỡ: Xác định tỷ lệ cơ-mỡ tương đối (thấp, trung bình, cao), phân bố mỡ chính trên cơ thể (mỡ bụng, mỡ dưới da, mỡ nội tạng).\n" +
-                "2. Đường nét cơ bắp: Đánh giá độ rõ nét của các nhóm cơ (cơ ngực, cơ tay, cơ bụng, cơ chân), sự cân đối giữa các nhóm cơ.\n" +
-                "3. Tỷ lệ cơ thể: Phân tích tỷ lệ vai-eo-hông, chiều dài tay/chân so với thân, sự cân đối tổng thể.\n" +
-                "4. Điểm mạnh/yếu: Xác định 2-3 điểm mạnh và 2-3 điểm yếu rõ ràng nhất của hình thể.\n\n" + 
-                
-                "Dựa trên phân tích, hãy phân loại thân hình vào một trong các nhóm sau và giải thích lý do:\n" + 
-                "- Thin (Gầy): Cơ thể thiếu cân, ít cơ bắp, tỷ lệ mỡ thấp.\n" + 
-                "- Skinny Fat (Gầy có mỡ): Cân nặng có thể bình thường hoặc thấp nhưng tỷ lệ mỡ cao, ít cơ bắp.\n" + 
-                "- Overweight (Thừa cân): Cân nặng và tỷ lệ mỡ cao hơn mức khuyến nghị.\n" + 
-                "- Normal (Bình thường): Cân nặng cân đối, tỷ lệ cơ-mỡ trong mức trung bình.\n" + 
-                "- Fit (Có cơ bắp): Cân nặng hợp lý, tỷ lệ mỡ thấp, cơ bắp rõ nét.\n\n" +
-                
-                "Đề xuất tập luyện cần bao gồm:\n" + 
-                "1. Kế hoạch tổng thể: Mục tiêu tập luyện phù hợp với thể trạng (tăng cơ, giảm mỡ, cân bằng, v.v.).\n" + 
-                "2. Tần suất tập luyện: Số buổi/tuần, thời gian/buổi phù hợp.\n" + 
-                "3. Các bài tập cụ thể (ít nhất 5 bài): Tên bài tập, nhóm cơ mục tiêu, số hiệp/lần lặp lại.\n" + 
-                "4. Dinh dưỡng: Hướng dẫn ngắn gọn về chế độ ăn phù hợp (lượng protein, carbs, chất béo).\n" + 
-                "5. Cardio và nghỉ ngơi: Đề xuất về cardio và thời gian nghỉ ngơi/phục hồi.\n\n" +
-                
-                "Mục tiêu của bạn là đưa ra đánh giá cơ thể chuyên nghiệp, khách quan và hữu ích cho khách hàng. " +
-                "Không phân tích các phần không liên quan đến thể hình như khuôn mặt nếu có. " +
-                "Hãy trả về CHÍNH XÁC định dạng JSON với cấu trúc sau:" +
-                "{\n" +
-                "  \"bodyType\": \"[Loại hình thể - chọn một trong các loại: Thin (gầy), Skinny Fat (gầy có mỡ), Overweight (thừa cân), Normal (bình thường), hoặc Fit (có cơ bắp)]\",\n" +
-                "  \"analysis\": \"[Phân tích chi tiết theo 5 yếu tố đã nêu ở trên, với ngôn ngữ TIẾNG VIỆT rõ ràng, dễ hiểu]\",\n" +
-                "  \"recommendations\": \"[Đề xuất chi tiết 5 khía cạnh về tập luyện và dinh dưỡng như đã nêu ở trên, BẰNG TIẾNG VIỆT]\"\n" +
-                "}";
-        
-        // Thêm system message như một tham số cấp cao
-        requestBody.put("system", systemPrompt);
-        
-        List<Map<String, Object>> messages = new ArrayList<>();
-        
-        // Chỉ thêm user message
-        Map<String, Object> userMessage = new HashMap<>();
-        userMessage.put("role", "user");
-        
-        // Tạo nội dung tin nhắn user - ĐÃ CẢI TIẾN
+                "- Skinny Fat: Cân nặng có vẻ bình thường nhưng có mỡ bụng, cơ bắp ít và không rõ nét. ";
+
+        // Tạo nội dung user message
         String prompt = "Hãy phân tích hình thể cơ thể trong ảnh này (bỏ qua khuôn mặt nếu có). " + 
                 "Thông số cơ thể: Cao " + height + "cm, nặng " + weight + "kg, giới tính: " + gender + ". " +
                 "Dựa vào hình ảnh và chỉ số BMI = " + Math.round((weight / Math.pow(height/100, 2)) * 10) / 10.0 + ", hãy phân tích các yếu tố sau:\n\n" +
-                
                 "1. Phân loại hình thể (chọn MỘT loại phù hợp nhất): Thin (gầy), Skinny Fat (gầy có mỡ), Overweight (thừa cân), Normal (bình thường), hoặc Fit (có cơ bắp).\n\n" +
-                
                 "2. Phân tích chi tiết (ít nhất 150 từ):\n" + 
                 "   - Tỷ lệ cơ-mỡ và phân bố\n" + 
                 "   - Đường nét cơ bắp và sự rõ ràng\n" + 
                 "   - Tỷ lệ cơ thể tổng thể\n" + 
                 "   - 2-3 điểm mạnh rõ ràng nhất\n" + 
                 "   - 2-3 điểm yếu cần cải thiện\n\n" +
-                
                 "3. Đề xuất chi tiết (ít nhất 200 từ):\n" + 
                 "   - Kế hoạch tập luyện tổng thể phù hợp nhất\n" + 
                 "   - Tần suất tập luyện lý tưởng (số buổi/tuần, thời gian/buổi)\n" + 
                 "   - Liệt kê ít nhất 5 bài tập cụ thể (tên bài, nhóm cơ, số hiệp/lần lặp lại)\n" + 
                 "   - Hướng dẫn dinh dưỡng phù hợp (lượng protein, carbs, chất béo)\n" + 
                 "   - Đề xuất về cardio và thời gian nghỉ ngơi/phục hồi\n\n" +
-                
-                "Hãy trả về KẾT QUẢ DẠNG JSON với 3 trường: bodyType, analysis, và recommendations. " +
-                "TRẢ LỜI HOÀN TOÀN BẰNG TIẾNG VIỆT với ngôn ngữ dễ hiểu nhưng chuyên nghiệp, tránh dùng tiếng Anh trừ các thuật ngữ thông dụng. " +
-                "QUAN TRỌNG: Sử dụng từ 'bạn' thay vì 'người này' khi đề cập đến chủ nhân của hình thể trong phân tích.";
+                "Hãy trả về KẾT QUẢ DẠNG JSON với 3 trường: bodyType, analysis, và recommendations.";
 
-        List<Map<String, Object>> content = new ArrayList<>();
+        // Create the messages array with proper structure
+        List<Map<String, Object>> messages = new ArrayList<>();
+        Map<String, Object> userMessage = new HashMap<>();
+        userMessage.put("role", "user");
 
-        // Thêm nội dung text
+        // Create the content array for the message
+        List<Map<String, Object>> contents = new ArrayList<>();
+        
+        // Add text content
         Map<String, Object> textContent = new HashMap<>();
         textContent.put("type", "text");
         textContent.put("text", prompt);
-        content.add(textContent);
+        contents.add(textContent);
 
-        // Thêm nội dung hình ảnh
+        // Add image content
         Map<String, Object> imageContent = new HashMap<>();
         imageContent.put("type", "image");
-        Map<String, String> imageData = new HashMap<>();
-        imageData.put("type", "base64");
-        imageData.put("media_type", image.getContentType());
-        imageData.put("data", base64Image);
-        imageContent.put("source", imageData);
-        content.add(imageContent);
+        Map<String, String> source = new HashMap<>();
+        source.put("type", "base64");
+        source.put("media_type", image.getContentType());
+        source.put("data", base64Image);
+        imageContent.put("source", source);
+        contents.add(imageContent);
 
-        userMessage.put("content", content);
+        // Add content to the message
+        userMessage.put("content", contents);
         messages.add(userMessage);
+
+        // Create the complete request body
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", claudeModel != null ? claudeModel : "claude-3-haiku-20240307");
         requestBody.put("messages", messages);
+        requestBody.put("max_tokens", 1000);
+        requestBody.put("temperature", 0.7);
+        requestBody.put("system", systemPrompt);
 
-        // Gửi yêu cầu và nhận kết quả
-        try {
-            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-            logger.info("Sending request to Claude API with model: {}", claudeModel);
-            logger.info("Request contains system message as top-level parameter + user prompt");
+        // Log the request structure for debugging
+        logger.debug("Request body structure: {}", new ObjectMapper().writeValueAsString(requestBody));
 
-            ResponseEntity<Map> response = restTemplate.exchange(claudeApiUrl, HttpMethod.POST, entity, Map.class);
-            HttpStatus statusCode = response.getStatusCode();
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+        logger.info("Sending request to Claude API with model: {}", claudeModel);
 
-            if (statusCode.is2xxSuccessful()) {
-                logger.info("Claude API call successful with status: {}", statusCode);
-
-                // Parse và trả về kết quả
-                Map responseBody = response.getBody();
-                logger.debug("Claude API response received");
-
-                // Thử phương pháp 1: Parse đứng đắn
-                try {
-                    ObjectMapper objectMapper = new ObjectMapper();
-
-                    if (responseBody != null && responseBody.containsKey("content")) {
-                        List<Map<String, Object>> contentList = (List<Map<String, Object>>) responseBody.get("content");
-                        if (!contentList.isEmpty()) {
-                            Map<String, Object> firstContent = contentList.get(0);
-                            if (firstContent.containsKey("text")) {
-                                String text = (String) firstContent.get("text");
-                                logger.info("Successfully parsed Claude response");
-                                return text;
-                            }
-                        }
-                    }
-
-                    // Nếu cách trên không được, thử cách khác
-                    String jsonString = objectMapper.writeValueAsString(responseBody);
-                    if (jsonString.contains("\"content\":")) {
-                        try {
-                            JsonNode rootNode = objectMapper.readTree(jsonString);
-                            JsonNode contentNode = rootNode.get("content");
-                            if (contentNode != null && contentNode.isArray() && contentNode.size() > 0) {
-                                JsonNode firstContentNode = contentNode.get(0);
-                                if (firstContentNode.has("text")) {
-                                    String text = firstContentNode.get("text").asText();
-                                    logger.info("Successfully parsed Claude response with JsonNode");
-                                    return text;
-                                }
-                            }
-                        } catch (Exception e) {
-                            logger.error("Error parsing JSON with JsonNode: {}", e.getMessage());
-                        }
-                    }
-                } catch (Exception e) {
-                    logger.error("Error converting response to JSON: {}", e.getMessage());
-                }
-
-                // Nếu không thể parse một cách chuẩn, trả về thông báo lỗi
-                return "{\"bodyType\": \"Normal\", \"analysis\": \"Không thể phân tích chi tiết từ AI. Có lỗi khi xử lý phản hồi.\", \"recommendations\": \"Đề xuất mặc định: Tập trung vào các bài tập cardio và cường độ vừa phải.\"}";
-            } else {
-                logger.error("Claude API call failed with status: {}", statusCode);
-                return "{\"bodyType\": \"Normal\", \"analysis\": \"Lỗi kết nối tới Claude API. Mã trạng thái: " + statusCode + "\", \"recommendations\": \"Đề xuất mặc định: Tập trung vào các bài tập cardio và cường độ vừa phải.\"}";
-            }
-        } catch (Exception e) {
-            logger.error("Error when calling Claude API: {}", e.getMessage(), e);
-
-            // Trả về JSON mặc định với thông báo lỗi
-            if (e instanceof org.springframework.web.client.HttpClientErrorException) {
-                org.springframework.web.client.HttpClientErrorException clientError = (org.springframework.web.client.HttpClientErrorException)e;
-                logger.error("HTTP Client Error: {} - {}", clientError.getStatusCode(), clientError.getResponseBodyAsString());
-
-                if (clientError.getStatusCode() == HttpStatus.UNAUTHORIZED) {
-                    return "{\"bodyType\": \"Normal\", \"analysis\": \"Lỗi xác thực với Claude API. Kiểm tra API key: " + clientError.getStatusText() + "\", \"recommendations\": \"Đề xuất mặc định: Tập trung vào các bài tập cardio và cường độ vừa phải.\"}";
-                } else if (clientError.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
-                    return "{\"bodyType\": \"Normal\", \"analysis\": \"Vượt quá giới hạn yêu cầu API. Vui lòng chờ một lúc rồi thử lại.\", \"recommendations\": \"Đề xuất mặc định: Tập trung vào các bài tập cardio và cường độ vừa phải.\"}";
-                } else if (clientError.getStatusCode() == HttpStatus.BAD_REQUEST) {
-                    return "{\"bodyType\": \"Normal\", \"analysis\": \"Yêu cầu không hợp lệ. Lỗi: " + clientError.getResponseBodyAsString() + "\", \"recommendations\": \"Đề xuất mặc định: Tập trung vào các bài tập cardio và cường độ vừa phải.\"}";
-                }
-            } else if (e instanceof org.springframework.web.client.HttpServerErrorException) {
-                org.springframework.web.client.HttpServerErrorException serverError = (org.springframework.web.client.HttpServerErrorException)e;
-                logger.error("HTTP Server Error: {} - {}", serverError.getStatusCode(), serverError.getResponseBodyAsString());
-
-                if (serverError.getStatusCode() == HttpStatus.SERVICE_UNAVAILABLE) {
-                    return "{\"bodyType\": \"Normal\", \"analysis\": \"Dịch vụ Claude API hiện không khả dụng. Vui lòng thử lại sau.\", \"recommendations\": \"Đề xuất mặc định: Tập trung vào các bài tập cardio và cường độ vừa phải.\"}";
-                }
-            } else if (e instanceof org.springframework.web.client.ResourceAccessException) {
-                logger.error("Network error: {}", e.getMessage());
-                return "{\"bodyType\": \"Normal\", \"analysis\": \"Lỗi mạng khi kết nối đến Claude API. Hãy kiểm tra kết nối mạng của bạn.\", \"recommendations\": \"Đề xuất mặc định: Tập trung vào các bài tập cardio và cường độ vừa phải.\"}";
-            }
-
-            if (e.getMessage().contains("401")) {
-                return "{\"bodyType\": \"Normal\", \"analysis\": \"Lỗi xác thực với Claude API. Vui lòng kiểm tra API key.\", \"recommendations\": \"Đề xuất mặc định: Tập trung vào các bài tập cardio và cường độ vừa phải.\"}";
-            } else if (e.getMessage().contains("429")) {
-                return "{\"bodyType\": \"Normal\", \"analysis\": \"Vượt quá hạn mức cuộc gọi API. Vui lòng thử lại sau.\", \"recommendations\": \"Đề xuất mặc định: Tập trung vào các bài tập cardio và cường độ vừa phải.\"}";
-            } else {
-                return "{\"bodyType\": \"Normal\", \"analysis\": \"Lỗi kết nối tới Claude API: " + e.getMessage() + "\", \"recommendations\": \"Đề xuất mặc định: Tập trung vào các bài tập cardio và cường độ vừa phải.\"}";
-            }
-        }
+        return restTemplate.exchange(claudeApiUrl, HttpMethod.POST, entity, Map.class);
     }
 
     private ImageAnalysisResponseDTO parseClaudeResponse(String claudeResponse) {
-        logger.info("Parsing Claude response: {}", claudeResponse);
+        logger.info("Parsing Claude response");
         ObjectMapper objectMapper = new ObjectMapper();
 
         try {
-            // Tìm vị trí JSON đầu tiên trong chuỗi trả về
-            int startIndex = claudeResponse.indexOf("{");
-            int endIndex = claudeResponse.lastIndexOf("}") + 1;
-            if (startIndex >= 0 && endIndex > startIndex) {
-                String jsonPart = claudeResponse.substring(startIndex, endIndex);
+            // Clean and normalize the response string
+            String normalizedResponse = claudeResponse.trim()
+                    .replaceAll("\\r\\n|\\r|\\n", " ") // Replace all types of newlines with space
+                    .replaceAll("\\s+", " "); // Normalize multiple spaces to single space
 
-                // Thử parse trực tiếp
+            // First try to find JSON in the response using regex
+            String jsonPattern = "\\{[^{}]*\\}";
+            Pattern pattern = Pattern.compile(jsonPattern);
+            Matcher matcher = pattern.matcher(normalizedResponse);
+
+            // Find the largest JSON object in the response
+            String largestJson = "";
+            while (matcher.find()) {
+                String found = matcher.group();
+                if (found.length() > largestJson.length()) {
+                    largestJson = found;
+                }
+            }
+
+            // If we found a JSON object, try to parse it
+            if (!largestJson.isEmpty()) {
                 try {
-                    return objectMapper.readValue(jsonPart, ImageAnalysisResponseDTO.class);
+                    // Configure ObjectMapper to be more lenient
+                    objectMapper.configure(com.fasterxml.jackson.core.JsonParser.Feature.ALLOW_UNQUOTED_FIELD_NAMES, true);
+                    objectMapper.configure(com.fasterxml.jackson.core.JsonParser.Feature.ALLOW_SINGLE_QUOTES, true);
+                    
+                    // Try to parse directly to ImageAnalysisResponseDTO
+                    return objectMapper.readValue(largestJson, ImageAnalysisResponseDTO.class);
                 } catch (Exception e) {
-                    logger.error("Could not parse JSON to ImageAnalysisResponseDTO: {}", e.getMessage());
-                    // Nếu không thể parse trực tiếp, thử parse thành JsonNode
+                    logger.warn("Could not parse JSON directly to DTO, trying JsonNode approach: {}", e.getMessage());
+                    
+                    // Try parsing as JsonNode
                     try {
-                        JsonNode jsonNode = objectMapper.readTree(jsonPart);
+                        JsonNode jsonNode = objectMapper.readTree(largestJson);
                         ImageAnalysisResponseDTO result = new ImageAnalysisResponseDTO();
-                        result.setBodyType(jsonNode.has("bodyType") ? jsonNode.get("bodyType").asText() : "Normal");
-                        result.setAnalysis(jsonNode.has("analysis") ? jsonNode.get("analysis").asText() : "Không tìm thấy phân tích trong phản hồi.");
-                        result.setRecommendations(jsonNode.has("recommendations") ? jsonNode.get("recommendations").asText() : "Không tìm thấy đề xuất trong phản hồi.");
+                        
+                        // Extract fields with proper null checks
+                        if (jsonNode.has("bodyType")) {
+                            result.setBodyType(jsonNode.get("bodyType").asText());
+                        } else {
+                            result.setBodyType("Normal");
+                        }
+                        
+                        if (jsonNode.has("analysis")) {
+                            result.setAnalysis(jsonNode.get("analysis").asText());
+                        } else {
+                            result.setAnalysis("Không thể phân tích chi tiết. Vui lòng thử lại.");
+                        }
+                        
+                        if (jsonNode.has("recommendations")) {
+                            result.setRecommendations(jsonNode.get("recommendations").asText());
+                        } else if (jsonNode.has("recom")) { // Check alternative field name
+                            result.setRecommendations(jsonNode.get("recom").asText());
+                        } else {
+                            result.setRecommendations("Đề xuất mặc định: Tập trung vào các bài tập cardio và cường độ vừa phải.");
+                        }
+                        
                         return result;
                     } catch (Exception ex) {
                         logger.error("Error parsing with JsonNode: {}", ex.getMessage());
+                        throw ex;
                     }
                 }
             }
-        } catch (Exception e) {
-            logger.error("Error extracting JSON: {}", e.getMessage());
-        }
 
-        // Nếu không thể parse, trả về kết quả mặc định với toàn bộ phản hồi
-        ImageAnalysisResponseDTO fallback = new ImageAnalysisResponseDTO();
-        fallback.setBodyType("Normal");
-        fallback.setAnalysis("Không thể phân tích chi tiết từ AI. (Không tách được JSON từ phản hồi)");
-        fallback.setRecommendations("Đề xuất mặc định: Tập trung vào các bài tập cardio và cường độ vừa phải.");
-        logger.error("Claude response (for debug): {}", claudeResponse);
-        return fallback;
+            // If no valid JSON found, try to extract information using regex
+            Pattern bodyTypePattern = Pattern.compile("\"bodyType\"\\s*:\\s*\"([^\"]+)\"");
+            Pattern analysisPattern = Pattern.compile("\"analysis\"\\s*:\\s*\"([^\"]+)\"");
+            Pattern recommendationsPattern = Pattern.compile("\"recommendations\"\\s*:\\s*\"([^\"]+)\"");
+
+            Matcher bodyTypeMatcher = bodyTypePattern.matcher(normalizedResponse);
+            Matcher analysisMatcher = analysisPattern.matcher(normalizedResponse);
+            Matcher recommendationsMatcher = recommendationsPattern.matcher(normalizedResponse);
+
+            ImageAnalysisResponseDTO result = new ImageAnalysisResponseDTO();
+            
+            // Extract values with proper error handling
+            try {
+                result.setBodyType(bodyTypeMatcher.find() ? bodyTypeMatcher.group(1) : "Normal");
+            } catch (Exception e) {
+                logger.warn("Error extracting bodyType: {}", e.getMessage());
+                result.setBodyType("Normal");
+            }
+
+            try {
+                result.setAnalysis(analysisMatcher.find() ? analysisMatcher.group(1) : 
+                    "Không thể trích xuất phân tích từ phản hồi AI. Vui lòng thử lại.");
+            } catch (Exception e) {
+                logger.warn("Error extracting analysis: {}", e.getMessage());
+                result.setAnalysis("Không thể trích xuất phân tích từ phản hồi AI. Vui lòng thử lại.");
+            }
+
+            try {
+                result.setRecommendations(recommendationsMatcher.find() ? recommendationsMatcher.group(1) : 
+                    "Đề xuất mặc định: Tập trung vào các bài tập cardio và cường độ vừa phải.");
+            } catch (Exception e) {
+                logger.warn("Error extracting recommendations: {}", e.getMessage());
+                result.setRecommendations("Đề xuất mặc định: Tập trung vào các bài tập cardio và cường độ vừa phải.");
+            }
+
+            return result;
+
+        } catch (Exception e) {
+            logger.error("Error parsing Claude response: {}", e.getMessage());
+            logger.debug("Claude response for debugging: {}", claudeResponse);
+
+            // Return a fallback response with error information
+            ImageAnalysisResponseDTO fallback = new ImageAnalysisResponseDTO();
+            fallback.setBodyType("Normal");
+            fallback.setAnalysis("Không thể phân tích chi tiết. Lỗi xử lý phản hồi: " + e.getMessage());
+            fallback.setRecommendations("Đề xuất mặc định: Tập trung vào các bài tập cardio và cường độ vừa phải.");
+            return fallback;
+        }
     }
 
     /**
@@ -815,6 +821,16 @@ public class TrackDataAiController {
      * Sử dụng cách tiếp cận khác với prompt không đề cập đến khuôn mặt
      */
     private String callClaudeApiAlternative(MultipartFile image, Double height, Double weight, String gender) throws Exception {
+        // Rate limiting check
+        synchronized (claudeApiLock) {
+            long currentTime = System.currentTimeMillis();
+            long timeSinceLastCall = currentTime - lastCallTimestamp;
+            if (timeSinceLastCall < MIN_CALL_INTERVAL_MS) {
+                Thread.sleep(MIN_CALL_INTERVAL_MS - timeSinceLastCall);
+            }
+            lastCallTimestamp = System.currentTimeMillis();
+        }
+
         // Thiết lập header
         HttpHeaders headers = new HttpHeaders();
         headers.set("x-api-key", claudeApiKey);
@@ -839,12 +855,10 @@ public class TrackDataAiController {
         requestBody.put("system", systemPrompt);
 
         List<Map<String, Object>> messages = new ArrayList<>();
-
-        // Chỉ dùng một tin nhắn người dùng
         Map<String, Object> userMessage = new HashMap<>();
         userMessage.put("role", "user");
 
-        // Tạo nội dung tin nhắn người dùng không đề cập đến khuôn mặt
+        // Create user message content
         String prompt = "Tôi là huấn luyện viên fitness. Hãy giúp tôi phân tích thân hình cơ thể trong ảnh này. " +
                 "Thông số cơ thể: Cao " + height + "cm, nặng " + weight + "kg, giới tính: " + gender + ". " +
                 "Bạn có thể phân tích và phân loại hình thể này không? " +
@@ -853,14 +867,11 @@ public class TrackDataAiController {
                 "Cho tôi kết quả dạng JSON có bodyType, analysis, và recommendations. Đừng kèm giải thích, chỉ trả kết quả JSON.";
 
         List<Map<String, Object>> content = new ArrayList<>();
-
-        // Thêm nội dung text
         Map<String, Object> textContent = new HashMap<>();
         textContent.put("type", "text");
         textContent.put("text", prompt);
         content.add(textContent);
 
-        // Thêm nội dung hình ảnh
         Map<String, Object> imageContent = new HashMap<>();
         imageContent.put("type", "image");
         Map<String, String> imageData = new HashMap<>();
@@ -874,42 +885,92 @@ public class TrackDataAiController {
         messages.add(userMessage);
         requestBody.put("messages", messages);
 
-        // Gửi yêu cầu và nhận kết quả
-        try {
-            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-            logger.info("Sending alternative request to Claude API");
+        int retryCount = 0;
+        long backoffMs = INITIAL_BACKOFF_MS;
+        Exception lastException = null;
 
-            ResponseEntity<Map> response = restTemplate.exchange(claudeApiUrl, HttpMethod.POST, entity, Map.class);
-            HttpStatus statusCode = response.getStatusCode();
+        while (retryCount < MAX_RETRIES) {
+            try {
+                HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+                logger.info("Alternative approach: Attempt {} to call Claude API", retryCount + 1);
 
-            if (statusCode.is2xxSuccessful()) {
-                logger.info("Alternative Claude API call successful");
+                ResponseEntity<Map> response = restTemplate.exchange(claudeApiUrl, HttpMethod.POST, entity, Map.class);
+                HttpStatus statusCode = response.getStatusCode();
 
-                // Parse và trả về kết quả
-                Map responseBody = response.getBody();
+                if (statusCode.is2xxSuccessful()) {
+                    logger.info("Alternative Claude API call successful");
+                    Map responseBody = response.getBody();
 
-                if (responseBody != null && responseBody.containsKey("content")) {
-                    List<Map<String, Object>> contentList = (List<Map<String, Object>>) responseBody.get("content");
-                    if (!contentList.isEmpty()) {
-                        Map<String, Object> firstContent = contentList.get(0);
-                        if (firstContent.containsKey("text")) {
-                            String text = (String) firstContent.get("text");
-                            logger.info("Successfully parsed alternative Claude response");
-                            return text;
+                    if (responseBody != null && responseBody.containsKey("content")) {
+                        List<Map<String, Object>> contentList = (List<Map<String, Object>>) responseBody.get("content");
+                        if (!contentList.isEmpty()) {
+                            Map<String, Object> firstContent = contentList.get(0);
+                            if (firstContent.containsKey("text")) {
+                                return (String) firstContent.get("text");
+                            }
                         }
                     }
+
+                    throw new RuntimeException("Invalid response format from Claude API");
+                }
+            } catch (Exception e) {
+                lastException = e;
+                logger.error("Alternative approach: Error on attempt {}: {}", retryCount + 1, e.getMessage());
+
+                // Check if we should retry based on the error type
+                boolean shouldRetry = false;
+                if (e instanceof org.springframework.web.client.HttpServerErrorException) {
+                    org.springframework.web.client.HttpServerErrorException serverError = 
+                        (org.springframework.web.client.HttpServerErrorException) e;
+                    
+                    // Retry on 5xx errors
+                    if (serverError.getStatusCode().is5xxServerError()) {
+                        shouldRetry = true;
+                    }
+                    
+                    // Special handling for 529 Overloaded error
+                    if (serverError.getRawStatusCode() == 529) {
+                        logger.warn("Alternative approach: Claude API is overloaded. Implementing exponential backoff.");
+                        shouldRetry = true;
+                    }
+                } else if (e instanceof org.springframework.web.client.ResourceAccessException) {
+                    // Retry on network errors
+                    shouldRetry = true;
                 }
 
-                // Nếu không thể parse, trả về thông báo lỗi
-                return "{\"bodyType\": \"Normal\", \"analysis\": \"Không thể phân tích chi tiết từ cách tiếp cận thay thế.\", \"recommendations\": \"Đề xuất mặc định: Tập trung vào các bài tập cardio và cường độ vừa phải.\"}";
-            } else {
-                logger.error("Alternative Claude API call failed with status: {}", statusCode);
-                return "{\"bodyType\": \"Normal\", \"analysis\": \"Lỗi kết nối tới Claude API với cách tiếp cận thay thế. Mã trạng thái: " + statusCode + "\", \"recommendations\": \"Đề xuất mặc định: Tập trung vào các bài tập cardio và cường độ vừa phải.\"}";
+                if (!shouldRetry || retryCount >= MAX_RETRIES - 1) {
+                    break;
+                }
+
+                // Calculate backoff time with jitter
+                long jitter = (long) (Math.random() * 1000); // Add up to 1 second of random jitter
+                long actualBackoff = Math.min(backoffMs + jitter, MAX_BACKOFF_MS);
+                logger.info("Alternative approach: Backing off for {} ms before retry", actualBackoff);
+                Thread.sleep(actualBackoff);
+                
+                backoffMs = Math.min((long) (backoffMs * BACKOFF_MULTIPLIER), MAX_BACKOFF_MS);
+                retryCount++;
             }
-        } catch (Exception e) {
-            logger.error("Error when calling alternative Claude API: {}", e.getMessage());
-            return "{\"bodyType\": \"Normal\", \"analysis\": \"Lỗi khi gọi Claude API với cách tiếp cận thay thế: " + e.getMessage() + "\", \"recommendations\": \"Đề xuất mặc định: Tập trung vào các bài tập cardio và cường độ vừa phải.\"}";
         }
+
+        // If we've exhausted all retries, handle the final error
+        if (lastException != null) {
+            if (lastException instanceof org.springframework.web.client.HttpServerErrorException) {
+                org.springframework.web.client.HttpServerErrorException serverError = 
+                    (org.springframework.web.client.HttpServerErrorException) lastException;
+                
+                if (serverError.getRawStatusCode() == 529) {
+                    return "{\"bodyType\": \"Normal\", \"analysis\": \"Claude API hiện đang quá tải (phương pháp thay thế). Vui lòng thử lại sau vài phút.\", " +
+                           "\"recommendations\": \"Đề xuất mặc định: Tập trung vào các bài tập cardio và cường độ vừa phải.\"}";
+                }
+            }
+            
+            return "{\"bodyType\": \"Normal\", \"analysis\": \"Lỗi kết nối tới Claude API (phương pháp thay thế) sau " + MAX_RETRIES + 
+                   " lần thử: " + lastException.getMessage() + "\", \"recommendations\": \"Đề xuất mặc định: Tập trung vào các bài tập cardio và cường độ vừa phải.\"}";
+        }
+
+        return "{\"bodyType\": \"Normal\", \"analysis\": \"Không thể kết nối tới Claude API (phương pháp thay thế) sau nhiều lần thử.\", " +
+               "\"recommendations\": \"Đề xuất mặc định: Tập trung vào các bài tập cardio và cường độ vừa phải.\"}";
     }
 
     @GetMapping("/rebuild-decision-tree")
