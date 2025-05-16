@@ -1,9 +1,11 @@
 package com.capstone.wellnessnavigatorgym.service.impl;
 
 import com.capstone.wellnessnavigatorgym.dto.course.CourseDayDetailDto;
+import com.capstone.wellnessnavigatorgym.dto.course.CourseDetailsOfExerciseDto;
 import com.capstone.wellnessnavigatorgym.dto.course.CourseTypeDto;
 import com.capstone.wellnessnavigatorgym.dto.day.DayDto;
 import com.capstone.wellnessnavigatorgym.dto.day.DayDetailDto;
+import com.capstone.wellnessnavigatorgym.dto.exercise.ExerciseDto;
 import com.capstone.wellnessnavigatorgym.entity.*;
 import com.capstone.wellnessnavigatorgym.repository.ICourseDayRepository;
 import com.capstone.wellnessnavigatorgym.repository.ICourseRepository;
@@ -16,7 +18,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import javax.persistence.Tuple;
 import java.util.Comparator;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -157,8 +161,29 @@ public class CourseDayServiceImpl implements ICourseDayService {
         dayDetailDto.setDayName("Day " + courseDay.getDayId());
         dayDetailDto.setStatus(courseDay.getStatus());
         
-        // TODO: Fetch exercises for this day and set them in dayDetailDto
-        // This will require additional repository and service methods
+        // Lấy danh sách bài tập cho ngày cụ thể
+        List<Tuple> exerciseTuples = courseRepository.getCourseDetailsByDayAndCourseOfExercise(courseId, dayId);
+        
+        if (exerciseTuples != null && !exerciseTuples.isEmpty()) {
+            List<ExerciseDto> exerciseDtos = exerciseTuples.stream()
+                .map(tuple -> {
+                    ExerciseDto dto = new ExerciseDto();
+                    dto.setExerciseId(tuple.get("exercise_id", Integer.class));
+                    dto.setExerciseName(tuple.get("exercise_name", String.class));
+                    dto.setDescription(tuple.get("exercise_description", String.class));
+                    dto.setVideoUrl(tuple.get("video_url", String.class));
+                    dto.setStatus(true); // Default to true since these are active exercises
+                    return dto;
+                })
+                .collect(Collectors.toList());
+            
+            dayDetailDto.setExercises(exerciseDtos);
+            logger.debug("Found {} exercises for day {} in course {}", 
+                exerciseDtos.size(), dayId, courseId);
+        } else {
+            logger.warn("No exercises found for day {} in course {}", dayId, courseId);
+            dayDetailDto.setExercises(Collections.emptyList());
+        }
         
         return dayDetailDto;
     }

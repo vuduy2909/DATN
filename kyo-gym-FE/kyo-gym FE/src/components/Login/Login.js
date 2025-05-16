@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import axios from 'axios';
 import styles from './Login.module.css'
 import { useNavigate } from 'react-router-dom';
@@ -8,7 +8,7 @@ import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 
 const Login = () => {
-    const { user, setUser } = useAuth();
+    const { setUser } = useAuth();
     const [username, setUsername] = useState('');
     const [usernameError, setUsernameError] = useState('');
     const [password, setPassword] = useState('');
@@ -28,11 +28,14 @@ const Login = () => {
             if (response.status === 200) {
                 const token = response.data.token;
                 localStorage.setItem('token', token);
-                setUser(token);
-                if (response.data.roles == 'ROLE_ADMIN') {
-                    navigate('/admin')
+                
+                // Set user and check admin status in one step
+                if (response.data.roles === 'ROLE_ADMIN') {
+                    setUser(token);
+                    navigate('/admin', { replace: true });
                 } else {
-                    navigate('/')
+                    setUser(token);
+                    navigate('/', { replace: true });
                 }
             } else {
                 setUsernameError('Username không hợp lệ')
@@ -48,12 +51,6 @@ const Login = () => {
         navigate('/register');
     };
 
-    useEffect(() => {
-        if (user) {
-            navigate('/');
-        }
-    }, [navigate, user]);
-
     const handleGoogleLoginSuccess = async (response) => {
         try {
             const googleToken = response.credential;
@@ -64,8 +61,14 @@ const Login = () => {
             if (googleResponse.status === 200) {
                 const token = googleResponse.data.token;
                 localStorage.setItem('token', token);
-                setUser(token);
-                navigate('/');
+                
+                if (googleResponse.data.roles === 'ROLE_ADMIN') {
+                    setUser(token);
+                    navigate('/admin', { replace: true });
+                } else {
+                    setUser(token);
+                    navigate('/', { replace: true });
+                }
             } else {
                 console.error('Google login not successful');
             }
@@ -83,8 +86,9 @@ const Login = () => {
             <div className={styles.myContainer}>
                 <div className={styles.myCol}>
                     <h1 className={styles.myTitle}>
-                        Unleash Your Potential<br />
-                        <span className={styles.text_red}>with Fitness AI</span>
+                        <div className={styles.centered_text}>Unleash Your</div>
+                        <div className={styles.centered_text}>Potential</div>
+                        <span className={styles.text_red}>with StartGym AI</span>
                     </h1>
                     <p className={styles.mySubtitle}>
                         Discover the future of fitness with our AI-powered platform.
@@ -98,14 +102,14 @@ const Login = () => {
                         <ThemeProvider theme={defaultTheme}>
                             <Container component="main" maxWidth="xs">
                                 <CssBaseline />
-                                <Box sx={{ marginTop: 8, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                                     <Avatar sx={{ m: 1, bgcolor: 'var(--color-red-body)' }}>
                                         <LockOutlinedIcon />
                                     </Avatar>
                                     <Typography component="h1" variant="h5">
                                         Sign in
                                     </Typography>
-                                    <Box component="form" Validate sx={{ mt: 1 }} onSubmit={handleLogin}>
+                                    <Box component="form" Validate sx={{ mt: 1, width: '100%' }} onSubmit={handleLogin}>
                                         <TextField
                                             margin="normal"
                                             required

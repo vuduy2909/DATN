@@ -24,7 +24,7 @@ public interface ICourseRepository extends JpaRepository<Course, Integer> {
             "from course c " +
             "join course_days cd on c.course_id = cd.course_id " +
             "join days d on cd.day_id = d.day_id " +
-            "join exercise_day ed on d.day_id = ed.day_id " +
+            "join exercise_day ed on d.day_id = ed.day_id and ed.course_id = c.course_id " +
             "join exercise e on ed.exercise_id = e.exercise_id " +
             "where c.course_id = :courseId and d.day_id = :dayId and ed.status = true and cd.status = true", nativeQuery = true)
     List<Tuple> getCourseDetailsByDayAndCourseOfExercise(@Param("courseId") Integer courseId, @Param("dayId") Integer dayId);
@@ -34,7 +34,7 @@ public interface ICourseRepository extends JpaRepository<Course, Integer> {
             "FROM course c " +
             "JOIN course_days cd ON c.course_id = cd.course_id " +
             "JOIN days d ON cd.day_id = d.day_id " +
-            "JOIN exercise_day ed ON d.day_id = ed.day_id " +
+            "JOIN exercise_day ed ON d.day_id = ed.day_id AND ed.course_id = c.course_id " +
             "JOIN exercise e ON ed.exercise_id = e.exercise_id " +
             "JOIN comments cm ON e.exercise_id = cm.exercise_id " +
             "JOIN customer cu ON cm.customer_id = cu.customer_id " +

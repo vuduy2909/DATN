@@ -1,43 +1,74 @@
+/* Test CSS change */
+body {
+    background-color: #faf9f6 !important;
+}
+
 .myContainer {
-    display: flex;
-    padding: 7rem 17rem;
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: center !important;
+    align-items: center !important;
+    min-height: 100vh !important;
+    padding: 0 40px !important;
+    background-color: #faf9f6 !important;
+    gap: 40px !important;
 }
 
 .myCol {
-    text-align: center;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    width: 100%;
+    text-align: center !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+    width: 50% !important;
+    max-width: 600px !important;
+    margin: 0 !important;
+    padding: 0 !important;
 }
 
 .myTitle {
-    margin: 4rem 0;
-    font-size: 4rem;
-    font-weight: bold;
+    margin: 0 0 20px 0 !important;
+    font-size: 3.2rem !important;
+    font-weight: bold !important;
+    line-height: 1.1 !important;
+    text-align: center !important;
+    width: 100% !important;
+}
+
+.centered_text {
+    text-align: center !important;
+    width: 100% !important;
+    display: block !important;
 }
 
 .text_red {
-    color: var(--color-red-body);
+    color: var(--color-red-body) !important;
+    display: block !important;
+    margin-top: 10px !important;
 }
 
 .mySubtitle {
-    color: hsl(217, 10%, 50.8%);
-    padding: 0 3rem;
+    color: hsl(217, 10%, 50.8%) !important;
+    padding: 0 !important;
+    font-size: 1.1rem !important;
+    margin-bottom: 0 !important;
+    text-align: center !important;
+    line-height: 1.5 !important;
 }
 
 .myCard {
-    background-color: #fff;
-    border: 1px solid #ddd;
-    border-radius: 0.25rem;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    margin: 5rem 0;
-    overflow: hidden;
-    width: 90%;
+    background-color: #fff !important;
+    border: 1px solid #ddd !important;
+    border-radius: 0.5rem !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08) !important;
+    width: 420px !important;
+    margin: 0 !important;
+    overflow: visible !important;
 }
 
 .myCardBody {
-    padding: 2rem;
+    padding: 1.5rem !important;
+    width: 100% !important;
 }
 
 .myInputWrapper {
@@ -134,4 +165,26 @@
 
 .link {
     cursor: pointer;
+}
+
+@media (max-width: 900px) {
+    .myContainer {
+        flex-direction: column !important;
+        padding: 30px 20px !important;
+        gap: 30px !important;
+    }
+    
+    .myCol {
+        width: 100% !important;
+        text-align: center !important;
+        align-items: center !important;
+    }
+    
+    .myTitle {
+        font-size: 2.5rem !important;
+    }
+    
+    .mySubtitle {
+        text-align: center !important;
+    }
 }
