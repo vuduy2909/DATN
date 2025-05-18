@@ -48,3 +48,4 @@ build/
 Thumbs.db
 # Ignore SQL dump files
 *.sql
+*.json
