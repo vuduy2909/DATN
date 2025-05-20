@@ -17,10 +17,10 @@ import Button from '@mui/material/Button';
 const Step4 = ({ formData, handleChange, handleNext, handlePrevious }) => {
 
     const frequencyOptions = [
-        { value: '2 buổi/tuần', imageSrc: twice },
-        { value: '3 buổi/tuần', imageSrc: three },
-        { value: '4 buổi/tuần', imageSrc: four },
-        { value: '5 buổi/tuần', imageSrc: five },
+        { value: 'Occasionally', label: '2 buổi/tuần', imageSrc: twice },
+        { value: 'Moderate', label: '3 buổi/tuần', imageSrc: three },
+        { value: 'Regularly', label: '4 buổi/tuần', imageSrc: four },
+        { value: 'Advanced', label: '5 buổi/tuần', imageSrc: five },
     ];
 
     const handleCardClick = (selectedFrequency) => {
@@ -97,11 +97,11 @@ const Step4 = ({ formData, handleChange, handleNext, handlePrevious }) => {
                                         component="img"
                                         sx={{ height: 75 }}
                                         image={option.imageSrc}
-                                        alt={option.value}
+                                        alt={option.label}
                                     />
                                     <CardContent sx={{ flex: '1 0 auto', width: '70%' }}>
                                         <Typography component="div" variant="subtitle1" sx={{ letterSpacing: '3px', lineHeight: 'unset', fontSize: 21 }}>
-                                            {option.value}
+                                            {option.label}
                                         </Typography>
                                     </CardContent>
                                 </Box>

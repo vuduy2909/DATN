@@ -33,7 +33,6 @@ const Question = () => {
     }, [user])
 
     const [formData, setFormData] = useState({
-        activity_level: '',
         age: '',
         gender: '',
         bmi: '',
@@ -73,7 +72,7 @@ const Question = () => {
         console.log("Form data before submission:", formData);
         
         // Check if any required fields are missing
-        const requiredFields = ['activity_level', 'age', 'gender', 'bmi', 'customerId'];
+        const requiredFields = ['age', 'gender', 'bmi', 'customerId'];
         const missingFields = requiredFields.filter(field => formData[field] === '');
         
         if (missingFields.length > 0) {

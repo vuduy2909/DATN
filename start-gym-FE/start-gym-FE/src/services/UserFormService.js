@@ -8,7 +8,7 @@ const UserFormService = {
       console.log('UserFormService: Preparing to submit form data:', formData);
       
       // Kiểm tra các trường bắt buộc
-      const requiredFields = ['activity_level', 'age', 'gender', 'customerId'];
+      const requiredFields = ['age', 'gender', 'customerId'];
       const missingFields = requiredFields.filter(field => !formData[field]);
       
       if (missingFields.length > 0) {

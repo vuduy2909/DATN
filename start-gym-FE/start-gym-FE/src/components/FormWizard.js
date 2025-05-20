@@ -71,14 +71,14 @@ const FormWizard = () => {
       
       // Đảm bảo đúng tên trường với backend (chestSize -> bust, waistSize -> waist)
       const apiFormData = {
-        activity_level: formData.trainingFrequency,
+        training_history: formData.trainingFrequency, // Lịch sử tập luyện hiện tại
+        trainingFrequency: formData.desiredFrequency, // Tần suất tập luyện mong muốn
         age: formData.age,
         gender: formData.gender,
         height: formData.height,
         weight: formData.weight,
         bmi: formData.weight / Math.pow(formData.height/100, 2), // Tính BMI
         training_goals: formData.trainingGoal,
-        training_history: formData.desiredFrequency,
         occupation: formData.occupation,
         work_environment: formData.workEnvironment,
         health_issues: formData.healthIssues ? formData.healthIssues.join(',') : '',

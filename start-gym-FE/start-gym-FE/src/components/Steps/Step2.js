@@ -17,16 +17,6 @@ const Step2 = ({ formData, handleChange, handleNext, handlePrevious }) => {
     const [age, setAge] = useState('');
     const [ageError, setAgeError] = useState('');
     const [gender, setGender] = useState('');
-    const [bodyType, setBodyType] = useState('');
-
-    // Danh sách 5 loại cơ thể như trong cơ sở dữ liệu
-    const bodyTypes = [
-        "Thin",
-        "Skinny Fat",
-        "Overweight",
-        "Normal",
-        "Fit"
-    ];
 
     const handleHeightChange = (e) => {
         const value = e.target.value;
@@ -63,25 +53,28 @@ const Step2 = ({ formData, handleChange, handleNext, handlePrevious }) => {
 
     const handleSubmit = () => {
         // Tính BMI nếu cần
-        const heightValue = parseFloat(height) / 100;
+        const heightValue = parseFloat(height);
         const weightValue = parseFloat(weight);
+        const ageValue = parseInt(age, 10);
+        let genderValue = gender;
+        if (gender === 'Nam') genderValue = 'Male';
+        if (gender === 'Nữ') genderValue = 'Female';
 
         if (heightValue > 0 && weightValue > 0 && !isNaN(heightValue) && !isNaN(weightValue)) {
-            const bmiValue = (weightValue / (heightValue * heightValue)).toFixed(1);
+            const bmiValue = (weightValue / Math.pow(heightValue/100, 2)).toFixed(1);
             handleChange({
                 target: {
                     name: 'bmi',
-                    value: bmiValue,
+                    value: parseFloat(bmiValue),
                 },
             });
         }
 
         // Cập nhật các giá trị cho form
-        handleChange({ target: { name: 'height', value: height } });
-        handleChange({ target: { name: 'weight', value: weight } });
-        handleChange({ target: { name: 'age', value: age } });
-        handleChange({ target: { name: 'gender', value: gender } });
-        handleChange({ target: { name: 'bodyType', value: bodyType } });
+        handleChange({ target: { name: 'height', value: heightValue } });
+        handleChange({ target: { name: 'weight', value: weightValue } });
+        handleChange({ target: { name: 'age', value: ageValue } });
+        handleChange({ target: { name: 'gender', value: genderValue } });
         
         handleNext();
     };
@@ -202,22 +195,6 @@ const Step2 = ({ formData, handleChange, handleNext, handlePrevious }) => {
                             endAdornment: <InputAdornment position="end">kg</InputAdornment>,
                         }}
                     />
-                    <FormControl fullWidth sx={{ m: 1 }}>
-                        <InputLabel id="body-type-select-label" color='error'>Loại cơ thể</InputLabel>
-                        <Select
-                            labelId="body-type-select-label"
-                            id="body-type-select"
-                            value={bodyType}
-                            label="Loại cơ thể"
-                            color='error'
-                            required
-                            onChange={(e) => setBodyType(e.target.value)}
-                        >
-                            {bodyTypes.map(type => (
-                                <MenuItem key={type} value={type}>{type}</MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
                 </div>
                 <div className={styles.btnGroup}>
                     <Button

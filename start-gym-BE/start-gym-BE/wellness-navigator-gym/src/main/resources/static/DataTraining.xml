@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <treeNode>
-    <attributeName>health_issues</attributeName>
+    <attributeName>body_type</attributeName>
     <children/>
     <isLeaf>false</isLeaf>
     <classification>false</classification>

@@ -35,11 +35,15 @@ public class CustomerCourseServiceImpl implements ICustomerCourseService {
     public void saveRecommendedCourses(Course course, Integer customerId) {
         Customer customer = customerRepository.findById(customerId).orElse(null);
         if (customer != null && course != null) {
-            CustomerCourse customerCourse = new CustomerCourse();
-            customerCourse.setCourse(course);
-            customerCourse.setCustomer(customer);
-            customerCourse.setRecommendedStatus(true);
-            customerCourseRepository.save(customerCourse);
+            // Fetch a fresh Course entity from the repository instead of using the potentially detached one
+            Course managedCourse = courseRepository.findById(course.getCourseId()).orElse(null);
+            if (managedCourse != null) {
+                CustomerCourse customerCourse = new CustomerCourse();
+                customerCourse.setCourse(managedCourse);
+                customerCourse.setCustomer(customer);
+                customerCourse.setRecommendedStatus(true);
+                customerCourseRepository.save(customerCourse);
+            }
         }
     }
     

@@ -83,7 +83,6 @@ public class CustomerUserDetailDto {
                         if (courseIdObj != null) {
                             return new CourseDetail(
                                 ConvertToInteger.convertToInteger(tuple.get("user_data_id")),
-                                tuple.get("activity_level", String.class),
                                 ConvertToInteger.convertToInteger(tuple.get("age")),
                                 tuple.get("bmi", Double.class),
                                 tuple.get("gender", String.class),

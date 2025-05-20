@@ -39,7 +39,12 @@ public class TrackDataAiServiceImpl implements ITrackDataAiService {
 
     @Override
     public List<TrackDataAi> getFilteredTrackDataAi(UserDataDTO userDataDTO) {
-        return trackDataAiRepository.findCustomByUserData(userDataDTO);
+        List<TrackDataAi> result = trackDataAiRepository.findSimilarData(userDataDTO);
+        if (result.isEmpty()) {
+            // Fallback to a more general search if no specific matches found
+            result = trackDataAiRepository.findByAgeAndGender(userDataDTO);
+        }
+        return result;
     }
 
 }

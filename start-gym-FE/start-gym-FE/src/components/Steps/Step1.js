@@ -15,11 +15,11 @@ import Typography from '@mui/material/Typography';
 
 const Step1 = ({ formData, handleChange, handleNext }) => {
     const trainingFrequencies = [
-        { value: 'Không tập', imageSrc: beginner },
-        { value: '2 buổi/tuần', imageSrc: occasionally },
-        { value: '3 buổi/tuần', imageSrc: moderate },
-        { value: '4 buổi/tuần', imageSrc: advanced },
-        { value: '5 buổi/tuần trở lên', imageSrc: regularly },
+        { value: 'Never', label: 'Không tập', imageSrc: beginner },
+        { value: 'Occasionally', label: '2 buổi/tuần', imageSrc: occasionally },
+        { value: 'Moderate', label: '3 buổi/tuần', imageSrc: moderate },
+        { value: 'Regularly', label: '4 buổi/tuần', imageSrc: regularly },
+        { value: 'Advanced', label: '5 buổi/tuần trở lên', imageSrc: advanced },
     ];
 
     const handleCardClick = (selectedFrequency) => {
@@ -97,11 +97,11 @@ const Step1 = ({ formData, handleChange, handleNext }) => {
                                         component="img"
                                         sx={{ height: 75 }}
                                         image={frequency.imageSrc}
-                                        alt={frequency.value}
+                                        alt={frequency.label}
                                     />
                                     <CardContent sx={{ flex: '1 0 auto', width: '70%' }}>
                                         <Typography component="div" variant="subtitle1" sx={{ letterSpacing: '3px', lineHeight: 'unset', fontSize: 21 }}>
-                                            {frequency.value}
+                                            {frequency.label}
                                         </Typography>
                                     </CardContent>
                                 </Box>

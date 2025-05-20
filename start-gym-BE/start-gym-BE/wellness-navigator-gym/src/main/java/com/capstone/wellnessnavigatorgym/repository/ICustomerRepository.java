@@ -101,7 +101,7 @@ public interface ICustomerRepository extends JpaRepository<Customer, Integer> {
 
     @Query(value = "SELECT c.customer_id, c.customer_code, c.customer_name, c.customer_phone, c.customer_gender, " +
             "c.date_of_birth, c.id_card, c.customer_address, c.customer_img, ct.customer_type_name, a.user_name, " +
-            "a.email, u.user_data_id, u.activity_level, u.age, u.bmi, u.gender, u.training_goals, u.training_history, " +
+            "a.email, u.user_data_id, u.age, u.bmi, u.gender, u.training_goals, u.training_history, " +
             "cc.recommended_status, co.course_id, co.course_name, co.description, co.duration, co.image, co.status, " +
             "cty.course_type_name "+
             "FROM customer c " +
@@ -120,4 +120,14 @@ public interface ICustomerRepository extends JpaRepository<Customer, Integer> {
             "JOIN account a ON c.account_id = a.account_id " +
             "WHERE a.user_name = :username AND c.is_enable = true", nativeQuery = true)
     Customer findByAccountUserName(@Param("username") String username);
+
+    @Query(value = "SELECT a.customer_id, a.customer_name, a.customer_phone, a.customer_gender, a.customer_date_of_birth, " +
+            "a.customer_address, a.customer_card_id, a.is_delete, a.is_enable, u.user_id, a.create_time, " +
+            "a.email, u.user_data_id, u.age, u.bmi, u.gender, u.training_goals, u.training_history, " +
+            "u.heart_disease, u.respiratory_disease, u.recent_injury, u.training_frequency, " +
+            "u.occupation, u.work_environment, u.health_issues " +
+            "FROM customer a LEFT JOIN user_data_ai u " +
+            "ON a.customer_id = u.customer_id " +
+            "ORDER BY a.create_time DESC", nativeQuery = true)
+    List<Tuple> getAllCustomerInfo();
 }

@@ -97,7 +97,6 @@ public class BuildDecisionTree {
      */
     private List<String> getAttributeNames() {
         return Arrays.asList(
-            "activity_level",
             "age",
             "gender", 
             "bmi",
@@ -107,10 +106,12 @@ public class BuildDecisionTree {
             "weight",
             "waist_circumference",
             "chest_circumference",
-            "body_type",      // Đảm bảo nhất quán với tên trường trong controller
+            "body_type",
             "occupation",
             "work_environment",
-            "health_issues"
+            "heart_disease",
+            "respiratory_disease",
+            "recent_injury"
         );
     }
 
@@ -163,6 +164,16 @@ public class BuildDecisionTree {
         return courses.stream()
                 .filter(course -> course.getCourseId().equals(courseId))
                 .findFirst()
+                .map(course -> {
+                    // Return a new Course with just the ID to avoid detached entity issues
+                    Course newCourse = new Course(courseId);
+                    newCourse.setCourseName(course.getCourseName());
+                    newCourse.setDescription(course.getDescription());
+                    newCourse.setDuration(course.getDuration());
+                    newCourse.setImage(course.getImage());
+                    newCourse.setStatus(course.getStatus());
+                    return newCourse;
+                })
                 .orElse(null);
     }
 
@@ -274,12 +285,15 @@ public class BuildDecisionTree {
     public Course traverseDecisionTree(TreeNode currentNode, Map<String, Object> userData) {
         if (currentNode == null) {
             logger.error("Null node encountered during tree traversal");
-            return null;
+            return getDefaultCourse();
         }
         
         try {
-            // Log thông tin người dùng để debug
-            logger.debug("Traversing decision tree with user data: {}", userData);
+            // Apply default values at the beginning of traversal
+            addDefaultValuesToUserData(userData);
+            
+            // Log thông tin người dùng để debug sau khi thêm giá trị mặc định
+            logger.debug("Traversing decision tree with user data (after defaults): {}", userData);
             
             while (!currentNode.isLeaf()) {
                 String attributeName = currentNode.getAttributeName();
@@ -287,42 +301,71 @@ public class BuildDecisionTree {
                 
                 logger.debug("Current node attribute: {}, user value: {}", attributeName, attributeValue);
 
-                // Kiểm tra nhanh và chuyển sang nút con tương ứng
+                // Kiểm tra xem nút hiện tại có con không
+                Map<Object, TreeNode> children = currentNode.getChildren();
+                if (children == null || children.isEmpty()) {
+                    logger.warn("Current node for attribute '{}' has no children, treating as leaf node", attributeName);
+                    // Xử lý nút không có con như nút lá và trả về khóa học mặc định
+                    return getDefaultCourse();
+                }
+
+                // Kiểm tra và xử lý nếu giá trị thuộc tính là null
                 if (attributeValue == null) {
                     logger.warn("Missing attribute value for: {}", attributeName);
-                    // Nếu không có giá trị, thử chọn nhánh phổ biến nhất
-                    Map<Object, TreeNode> children = currentNode.getChildren();
-                    if (children.isEmpty()) {
-                        logger.error("Current node has no children and attribute value is missing");
-                        return null;
-                    }
                     currentNode = findMostCommonChildNode(children);
                     logger.debug("Selected most common child node for missing attribute");
                 } else {
-                    TreeNode nextNode = currentNode.getChildren().get(attributeValue);
+                    TreeNode nextNode = children.get(attributeValue);
                     if (nextNode == null) {
                         logger.warn("No matching path for attribute {} with value {}", attributeName, attributeValue);
-                        // Nếu không có nhánh khớp, chọn nhánh gần nhất có thể
-                        nextNode = findClosestMatchingNode(currentNode, attributeValue);
+                        
+                        // Đặc biệt xử lý cho body_type
+                        if (attributeName.equals("body_type")) {
+                            logger.info("Special handling for body_type attribute");
+                            for (Map.Entry<Object, TreeNode> entry : children.entrySet()) {
+                                logger.info("Available body_type option: {}", entry.getKey());
+                                // Lấy giá trị đầu tiên có sẵn
+                                nextNode = entry.getValue();
+                                break;
+                            }
+                        } else {
+                            // Đối với các thuộc tính khác, tìm node gần nhất
+                            nextNode = findClosestMatchingNode(currentNode, attributeValue);
+                        }
+                        
                         logger.debug("Selected closest matching node: {}", nextNode != null ? "found" : "not found");
+                        
+                        if (nextNode == null && !children.isEmpty()) {
+                            // Nếu vẫn không tìm thấy nút khớp, sử dụng nút con đầu tiên
+                            nextNode = children.values().iterator().next();
+                            logger.debug("Fallback to first child node");
+                        }
                     }
                     currentNode = nextNode;
                 }
                 
                 if (currentNode == null) {
                     logger.error("Traversal failed - reached null node");
-                    return null;
+                    return getDefaultCourse();
                 }
             }
 
             // Trả về courseId từ nút lá
             Course recommendedCourse = currentNode.isLeaf() ? currentNode.getCourseDataId() : null;
+            
+            // Nếu không tìm thấy khóa học được đề xuất, trả về khóa học mặc định
+            if (recommendedCourse == null) {
+                recommendedCourse = getDefaultCourse();
+                logger.info("No recommendation found in leaf node. Using default course: {}", 
+                            recommendedCourse != null ? recommendedCourse.getCourseId() : "none");
+            }
+            
             logger.info("Decision tree traversal complete. Recommended course: {}", 
                        recommendedCourse != null ? recommendedCourse.getCourseId() : "none");
             return recommendedCourse;
         } catch (Exception e) {
             logger.error("Error during decision tree traversal: {}", e.getMessage(), e);
-            return null;
+            return getDefaultCourse();
         }
     }
     
@@ -338,13 +381,104 @@ public class BuildDecisionTree {
      * Tìm nút con gần nhất khi không có nút con chính xác
      */
     private TreeNode findClosestMatchingNode(TreeNode currentNode, Object attributeValue) {
-        // Đơn giản chọn nút con đầu tiên
-        if (!currentNode.getChildren().isEmpty()) {
-            return currentNode.getChildren().values().iterator().next();
+        // Nếu không có giá trị thuộc tính khớp chính xác, hãy thử tìm giá trị gần nhất
+        Map<Object, TreeNode> children = currentNode.getChildren();
+        if (children.isEmpty()) {
+            logger.warn("Node has no children to select from");
+            return null;
+        }
+        
+        // Đối với body_type, xử lý đặc biệt để đảm bảo luôn tìm được nhánh phù hợp
+        if (currentNode.getAttributeName().equals("body_type")) {
+            logger.info("Finding alternative body type match for value: {}", attributeValue);
+            
+            // Thử tìm các giá trị phổ biến theo thứ tự ưu tiên
+            String[] bodyTypes = {"Normal", "Average", "Medium", "Skinny Fat", "Fit", "Athletic", "Overweight", "Thin", "Obese"};
+            
+            for (String bodyType : bodyTypes) {
+                if (children.containsKey(bodyType)) {
+                    logger.info("Selected alternative body type: {}", bodyType);
+                    return children.get(bodyType);
+                }
+            }
+            
+            // Nếu không tìm thấy, trả về nút con đầu tiên
+            logger.info("No matching body type found, using first available type");
+            return children.values().iterator().next();
+        }
+        
+        // Đối với các thuộc tính khác, chỉ đơn giản trả về nút con đầu tiên
+        if (!children.isEmpty()) {
+            return children.values().iterator().next();
         }
         return null;
     }
     
+    /**
+     * Helper method to add default values to missing user data attributes
+     */
+    private void addDefaultValuesToUserData(Map<String, Object> userData) {
+        // Body type default
+        if (!userData.containsKey("body_type") || userData.get("body_type") == null) {
+            userData.put("body_type", "Normal");
+            logger.info("Added default value 'Normal' for body_type attribute");
+        }
+        
+        // Health attributes defaults
+        if (!userData.containsKey("heart_disease") || userData.get("heart_disease") == null) {
+            userData.put("heart_disease", false);
+        }
+        if (!userData.containsKey("respiratory_disease") || userData.get("respiratory_disease") == null) {
+            userData.put("respiratory_disease", false);
+        }
+        if (!userData.containsKey("recent_injury") || userData.get("recent_injury") == null) {
+            userData.put("recent_injury", false);
+        }
+        
+        // Training goals default if missing
+        if (!userData.containsKey("training_goals") || userData.get("training_goals") == null) {
+            userData.put("training_goals", "General Fitness");
+            logger.info("Added default value 'General Fitness' for training_goals attribute");
+        }
+        
+        // Other potential defaults
+        if (!userData.containsKey("training_history") || userData.get("training_history") == null) {
+            userData.put("training_history", "Beginner");
+            logger.info("Added default value 'Beginner' for training_history attribute");
+        }
+        
+        if (!userData.containsKey("work_environment") || userData.get("work_environment") == null) {
+            userData.put("work_environment", "Sedentary");
+            logger.info("Added default value 'Sedentary' for work_environment attribute");
+        }
+    }
+    
+    /**
+     * Helper method to get a default course
+     */
+    private Course getDefaultCourse() {
+        if (courses != null && !courses.isEmpty()) {
+            Course originalCourse = courses.get(0);
+            // Create a new Course with just the ID and basic properties to avoid detached entity issues
+            Course defaultCourse = new Course(originalCourse.getCourseId());
+            defaultCourse.setCourseName(originalCourse.getCourseName());
+            defaultCourse.setDescription(originalCourse.getDescription());
+            defaultCourse.setDuration(originalCourse.getDuration());
+            defaultCourse.setImage(originalCourse.getImage());
+            defaultCourse.setStatus(originalCourse.getStatus());
+            logger.info("Returning default course: {}", defaultCourse.getCourseId());
+            return defaultCourse;
+        }
+        
+        logger.error("No courses available in the system to use as default!");
+        // Tạo một khóa học "giả" để tránh trả về null
+        Course fallbackCourse = new Course();
+        fallbackCourse.setCourseId(1);
+        fallbackCourse.setCourseName("Khóa học mặc định cho người mới bắt đầu");
+        fallbackCourse.setDescription("Khóa học này được đề xuất khi không tìm thấy khóa học phù hợp khác");
+        return fallbackCourse;
+    }
+
     /**
      * Phương thức tiện ích để xây dựng và xuất cây quyết định
      */

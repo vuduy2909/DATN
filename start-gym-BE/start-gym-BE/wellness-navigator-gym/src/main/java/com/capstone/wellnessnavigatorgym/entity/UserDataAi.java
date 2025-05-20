@@ -10,34 +10,39 @@ import javax.persistence.*;
 @Getter
 @RequiredArgsConstructor
 @Entity
+@Table(name = "user_data_ai")
 public class UserDataAi {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer userDataId;
-    private String activityLevel;
+    @Column(name = "user_data_id", nullable = false)
+    private Integer user_data_id;
+    
+    @Column(name = "track_data_ai_id", nullable = true)
+    private Integer track_data_ai_id;
+    
     private Integer age;
     private String gender;
     private Double height;     // Chiều cao (cm)
     private Double weight;     // Cân nặng (kg)
-    private Double weight_after;
-    private Double bmi;
     private Double waist_circumference;
     private Double chest_circumference;
-    private Double waist_circumference_after;
-    private Double chest_circumference_after;
-    private String bodyType;   // Loại cơ thể
-    private String trainingGoals;
-    private String trainingHistory;
-    private String trainingFrequency;
-    private Boolean heartDisease;
-    private Boolean respiratoryDisease;
-    private Boolean recentInjury;
+    private Double bmi;
     private String occupation; // Nghề nghiệp
-    private String workEnvironment; // Môi trường làm việc
-    private String healthIssues; // Các vấn đề sức khỏe (có thể lưu dạng chuỗi phân cách bằng dấu phẩy)
+    private String work_environment; // Môi trường làm việc
+    private String training_goals;
+    private Boolean heart_disease;
+    private Boolean respiratory_disease;
+    private Boolean recent_injury;
+    private String training_frequency;
+    private String body_type;   // Loại cơ thể
     private Boolean effective;
+    private String training_history;
 
-    @ManyToOne(cascade = CascadeType.ALL)
+    @ManyToOne(cascade = CascadeType.MERGE)
+    @JoinColumn(name = "course_id")
+    private Course course;
+
+    @ManyToOne(cascade = CascadeType.MERGE)
     @JoinColumn(name = "customer_id")
     private Customer customer;
 }

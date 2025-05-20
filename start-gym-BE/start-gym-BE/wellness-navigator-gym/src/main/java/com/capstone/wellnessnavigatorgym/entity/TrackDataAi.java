@@ -14,7 +14,6 @@ public class TrackDataAi {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer trackDataAiId;
-    private String activity_level;
     private Integer age;
     private String gender;
     private Double height;
@@ -36,7 +35,6 @@ public class TrackDataAi {
     public String toString() {
         return "TrackDataAi{" +
                 "trackDataAiId=" + trackDataAiId +
-                ", activityLevel='" + activity_level + '\'' +
                 ", age=" + age +
                 ", gender='" + gender + '\'' +
                 ", bmi=" + bmi +
@@ -49,8 +47,6 @@ public class TrackDataAi {
         switch (attributeName) {
             case "track_data_ai_id":
                 return getTrackDataAiId();
-            case "activity_level":
-                return getActivity_level();
             case "age":
                 return getAge();
             case "gender":
@@ -79,8 +75,12 @@ public class TrackDataAi {
                 return getEffective();
             case "body_type":
                 return null; // Not stored in TrackDataAi but needed for compatibility
-            case "health_issues":
-                return null; // Not stored in TrackDataAi but needed for compatibility
+            case "heart_disease":
+                return false; // Default value as it's not stored directly in this entity
+            case "respiratory_disease":
+                return false; // Default value as it's not stored directly in this entity
+            case "recent_injury":
+                return false; // Default value as it's not stored directly in this entity
             default:
                 System.out.println("Invalid attribute: " + attributeName);
                 return null;
@@ -90,7 +90,6 @@ public class TrackDataAi {
     public static boolean isValidAttribute(String attributeName) {
         switch (attributeName) {
             case "track_data_ai_id":
-            case "activity_level":
             case "age":
             case "gender":
             case "height":
@@ -105,7 +104,9 @@ public class TrackDataAi {
             case "course_id":
             case "effective":
             case "body_type":  // Support for compatibility
-            case "health_issues":  // Support for compatibility
+            case "heart_disease":
+            case "respiratory_disease":
+            case "recent_injury":
                 return true;
             default:
                 return false;
