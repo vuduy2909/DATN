@@ -1,0 +1,256 @@
+.container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stepIndicator {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.stepLabel {
+  font-size: 18px;
+  font-weight: 600;
+  color: #CF4044;
+  padding: 8px 20px;
+  border-radius: 20px;
+  background-color: #fff;
+  box-shadow: 0 2px 8px rgba(207, 64, 68, 0.15);
+  display: inline-block;
+}
+
+.content {
+  width: 100%;
+  max-width: 800px;
+}
+
+.card {
+  width: 100%;
+  background-color: #fff;
+  border-radius: 10px;
+  padding: 24px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.cardHeader {
+  margin-bottom: 24px;
+  text-align: center;
+  position: relative;
+}
+
+.cardHeader h2 {
+  color: #CF4044;
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #CF4044;
+  display: inline-block;
+}
+
+.loadingContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  width: 100%;
+}
+
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 5px solid rgba(207, 64, 68, 0.2);
+  border-top: 5px solid #CF4044;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-top: 20px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.alert {
+  margin: 16px 0;
+}
+
+.analysisResults {
+  padding: 0 8px;
+}
+
+.section {
+  padding: 20px;
+  margin-bottom: 24px;
+  border-radius: 8px;
+  border-left: 4px solid #CF4044;
+  transition: transform 0.2s;
+}
+
+.section:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Metrics display styles */
+.metricsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  margin-top: 16px;
+}
+
+.metricGroup {
+  padding: 12px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+}
+
+.metricItem {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px dashed #eee;
+}
+
+.metricItem:last-child {
+  border-bottom: none;
+}
+
+.metricItem span:first-child {
+  font-weight: 500;
+  color: #555;
+}
+
+.metricItem span:last-child {
+  font-weight: 600;
+  color: #CF4044;
+}
+
+.sectionTitle {
+  margin-top: 32px !important;
+  margin-bottom: 16px !important;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.courseContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-bottom: 40px;
+}
+
+.courseCard {
+  padding: 20px;
+  border-radius: 12px !important;
+  border: 1px solid #f0f0f0;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.courseCard:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(207, 64, 68, 0.1) !important;
+}
+
+.courseHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.divider {
+  margin: 12px 0 !important;
+}
+
+.courseFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.confirmationBox {
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  padding: 24px;
+  margin-top: 32px;
+  text-align: center;
+  border: 1px dashed #CF4044;
+}
+
+.buttonGroup {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-top: 24px;
+}
+
+.backButton {
+  color: #CF4044 !important;
+  border: 1px solid #CF4044 !important;
+  border-radius: 30px !important;
+  padding: 10px 24px !important;
+  font-weight: 500 !important;
+  text-transform: none !important;
+  font-size: 16px !important;
+}
+
+.confirmButton {
+  background-color: #CF4044 !important;
+  color: white !important;
+  border-radius: 30px !important;
+  padding: 10px 32px !important;
+  font-weight: 600 !important;
+  text-transform: none !important;
+  font-size: 16px !important;
+  box-shadow: 0 4px 8px rgba(207, 64, 68, 0.3) !important;
+  transition: transform 0.2s, box-shadow 0.2s !important;
+}
+
+.confirmButton:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(207, 64, 68, 0.4) !important;
+}
+
+.confirmButton:disabled {
+  background-color: #f0f0f0 !important;
+  color: #888 !important;
+}
+
+.logDataContainer {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.logItem {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background-color: #f9f9f9;
+  transition: background-color 0.2s;
+}
+
+.logItem:hover {
+  background-color: #f0f0f0;
+}
+
+.logLabel {
+  font-weight: 600;
+  color: #555;
+  margin-right: 10px;
+}
+
+.logValue {
+  font-weight: 500;
+  color: #CF4044;
+} 

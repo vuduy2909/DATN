@@ -32,6 +32,7 @@ public class UserDataDTO {
     private String occupation; // Nghề nghiệp
     private String work_environment; // Môi trường làm việc
     private Integer customerId;
+    private Integer recommendedCourseId; // ID của khóa học được đề xuất
 
     @Override
     public String toString() {
@@ -56,6 +57,7 @@ public class UserDataDTO {
                 ", occupation='" + occupation + '\'' +
                 ", work_environment='" + work_environment + '\'' +
                 ", customerId=" + customerId +
+                ", recommendedCourseId=" + recommendedCourseId +
                 '}';
     }
 }

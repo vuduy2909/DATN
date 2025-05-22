@@ -16,38 +16,52 @@ const UserFormService = {
         throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
       }
       
-      // Log additional measurements if available
-      if (formData.waist_circumference || formData.chest_circumference) {
-        console.log('UserFormService: Including body measurements:', {
-          waist_circumference: formData.waist_circumference || 'not provided',
-          chest_circumference: formData.chest_circumference || 'not provided'
+      // Override window.alert before API call to silence any alerts
+      const originalAlert = window.alert;
+      window.alert = function(message) {
+        console.log('Alert suppressed:', message);
+        return;
+      };
+      
+      try {
+        // Lấy token từ localStorage (hoặc vị trí lưu trữ khác)
+        const token = localStorage.getItem('token');
+        const headers = {};
+        
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+          console.log('UserFormService: Token found and included in headers');
+        } else {
+          console.warn('UserFormService: No token found in localStorage');
+        }
+        
+        // Thêm custom header để bỏ qua thông báo từ server
+        headers['X-Skip-Alert'] = 'true';
+        
+        // Sửa endpoint API để trùng với endpoint trong collectionService
+        console.log('UserFormService: Sending POST request to /track-data-ai/recommend-course');
+        const response = await request.post('/track-data-ai/recommend-course', formData, { headers });
+        console.log('UserFormService: Received response:', JSON.stringify(response));
+        
+        // Restore original alert
+        window.alert = originalAlert;
+        
+        // Xóa bất kỳ popup nào có thể đã xuất hiện
+        const closeButtons = document.querySelectorAll('button.MuiButtonBase-root');
+        closeButtons.forEach(button => {
+          if (button.textContent === 'OK' || button.textContent === 'Close') {
+            button.click();
+            console.log('UserFormService: Found and clicked a close button');
+          }
         });
+        
+        return response;
+      } catch (error) {
+        // Restore original alert even on error
+        window.alert = originalAlert;
+        console.error('API Error:', error);
+        throw error;
       }
-      
-      // Lấy token từ localStorage (hoặc vị trí lưu trữ khác)
-      const token = localStorage.getItem('token');
-      const headers = {};
-      
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-        console.log('UserFormService: Token found and included in headers');
-      } else {
-        console.warn('UserFormService: No token found in localStorage');
-      }
-      
-      // Sửa endpoint API để trùng với endpoint trong collectionService
-      console.log('UserFormService: Sending POST request to /track-data-ai/recommend-course');
-      const response = await request.post('/track-data-ai/recommend-course', formData, { headers });
-      console.log('UserFormService: Received response:', JSON.stringify(response));
-      
-      // Kiểm tra xem phản hồi có dữ liệu khóa học không
-      if (response && response.recommendedCourses) {
-        console.log('UserFormService: Recommended courses received:', response.recommendedCourses.length);
-      } else {
-        console.warn('UserFormService: No recommended courses in response');
-      }
-      
-      return response;
     } catch (error) {
       console.error('UserFormService: Error submitting form data:', error);
       if (error.response) {
@@ -60,6 +74,30 @@ const UserFormService = {
           return error.response.data;
         }
       }
+      throw error;
+    }
+  },
+
+  // Lấy dữ liệu chi tiết cho bước 7
+  getRecommendationStep7Data: async (userDataId) => {
+    try {
+      console.log('UserFormService: Fetching step 7 data for userDataId:', userDataId);
+      
+      // Lấy token từ localStorage
+      const token = localStorage.getItem('token');
+      const headers = {};
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      // Gọi API endpoint với userDataId làm query parameter
+      const response = await request.get(`/track-data-ai/recommendation-step-7?userDataId=${userDataId}`, { headers });
+      console.log('UserFormService: Received step 7 data:', response);
+      
+      return response;
+    } catch (error) {
+      console.error('UserFormService: Error fetching step 7 data:', error);
       throw error;
     }
   },

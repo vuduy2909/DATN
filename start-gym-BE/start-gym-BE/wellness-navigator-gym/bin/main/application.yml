@@ -1,0 +1,10 @@
+claude:
+  api:
+    key: "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"
+    url: "https://api.anthropic.com/v1/messages"
+    version: "2023-06-01"
+    model: "claude-3-haiku-20240307"
+
+spring:
+  main:
+    allow-bean-definition-overriding: true

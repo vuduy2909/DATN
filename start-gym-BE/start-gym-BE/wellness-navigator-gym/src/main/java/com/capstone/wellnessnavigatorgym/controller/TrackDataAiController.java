@@ -30,6 +30,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.Collections;
 
 @RestController
 @RequestMapping("/api/v1/track-data-ai")
@@ -149,15 +150,23 @@ public class TrackDataAiController {
                 return ResponseEntity.badRequest().body(new RecommendationDTO(null, "Customer not found"));
             }
 
-            // Lưu dữ liệu người dùng
+            // Set the recommended course_id on the UserDataDTO before saving
+            userDataDTO.setRecommendedCourseId(recommendations.getCourseId());
+            
+            // Lưu dữ liệu người dùng với effective=false (chưa được xác nhận)
             UserDataAi userDataAi = createUserDataAiFromDTO(userDataDTO, customer);
-            userDataAiService.saveUserDataAi(userDataAi);
+            userDataAi.setEffective(false); // Chưa được xác nhận
+            userDataAi = userDataAiService.saveUserDataAi(userDataAi);
 
-            // Lưu khóa học đề xuất
-            logger.info("Saving recommended course " + recommendations.getCourseId() + " for user " + userDataDTO.getCustomerId());
-            customerCourseService.saveRecommendedCourses(recommendations, userDataDTO.getCustomerId());
+            // Không lưu khóa học đề xuất vào CustomerCourse ngay lập tức, 
+            // mà sẽ đợi người dùng xác nhận ở bước tiếp theo
+            logger.info("Pending recommended course " + recommendations.getCourseId() + " for user " + userDataDTO.getCustomerId());
 
-            return ResponseEntity.ok(new RecommendationDTO(recommendations, "Course recommendations generated successfully"));
+            return ResponseEntity.ok(new RecommendationDTO(
+                recommendations, 
+                "Course recommendations generated successfully",
+                userDataAi.getUser_data_id()
+            ));
         } catch (Exception e) {
             logger.error("Error processing form data: " + e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -224,8 +233,14 @@ public class TrackDataAiController {
         userDataAi.setRespiratory_disease(dto.getRespiratory_disease() != null ? dto.getRespiratory_disease() : false);
         userDataAi.setRecent_injury(dto.getRecent_injury() != null ? dto.getRecent_injury() : false);
 
-        userDataAi.setEffective(true);
         userDataAi.setCustomer(customer);
+        
+        // Save the recommended course if available
+        if (dto.getRecommendedCourseId() != null) {
+            Course course = new Course(dto.getRecommendedCourseId());
+            userDataAi.setCourse(course);
+            logger.info("Set recommended course_id: {} for user_data_ai", dto.getRecommendedCourseId());
+        }
 
         return userDataAi;
     }
@@ -337,15 +352,23 @@ public class TrackDataAiController {
                 return ResponseEntity.badRequest().body(new RecommendationDTO(null, "Customer not found"));
             }
 
-            // Lưu dữ liệu người dùng
+            // Set the recommended course_id on the UserDataDTO before saving
+            userDataDTO.setRecommendedCourseId(recommendations.getCourseId());
+            
+            // Lưu dữ liệu người dùng với effective=false (chưa được xác nhận)
             UserDataAi userDataAi = createUserDataAiFromDTO(userDataDTO, customer);
-            userDataAiService.saveUserDataAi(userDataAi);
+            userDataAi.setEffective(false); // Chưa được xác nhận
+            userDataAi = userDataAiService.saveUserDataAi(userDataAi);
 
-            // Lưu khóa học đề xuất
-            logger.info("Saving recommended course " + recommendations.getCourseId() + " for user " + userDataDTO.getCustomerId());
-            customerCourseService.saveRecommendedCourses(recommendations, userDataDTO.getCustomerId());
+            // Không lưu khóa học đề xuất vào CustomerCourse ngay lập tức, 
+            // mà sẽ đợi người dùng xác nhận ở bước tiếp theo
+            logger.info("Pending recommended course " + recommendations.getCourseId() + " for user " + userDataDTO.getCustomerId());
 
-            return ResponseEntity.ok(new RecommendationDTO(recommendations, "Course recommendations generated successfully"));
+            return ResponseEntity.ok(new RecommendationDTO(
+                recommendations, 
+                "Course recommendations generated successfully",
+                userDataAi.getUser_data_id()
+            ));
         } catch (Exception e) {
             logger.error("Error in recommendation process: " + e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -518,6 +541,7 @@ public class TrackDataAiController {
             logger.info("Successfully analyzed image. Body type: {}", response.getBodyType());
 
             // Nếu có customerId, lưu kết quả và đề xuất khóa học
+            Integer userDataId = null;
             if (customerId != null) {
                 try {
                     // Tạo UserDataDTO từ kết quả phân tích
@@ -532,6 +556,7 @@ public class TrackDataAiController {
                     double bmi = weight / (heightInMeters * heightInMeters);
                     userDataDTO.setBmi(Math.round(bmi * 10.0) / 10.0);
                     
+                    // Sử dụng body_type được phát hiện từ Claude
                     userDataDTO.setBody_type(response.getBodyType());
                     
                     // Thiết lập các giá trị mặc định
@@ -543,8 +568,13 @@ public class TrackDataAiController {
                     logger.info("Attempting to recommend courses based on image analysis for customer ID: {}", customerId);
                     RecommendationDTO recommendation = recommendCourse(userDataDTO).getBody();
                     
-                    if (recommendation != null && recommendation.getRecommendedCourses() != null) {
-                        logger.info("Successfully recommended course: {}", recommendation.getRecommendedCourses().getCourseName());
+                    if (recommendation != null) {
+                        if (recommendation.getRecommendedCourses() != null) {
+                            logger.info("Successfully recommended course: {}", recommendation.getRecommendedCourses().getCourseName());
+                        }
+                        userDataId = recommendation.getUserDataId();
+                        response.setUserDataId(userDataId);
+                        logger.info("Setting userDataId: {} in image analysis response", userDataId);
                     } else {
                         logger.warn("No course was recommended based on image analysis");
                     }
@@ -1146,6 +1176,268 @@ public class TrackDataAiController {
             logger.error("Error rebuilding decision tree: " + e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error rebuilding decision tree: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/recommendation-details/{userDataId}")
+    public ResponseEntity<?> getRecommendationDetails(@PathVariable Integer userDataId) {
+        try {
+            // Find the user data AI record
+            UserDataAi userDataAi = userDataAiService.findUserDataAiById(userDataId);
+            if (userDataAi == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body("User data AI record not found with ID: " + userDataId);
+            }
+            
+            // Find the recommended course
+            Course recommendedCourse = null;
+            if (userDataAi.getCourse() != null) {
+                try {
+                    recommendedCourse = courseService.findCourseById(userDataAi.getCourse().getCourseId());
+                } catch (Exception e) {
+                    logger.warn("Could not find course: " + e.getMessage());
+                }
+            }
+            
+            // Get course type details if available
+            Map<String, Object> courseTypeDetails = new HashMap<>();
+            if (recommendedCourse != null && recommendedCourse.getCourseType() != null) {
+                courseTypeDetails.put("id", recommendedCourse.getCourseType().getCourseTypeId());
+                courseTypeDetails.put("name", recommendedCourse.getCourseType().getCourseTypeName());
+            }
+            
+            // Create a map with all the details
+            Map<String, Object> recommendationDetails = new HashMap<>();
+            recommendationDetails.put("userDataId", userDataAi.getUser_data_id());
+            recommendationDetails.put("customerId", userDataAi.getCustomer() != null ? userDataAi.getCustomer().getCustomerId() : null);
+            
+            // User metrics used for recommendation
+            Map<String, Object> userMetrics = new HashMap<>();
+            userMetrics.put("age", userDataAi.getAge());
+            userMetrics.put("gender", userDataAi.getGender());
+            userMetrics.put("height", userDataAi.getHeight());
+            userMetrics.put("weight", userDataAi.getWeight());
+            userMetrics.put("bmi", userDataAi.getBmi());
+            userMetrics.put("body_type", userDataAi.getBody_type());
+            userMetrics.put("training_goals", userDataAi.getTraining_goals());
+            userMetrics.put("training_history", userDataAi.getTraining_history());
+            userMetrics.put("training_frequency", userDataAi.getTraining_frequency());
+            userMetrics.put("occupation", userDataAi.getOccupation());
+            userMetrics.put("work_environment", userDataAi.getWork_environment());
+            userMetrics.put("heart_disease", userDataAi.getHeart_disease());
+            userMetrics.put("respiratory_disease", userDataAi.getRespiratory_disease());
+            userMetrics.put("recent_injury", userDataAi.getRecent_injury());
+            
+            recommendationDetails.put("userMetrics", userMetrics);
+            
+            // Course details
+            Map<String, Object> courseDetails = new HashMap<>();
+            if (recommendedCourse != null) {
+                courseDetails.put("id", recommendedCourse.getCourseId());
+                courseDetails.put("name", recommendedCourse.getCourseName());
+                courseDetails.put("description", recommendedCourse.getDescription());
+                courseDetails.put("duration", recommendedCourse.getDuration());
+                courseDetails.put("image", recommendedCourse.getImage());
+                courseDetails.put("status", recommendedCourse.getStatus());
+                courseDetails.put("courseType", courseTypeDetails);
+            }
+            
+            recommendationDetails.put("recommendedCourse", courseDetails);
+            recommendationDetails.put("isConfirmed", userDataAi.getEffective());
+            
+            // Add explanation of how this course matches the user profile
+            String explanation = generateRecommendationExplanation(userDataAi, recommendedCourse);
+            recommendationDetails.put("explanation", explanation);
+            
+            return ResponseEntity.ok(recommendationDetails);
+        } catch (Exception e) {
+            logger.error("Error getting recommendation details: " + e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error getting recommendation details: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Generate an explanation of why this course was recommended based on user metrics
+     */
+    private String generateRecommendationExplanation(UserDataAi userDataAi, Course course) {
+        StringBuilder explanation = new StringBuilder();
+        
+        if (course == null || userDataAi == null) {
+            return "Không có đủ thông tin để giải thích đề xuất.";
+        }
+        
+        // Add introduction
+        explanation.append("Khóa học này được đề xuất dựa trên các thông số của bạn:\n\n");
+        
+        // Body type explanation
+        if (userDataAi.getBody_type() != null) {
+            explanation.append("- Với hình thể ").append(userDataAi.getBody_type()).append(", ");
+            
+            if (userDataAi.getBody_type().equalsIgnoreCase("Skinny Fat")) {
+                explanation.append("bạn cần tập trung vào tăng cường cơ bắp và giảm lượng mỡ cơ thể.\n");
+            } else if (userDataAi.getBody_type().equalsIgnoreCase("Thin")) {
+                explanation.append("bạn nên tập trung vào tăng cân và phát triển cơ bắp.\n");
+            } else if (userDataAi.getBody_type().equalsIgnoreCase("Overweight")) {
+                explanation.append("bạn nên tập trung vào giảm mỡ và cải thiện sức khỏe tim mạch.\n");
+            } else if (userDataAi.getBody_type().equalsIgnoreCase("Normal")) {
+                explanation.append("bạn có thể tập trung vào duy trì và tăng cường sức khỏe tổng thể.\n");
+            } else if (userDataAi.getBody_type().equalsIgnoreCase("Fit")) {
+                explanation.append("bạn có thể tập trung vào nâng cao hiệu suất và phát triển cơ bắp đặc biệt.\n");
+            }
+        }
+        
+        // Training goals explanation
+        if (userDataAi.getTraining_goals() != null) {
+            explanation.append("- Mục tiêu tập luyện ").append(userDataAi.getTraining_goals())
+                      .append(" của bạn sẽ được đáp ứng thông qua khóa học này.\n");
+        }
+        
+        // BMI explanation
+        if (userDataAi.getBmi() != null) {
+            explanation.append("- Chỉ số BMI của bạn là ").append(userDataAi.getBmi()).append(". ");
+            
+            if (userDataAi.getBmi() < 18.5) {
+                explanation.append("Bạn đang ở dưới chuẩn và nên tập trung vào tăng khối lượng cơ.\n");
+            } else if (userDataAi.getBmi() >= 18.5 && userDataAi.getBmi() < 25) {
+                explanation.append("Bạn đang ở mức cân đối và nên tập trung vào duy trì và cải thiện sức khỏe.\n");
+            } else if (userDataAi.getBmi() >= 25 && userDataAi.getBmi() < 30) {
+                explanation.append("Bạn đang hơi thừa cân và nên tập trung vào giảm mỡ và tăng cơ.\n");
+            } else {
+                explanation.append("Bạn đang ở mức béo phì và nên tập trung vào giảm cân để cải thiện sức khỏe.\n");
+            }
+        }
+        
+        // Training history
+        if (userDataAi.getTraining_history() != null) {
+            explanation.append("- Với lịch sử tập luyện ").append(userDataAi.getTraining_history())
+                      .append(", khóa học này được thiết kế phù hợp với kinh nghiệm của bạn.\n");
+        }
+        
+        // Health conditions
+        boolean hasHealthIssues = false;
+        if (userDataAi.getHeart_disease() != null && userDataAi.getHeart_disease()) {
+            hasHealthIssues = true;
+            explanation.append("- Khóa học này an toàn cho người có vấn đề về tim mạch.\n");
+        }
+        
+        if (userDataAi.getRespiratory_disease() != null && userDataAi.getRespiratory_disease()) {
+            hasHealthIssues = true;
+            explanation.append("- Khóa học này phù hợp với người có vấn đề hô hấp.\n");
+        }
+        
+        if (userDataAi.getRecent_injury() != null && userDataAi.getRecent_injury()) {
+            hasHealthIssues = true;
+            explanation.append("- Khóa học này đã tính đến yếu tố chấn thương gần đây của bạn.\n");
+        }
+        
+        if (!hasHealthIssues) {
+            explanation.append("- Bạn không có vấn đề sức khỏe đặc biệt, nên khóa học này phù hợp tối ưu cho bạn.\n");
+        }
+        
+        // Course benefit
+        explanation.append("\nKhóa học ").append(course.getCourseName())
+                  .append(" sẽ giúp bạn đạt được mục tiêu của mình một cách hiệu quả và an toàn.");
+        
+        return explanation.toString();
+    }
+
+    @PostMapping("/confirm-recommendation/{userDataId}")
+    public ResponseEntity<?> confirmRecommendation(@PathVariable Integer userDataId) {
+        try {
+            // Find the user data AI record
+            UserDataAi userDataAi = userDataAiService.findUserDataAiById(userDataId);
+            if (userDataAi == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body("User data AI record not found with ID: " + userDataId);
+            }
+            
+            // Mark as effective (confirmed)
+            userDataAi.setEffective(true);
+            userDataAiService.saveUserDataAi(userDataAi);
+            
+            // Save recommended course to customer_course
+            if (userDataAi.getCourse() != null && userDataAi.getCustomer() != null) {
+                Integer customerId = userDataAi.getCustomer().getCustomerId();
+                Integer courseId = userDataAi.getCourse().getCourseId();
+                
+                // First check if this course is already recommended for this customer
+                List<CustomerCourse> existingCourses = customerCourseService.findByCustomerId(customerId);
+                boolean exists = existingCourses.stream()
+                        .anyMatch(cc -> cc.getCourse().getCourseId().equals(courseId));
+                
+                if (!exists) {
+                    logger.info("Saving confirmed course {} for user {}", courseId, customerId);
+                    customerCourseService.saveRecommendedCourseById(courseId, customerId);
+                } else {
+                    logger.info("Course {} already exists for user {}, skipping save", courseId, customerId);
+                }
+            } else {
+                logger.warn("Cannot save recommendation - course or customer is null in userDataAi record");
+            }
+            
+            // Return success response with redirect information
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "success");
+            response.put("message", "Recommendation confirmed successfully");
+            response.put("redirectUrl", "/collection/recommended-courses");
+            response.put("customerId", userDataAi.getCustomer() != null ? userDataAi.getCustomer().getCustomerId() : null);
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("Error confirming recommendation: " + e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error confirming recommendation: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/recommendation-step-7")
+    public ResponseEntity<?> getRecommendationStep7Data(@RequestParam(required = false) Integer userDataId) {
+        try {
+            // Check if userDataId is provided
+            if (userDataId == null) {
+                logger.warn("No userDataId provided to recommendation-step-7 endpoint");
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Missing required parameter: userDataId");
+                errorResponse.put("currentStep", 7);
+                errorResponse.put("totalSteps", 7);
+                errorResponse.put("stepTitle", "Xác Nhận Khóa Học Được Đề Xuất");
+                
+                // Add empty recommendation to avoid frontend errors
+                errorResponse.put("recommendedCourse", Collections.emptyMap());
+                errorResponse.put("userMetrics", Collections.emptyMap());
+                errorResponse.put("explanation", "Không thể lấy thông tin chi tiết khóa học. Vui lòng thử lại sau.");
+                
+                return ResponseEntity.ok(errorResponse);
+            }
+            
+            // Get all recommendation details
+            ResponseEntity<?> detailsResponse = getRecommendationDetails(userDataId);
+            
+            // If there was an error getting the details, return the error directly
+            if (detailsResponse.getStatusCode().isError()) {
+                return detailsResponse;
+            }
+            
+            // Get the details from the response
+            Map<String, Object> recommendationDetails = (Map<String, Object>) detailsResponse.getBody();
+            
+            // Add step information for the front-end
+            recommendationDetails.put("currentStep", 7);
+            recommendationDetails.put("totalSteps", 7);
+            recommendationDetails.put("stepTitle", "Xác Nhận Khóa Học Được Đề Xuất");
+            
+            // Add confirmation actions
+            Map<String, String> actions = new HashMap<>();
+            actions.put("confirm", "/api/v1/track-data-ai/confirm-recommendation/" + userDataId);
+            actions.put("skip", "/collection/recommended-courses");
+            recommendationDetails.put("actions", actions);
+            
+            return ResponseEntity.ok(recommendationDetails);
+        } catch (Exception e) {
+            logger.error("Error getting step 7 data: " + e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error getting step 7 data: " + e.getMessage());
         }
     }
 }
