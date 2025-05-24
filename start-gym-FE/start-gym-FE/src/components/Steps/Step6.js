@@ -135,7 +135,7 @@ const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
                 gender: formData.gender,
                 height: formData.height,
                 weight: formData.weight,
-                bmi: formData.weight / Math.pow(formData.height/100, 2), // Tính BMI
+                bmi: Math.round((formData.weight / Math.pow(formData.height/100, 2)) * 100) / 100, // Tính BMI và làm tròn 2 chữ số thập phân
                 training_goals: (trainingGoalMap[formData.trainingGoal] || '7, Weight Loss').trim(),
                 occupation: (occupationMap[formData.occupation] || 'Student').trim(),
                 work_environment: (workEnvironmentMap[formData.workEnvironment] || 'Office').trim(),

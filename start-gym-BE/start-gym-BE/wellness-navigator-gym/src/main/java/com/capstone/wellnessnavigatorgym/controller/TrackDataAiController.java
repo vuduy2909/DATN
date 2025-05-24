@@ -270,7 +270,7 @@ public class TrackDataAiController {
             if (userDataDTO.getBmi() == null && userDataDTO.getHeight() != null && userDataDTO.getWeight() != null) {
                 double heightInMeters = userDataDTO.getHeight() / 100.0;
                 double bmi = userDataDTO.getWeight() / (heightInMeters * heightInMeters);
-                userDataDTO.setBmi(Math.round(bmi * 10.0) / 10.0); // Làm tròn đến 1 chữ số thập phân
+                userDataDTO.setBmi(Math.round(bmi * 100.0) / 100.0); // Làm tròn đến 2 chữ số thập phân
             }
 
             Customer customer = customerService.findById(userDataDTO.getCustomerId());
@@ -468,7 +468,7 @@ public class TrackDataAiController {
             // Tính BMI nếu không có trong form data
             double heightInMeters = formData.getHeight() / 100.0;
             double bmi = formData.getWeight() / (heightInMeters * heightInMeters);
-            dto.setBmi(Math.round(bmi * 10.0) / 10.0); // Làm tròn đến 1 chữ số thập phân
+            dto.setBmi(Math.round(bmi * 100.0) / 100.0); // Làm tròn đến 2 chữ số thập phân
         }
 
         // Số đo cơ thể
@@ -734,7 +734,7 @@ public class TrackDataAiController {
                     // Tính BMI
                     double heightInMeters = height / 100.0;
                     double bmi = weight / (heightInMeters * heightInMeters);
-                    userDataDTO.setBmi(Math.round(bmi * 10.0) / 10.0);
+                    userDataDTO.setBmi(Math.round(bmi * 100.0) / 100.0);
                     
                     // Sử dụng body_type được phát hiện từ Claude
                     userDataDTO.setBody_type(response.getBodyType());
@@ -905,7 +905,7 @@ public class TrackDataAiController {
         // Tạo nội dung user message
         String prompt = "Hãy phân tích hình thể cơ thể trong ảnh này (bỏ qua khuôn mặt nếu có). " + 
                 "Thông số cơ thể: Cao " + height + "cm, nặng " + weight + "kg, giới tính: " + gender + ". " +
-                "Dựa vào hình ảnh và chỉ số BMI = " + Math.round((weight / Math.pow(height/100, 2)) * 10) / 10.0 + ", hãy phân tích các yếu tố sau:\n\n" +
+                "Dựa vào hình ảnh và chỉ số BMI = " + Math.round((weight / Math.pow(height/100, 2)) * 100) / 100.0 + ", hãy phân tích các yếu tố sau:\n\n" +
                 "1. Phân loại hình thể (chọn MỘT loại phù hợp nhất): Thin (gầy), Skinny Fat (gầy có mỡ), Overweight (thừa cân), Normal (bình thường), hoặc Fit (có cơ bắp).\n\n" +
                 "2. Phân tích chi tiết (ít nhất 150 từ):\n" + 
                 "   - Tỷ lệ cơ-mỡ và phân bố\n" + 
@@ -1886,7 +1886,7 @@ public class TrackDataAiController {
             if (userDataAi.getWeight_after() != null && userDataAi.getHeight() != null) {
                 double heightInMeters = userDataAi.getHeight() / 100.0;
                 bmiAfter = userDataAi.getWeight_after() / (heightInMeters * heightInMeters);
-                bmiAfter = Math.round(bmiAfter * 10.0) / 10.0;
+                bmiAfter = Math.round(bmiAfter * 100.0) / 100.0;
             }
             afterData.put("bmi_after", bmiAfter);
             response.put("afterData", afterData);

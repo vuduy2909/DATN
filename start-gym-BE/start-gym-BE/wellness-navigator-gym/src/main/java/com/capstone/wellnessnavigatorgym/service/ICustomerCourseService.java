@@ -16,4 +16,9 @@ public interface ICustomerCourseService {
     List<CustomerCourse> findByCustomerId(Integer customerId);
     
     List<CustomerCourse> findRecommendedCoursesByUsername(String username);
+    
+    // New methods for customer self-enrollment
+    boolean isCustomerEnrolledInCourse(Integer customerId, Integer courseId);
+    
+    void addCourseForCustomer(Integer courseId, Integer customerId);
 }

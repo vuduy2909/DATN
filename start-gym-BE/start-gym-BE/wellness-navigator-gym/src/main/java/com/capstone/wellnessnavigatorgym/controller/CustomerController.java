@@ -219,4 +219,60 @@ public class CustomerController {
                 .body("Failed to change password: " + e.getMessage());
         }
     }
+
+    @PutMapping("/update-profile")
+    public ResponseEntity<?> updateProfile(@RequestBody Map<String, String> profileData) {
+        try {
+            // Get current user
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String username = authentication.getName();
+            
+            // Validate required fields
+            String email = profileData.get("customerEmail");
+            String phone = profileData.get("customerPhone");
+            
+            if (email == null || email.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("Email is required");
+            }
+            
+            if (phone == null || phone.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("Phone number is required");
+            }
+            
+            // Validate email format
+            if (!email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
+                return ResponseEntity.badRequest().body("Invalid email format");
+            }
+            
+            // Validate phone format (10-11 digits)
+            if (!phone.matches("^\\d{10,11}$")) {
+                return ResponseEntity.badRequest().body("Phone number must be 10-11 digits");
+            }
+            
+            // Validate date of birth if provided (must be >16 years old)
+            String dateOfBirth = profileData.get("customerDateOfBirth");
+            if (dateOfBirth != null && !dateOfBirth.trim().isEmpty()) {
+                try {
+                    java.time.LocalDate birthDate = java.time.LocalDate.parse(dateOfBirth);
+                    java.time.LocalDate today = java.time.LocalDate.now();
+                    int age = java.time.Period.between(birthDate, today).getYears();
+                    
+                    if (age < 16) {
+                        return ResponseEntity.badRequest().body("You must be at least 16 years old");
+                    }
+                } catch (Exception e) {
+                    return ResponseEntity.badRequest().body("Invalid date format. Use YYYY-MM-DD");
+                }
+            }
+            
+            // Update profile
+            customerService.updateCustomerProfile(username, profileData);
+            
+            return ResponseEntity.ok(new MessageResponse("Profile updated successfully"));
+            
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("Failed to update profile: " + e.getMessage());
+        }
+    }
 }

@@ -51,23 +51,41 @@
 
 .footer {
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
     width: 100%;
+    gap: 15px;
+}
+
+.course_actions {
+    display: flex;
+    gap: 10px;
     align-items: center;
+    justify-content: space-between;
+}
+
+.course_actions .link {
+    flex: 1;
 }
 
 .btn {
-    background-color: var(--color-red-body);
+    background-color: #2ecc71;
     display: flex;
-    padding: 6px 12px;
+    padding: 8px 16px;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    gap: 8px;
     border-radius: 8px;
     border: unset;
     color: #fff;
-    font-size: 14px;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    width: 100%;
+}
+
+.btn:hover {
+    background-color: #27ae60;
+    transform: translateY(-1px);
 }
 
 .line {
@@ -226,4 +244,33 @@
 
 .link {
     text-decoration: none;
+}
+
+.card_header {
+    position: relative;
+    margin-bottom: 10px;
+}
+
+.course_badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 10;
+}
+
+.badge {
+    padding: 5px 12px;
+    border-radius: 15px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.badge.recommended {
+    background: linear-gradient(45deg, #f39c12, #e67e22);
+}
+
+.badge.self_enrolled {
+    background: linear-gradient(45deg, #3498db, #2980b9);
 }

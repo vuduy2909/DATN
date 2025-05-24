@@ -127,4 +127,97 @@ public class CustomerCourseController {
                 .body("Error adding recommended course: " + e.getMessage());
         }
     }
+
+    @PostMapping("/join/{courseId}")
+    public ResponseEntity<?> joinCourse(@PathVariable Integer courseId) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication.getName();
+        
+        try {
+            // Get customer info
+            Customer customer = customerRepository.findByAccountUserName(username);
+            if (customer == null) {
+                Map<String, String> error = new HashMap<>();
+                error.put("error", "Customer not found");
+                error.put("message", "Please login to join courses");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
+            }
+            
+            // Check if customer already joined this course
+            boolean alreadyJoined = customerCourseService.isCustomerEnrolledInCourse(customer.getCustomerId(), courseId);
+            if (alreadyJoined) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("error", "Already enrolled");
+                response.put("message", "You have already joined this course");
+                response.put("courseId", courseId);
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+            }
+            
+            // Add course for customer (not recommended, user choice)
+            customerCourseService.addCourseForCustomer(courseId, customer.getCustomerId());
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Successfully joined the course!");
+            response.put("courseId", courseId);
+            response.put("customerId", customer.getCustomerId());
+            response.put("customerName", customer.getCustomerName());
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (IllegalArgumentException e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Invalid course");
+            error.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        } catch (Exception e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Server error");
+            error.put("message", "Error joining course: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+        }
+    }
+
+    @GetMapping("/my-courses")
+    public ResponseEntity<?> getMyCourses() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication.getName();
+        
+        try {
+            Customer customer = customerRepository.findByAccountUserName(username);
+            if (customer == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body("Customer not found for username: " + username);
+            }
+            
+            List<CustomerCourse> allCourses = customerCourseService.findByCustomerId(customer.getCustomerId());
+            
+            List<Map<String, Object>> coursesDetails = allCourses.stream()
+                .map(cc -> {
+                    Map<String, Object> details = new HashMap<>();
+                    if (cc.getCourse() != null) {
+                        details.put("courseId", cc.getCourse().getCourseId());
+                        details.put("courseName", cc.getCourse().getCourseName());
+                        details.put("description", cc.getCourse().getDescription());
+                        details.put("duration", cc.getCourse().getDuration());
+                        details.put("image", cc.getCourse().getImage());
+                        details.put("isRecommended", cc.getRecommendedStatus() != null && cc.getRecommendedStatus());
+                        details.put("joinType", cc.getRecommendedStatus() != null && cc.getRecommendedStatus() ? "Recommended" : "Self-enrolled");
+                    }
+                    return details;
+                })
+                .collect(Collectors.toList());
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("customerName", customer.getCustomerName());
+            response.put("totalCourses", coursesDetails.size());
+            response.put("courses", coursesDetails);
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("Error getting courses: " + e.getMessage());
+        }
+    }
 } 

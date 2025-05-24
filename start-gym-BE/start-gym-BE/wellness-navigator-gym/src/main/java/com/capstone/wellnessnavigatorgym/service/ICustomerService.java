@@ -7,6 +7,8 @@ import com.capstone.wellnessnavigatorgym.entity.Customer;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.util.Map;
+
 public interface ICustomerService {
     void save(Customer customer);
 
@@ -34,4 +36,6 @@ public interface ICustomerService {
     boolean verifyCurrentPassword(String username, String password);
     
     void updatePassword(String username, String encodedPassword);
+    
+    void updateCustomerProfile(String username, Map<String, String> profileData);
 }

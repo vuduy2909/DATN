@@ -7,6 +7,7 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import dayjs from 'dayjs';
 
 const Register = () => {
     const [name, setName] = useState('');
@@ -21,6 +22,7 @@ const Register = () => {
     const [phoneError, setPhoneError] = useState('');
 
     const [dateOfBirth, setDateOfBirth] = useState(null);
+    const [dateOfBirthError, setDateOfBirthError] = useState('');
 
     const [address, setAddress] = useState('');
     const [addressError, setAddressError] = useState('');
@@ -82,6 +84,26 @@ const Register = () => {
         }
     }
 
+    const handleDateOfBirthChange = (newDate) => {
+        setDateOfBirth(newDate);
+        
+        if (!newDate) {
+            setDateOfBirthError('Vui lòng chọn ngày sinh');
+            return;
+        }
+
+        // Calculate age
+        const today = dayjs();
+        const birthDate = dayjs(newDate);
+        const age = today.diff(birthDate, 'year');
+        
+        if (age < 16) {
+            setDateOfBirthError('Bạn phải từ 16 tuổi trở lên để đăng ký');
+        } else {
+            setDateOfBirthError('');
+        }
+    };
+
     const handleAddressChange = (e) => {
         const value = e.target.value;
         setAddress(value)
@@ -141,8 +163,18 @@ const Register = () => {
                 return;
             }
 
-            if (nameError || usernameError || phoneError || addressError || emailError || passwordError || confirmPasswordError) {
+            if (nameError || usernameError || phoneError || dateOfBirthError || addressError || emailError || passwordError || confirmPasswordError) {
                 alert('Vui lòng sửa các lỗi trong form');
+                return;
+            }
+
+            // Double check age validation
+            const today = dayjs();
+            const birthDate = dayjs(dateOfBirth);
+            const age = today.diff(birthDate, 'year');
+            
+            if (age < 16) {
+                alert('Bạn phải từ 16 tuổi trở lên để đăng ký');
                 return;
             }
 
@@ -178,6 +210,9 @@ const Register = () => {
             }
         }
     };
+
+    // Calculate max date (16 years ago from today)
+    const maxDate = dayjs().subtract(16, 'year');
 
     return (
         <div className={styles.container}>
@@ -271,14 +306,15 @@ const Register = () => {
                                 <DatePicker
                                     label="Date of Birth * *"
                                     value={dateOfBirth}
-                                    onChange={(newDate) => setDateOfBirth(newDate)}
+                                    onChange={handleDateOfBirthChange}
+                                    maxDate={maxDate}
                                     slotProps={{
                                         textField: {
                                             fullWidth: true,
                                             required: true,
                                             size: 'small',
-                                            error: !dateOfBirth,
-                                            helperText: !dateOfBirth ? 'Vui lòng chọn ngày sinh' : ''
+                                            error: !!dateOfBirthError,
+                                            helperText: dateOfBirthError || 'Phải từ 16 tuổi trở lên'
                                         }
                                     }}
                                 />

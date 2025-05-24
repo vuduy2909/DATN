@@ -27,6 +27,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
@@ -87,6 +88,7 @@ public class SecurityController {
     }
 
     @PostMapping("/oauth/google")
+    @Transactional
     public ResponseEntity<?> loginGoogle(@RequestBody SocialResponse jwtResponseSocial) {
         final NetHttpTransport netHttpTransport = new NetHttpTransport();
         final JacksonFactory jacksonFactory = JacksonFactory.getDefaultInstance();
@@ -108,14 +110,27 @@ public class SecurityController {
                 newAccount.setRoles(Collections.singleton(new Role(1, "ROLE_USER")));
 
                 newAccount = accountService.save(newAccount);
+                
+                if (newAccount == null || newAccount.getAccountId() == null) {
+                    throw new RuntimeException("Failed to create account via Google OAuth");
+                }
 
                 Customer customerLimit = customerService.customerLimit();
                 Customer newCustomer = new Customer();
-                newCustomer.setCustomerCode(ConverterMaxCode.generateNextId(customerLimit.getCustomerCode()));
+                newCustomer.setCustomerCode(ConverterMaxCode.generateNextId(
+                    customerLimit != null ? customerLimit.getCustomerCode() : null
+                ));
                 newCustomer.setCustomerName(payload.get("name").toString());
                 newCustomer.setCustomerEmail(payload.getEmail());
                 newCustomer.setIsEnable(true);
                 newCustomer.setAccount(newAccount);
+                
+                // Set default customer type
+                List<CustomerType> customerTypes = customerTypeService.findAllCustomerType();
+                if (!customerTypes.isEmpty()) {
+                    newCustomer.setCustomerType(customerTypes.get(0));
+                }
+                
                 customerService.save(newCustomer);
             }
             String jwt = jwtTokenProvider.generateToken(payload.getEmail());
@@ -127,6 +142,7 @@ public class SecurityController {
     }
 
     @PostMapping("/signup")
+    @Transactional
     public ResponseEntity<?> registerUser(@RequestBody SignupRequest signupRequest) {
         try {
             // Validate input
@@ -171,10 +187,25 @@ public class SecurityController {
             
             // Save account first
             account = accountService.save(account);
+            
+            if (account == null || account.getAccountId() == null) {
+                throw new RuntimeException("Failed to create account");
+            }
+
+            // Get default customer type
+            List<CustomerType> customerTypes = customerTypeService.findAllCustomerType();
+            if (customerTypes.isEmpty()) {
+                throw new RuntimeException("No customer type available");
+            }
+            CustomerType defaultType = customerTypes.get(0);
 
             // Generate customer code
             Customer customerLimit = customerService.customerLimit();
-            String customerCode = ConverterMaxCode.generateNextId(customerLimit.getCustomerCode());
+            String customerCode = ConverterMaxCode.generateNextId(
+                customerLimit != null ? customerLimit.getCustomerCode() : null
+            );
+            
+            System.out.println("Generated customer code: " + customerCode); // Debug log
 
             // Create Customer record automatically
             Customer customer = new Customer();
@@ -187,22 +218,17 @@ public class SecurityController {
             customer.setCustomerAddress(signupRequest.getAddress());
             customer.setIsEnable(true);
             customer.setAccount(account);
-            
-            // Set default customer type (assuming ID 1 is the basic/free type)
-            List<CustomerType> customerTypes = customerTypeService.findAllCustomerType();
-            if (!customerTypes.isEmpty()) {
-                CustomerType defaultType = customerTypes.get(0); // Get first customer type as default
-                customer.setCustomerType(defaultType);
-            }
-            
-            // Note: idCard is removed, so we don't set it
+            customer.setCustomerType(defaultType);
             
             // Save customer
             customerService.save(customer);
+            
+            System.out.println("Customer saved successfully with ID: " + customer.getCustomerId()); // Debug log
 
             return new ResponseEntity<>(new MessageResponse("Account registration successful!"), HttpStatus.OK);
             
         } catch (Exception e) {
+            System.err.println("Registration error: " + e.getMessage()); // Debug log
             e.printStackTrace();
             return new ResponseEntity<>(new MessageResponse("Registration failed: " + e.getMessage()), HttpStatus.INTERNAL_SERVER_ERROR);
         }

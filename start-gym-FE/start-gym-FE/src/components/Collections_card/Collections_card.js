@@ -7,8 +7,9 @@ import { collectionService } from "../../service/collectionService";
 import { faStar } from "@fortawesome/free-solid-svg-icons";
 import Button from "@mui/material/Button";
 import { CircularProgress } from "@mui/material";
+import CourseJoinButton from "../Course/CourseJoinButton";
 
-const CollectionCard = ({ id, title, image, duration }) => {
+const CollectionCard = ({ id, title, image, duration, onJoinSuccess, isUserCourse = false, joinType = null, isRecommended = false }) => {
   const renderRating = () => {
     const stars = [];
     const ratingValue = parseInt(duration) || 3; // Default to 3 if can't parse
@@ -38,7 +39,17 @@ const CollectionCard = ({ id, title, image, duration }) => {
 
   return (
     <Card key={id} className={styles.collection_card}>
-      <Card.Img variant="top" src={image || 'https://via.placeholder.com/300x180?text=Course+Image'} className={styles.img} />
+      <div className={styles.card_header}>
+        <Card.Img variant="top" src={image || 'https://via.placeholder.com/300x180?text=Course+Image'} className={styles.img} />
+        {isUserCourse && joinType && (
+          <div className={styles.course_badge}>
+            <span className={`${styles.badge} ${isRecommended ? styles.recommended : styles.self_enrolled}`}>
+              {joinType}
+            </span>
+          </div>
+        )}
+      </div>
+      
       <Card.Body className={styles.card_body}>
         <Card.Title>{title}</Card.Title>
         <div className={styles.rating}>
@@ -57,16 +68,27 @@ const CollectionCard = ({ id, title, image, duration }) => {
         </svg>
         <div className={styles.footer}>
           <p className={styles.collection_duration}>Duration: {duration || 'Unknown'}</p>
-          <Link to={`/collections/${id}/days/1`} className={styles.link}>
-            <button className={styles.btn}>Join now</button>
-          </Link>
+          <div className={styles.course_actions}>
+            <Link to={`/collections/${id}/days/1`} className={styles.link}>
+              <button className={styles.btn}>
+                {isUserCourse ? 'Tiếp tục học' : 'Xem chi tiết'}
+              </button>
+            </Link>
+            {!isUserCourse && (
+              <CourseJoinButton 
+                courseId={id}
+                courseName={title}
+                onJoinSuccess={onJoinSuccess}
+              />
+            )}
+          </div>
         </div>
       </Card.Body>
     </Card>
   );
 };
 
-const Collections_card = ({ selectedCategory, recommendedCourses, loading }) => {
+const Collections_card = ({ selectedCategory, recommendedCourses, loading, onCourseJoinSuccess }) => {
   const [dataCourse, setDataCourse] = useState([]);
   const [loadingCourses, setLoadingCourses] = useState(true);
   const [error, setError] = useState(null);
@@ -124,30 +146,31 @@ const Collections_card = ({ selectedCategory, recommendedCourses, loading }) => 
     
     console.log("Filtering with category:", selectedCategory);
     console.log("Available courses:", dataCourse);
-    console.log("Recommended courses:", recommendedCourses);
+    console.log("User courses:", recommendedCourses);
     
     let filtered;
     
-    if (selectedCategory === "Recommend") {
-      // Force include course with ID 5 (Core Power Development)
-      const course5 = dataCourse.find(course => course.courseId === 5);
-      if (course5) {
-        console.log("Found Core Power Development course:", course5);
-        filtered = [course5];
-      } else {
-        console.log("Course ID 5 not found in available courses");
-        filtered = [];
-      }
-      
-      // Also include any other recommended courses if available
+    if (selectedCategory === "My Course") {
+      // For My Course tab, show user's courses if any exist
       if (recommendedCourses && recommendedCourses.length > 0) {
-        const otherRecommendedCourses = dataCourse.filter(course => 
-          recommendedCourses.some(rec => rec.courseId === course.courseId) && course.courseId !== 5
-        );
-        filtered = [...filtered, ...otherRecommendedCourses];
+        // Map user's courses to match the expected format
+        filtered = recommendedCourses.map(userCourse => ({
+          courseId: userCourse.courseId,
+          courseName: userCourse.courseName,
+          description: userCourse.description,
+          duration: userCourse.duration,
+          image: userCourse.image,
+          courseType: userCourse.courseType,
+          isUserCourse: true,
+          joinType: userCourse.joinType || (userCourse.isRecommended ? 'Recommended' : 'Self-enrolled'),
+          isRecommended: userCourse.isRecommended
+        }));
+        console.log("Showing user's courses in My Course tab:", filtered);
+      } else {
+        // No user courses, show empty state
+        filtered = [];
+        console.log("No user courses found for My Course tab");
       }
-      
-      console.log("Final recommended courses:", filtered);
     } else if (selectedCategory === "All") {
       filtered = dataCourse;
     } else {
@@ -185,7 +208,7 @@ const Collections_card = ({ selectedCategory, recommendedCourses, loading }) => 
     );
   }
 
-  const isRecommendWithNoData = selectedCategory === "Recommend" && filteredCards.length === 0;
+  const isMyCourseWithNoData = selectedCategory === "My Course" && filteredCards.length === 0;
 
   return (
     <div className={styles.collection}>
@@ -198,21 +221,40 @@ const Collections_card = ({ selectedCategory, recommendedCourses, loading }) => 
             description={course.description}
             duration={course.duration}
             image={course.image}
+            isUserCourse={course.isUserCourse || false}
+            joinType={course.joinType}
+            isRecommended={course.isRecommended || false}
+            onJoinSuccess={onCourseJoinSuccess}
           />
         ))
       ) : (
         <div className={styles.bn_left}>
           <div className={styles.bn_left_1}>
             <p className={styles.typo}>
-              <span className={styles.typo_red}>No</span> {isRecommendWithNoData ? "recommended" : ""} courses found
+              <span className={styles.typo_red}>
+                {isMyCourseWithNoData ? "Chưa có" : "No"}
+              </span> {isMyCourseWithNoData ? "khóa học nào" : "courses found"}
             </p>
             <p className={styles.typo_des}>
-              <Button variant="contained" className={styles.bn_left_btn}>
-                <Link to="/recommend" style={{ color: "#fff" }}>
-                  Start now
-                </Link>
-              </Button>
-              <span>to receive personalized recommendations.</span>
+              {isMyCourseWithNoData ? (
+                <>
+                  <span>Bạn chưa tham gia khóa học nào. Hãy khám phá các khóa học khác!</span>
+                  <Button variant="contained" className={styles.bn_left_btn}>
+                    <Link to="/recommend" style={{ color: "#fff" }}>
+                      Nhận gợi ý
+                    </Link>
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button variant="contained" className={styles.bn_left_btn}>
+                    <Link to="/recommend" style={{ color: "#fff" }}>
+                      Start now
+                    </Link>
+                  </Button>
+                  <span>to receive personalized recommendations.</span>
+                </>
+              )}
             </p>
           </div>
         </div>

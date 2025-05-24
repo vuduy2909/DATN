@@ -1,7 +1,7 @@
-# Kyo Gym Wellness Navigator - ReactJS Project
+# Start Gym Wellness Navigator - ReactJS Project
 
 ## Introduction
-Kyo Gym Wellness Navigator is a ReactJS web application designed to provide personalized workout recommendations using a Decision Tree algorithm. Users can fill out a form to receive tailored workout plans. The application also includes user authentication (login and logout), an admin page for exercise and user management, and an evaluation system for course effectiveness.
+Start Gym Wellness Navigator is a ReactJS web application designed to provide personalized workout recommendations using a Decision Tree algorithm. Users can fill out a form to receive tailored workout plans. The application also includes user authentication (login and logout), an admin page for exercise and user management, and an evaluation system for course effectiveness.
 
 ## Key Features
 - **Personalized Workout Recommendations:**
@@ -29,11 +29,11 @@ Kyo Gym Wellness Navigator is a ReactJS web application designed to provide pers
    - Use `npm run build` to create a packaged version for deployment.
 
 ## Contributions and Feedback
-- Contributions and feedback are highly appreciated. If you encounter issues or have suggestions, please create a [new issue](https://github.com/tung-td/kyo-gym-wellness-navigator/issues).
+- Contributions and feedback are highly appreciated. If you encounter issues or have suggestions, please create a [new issue](https://github.com/tung-td/Start-gym-wellness-navigator/issues).
 
 ## License
 This project is distributed under the [MIT License](LICENSE).
 
 ---
 
-Thank you for your interest and contribution to the Kyo Gym Wellness Navigator project! Wishing you a great experience with this application.
+Thank you for your interest and contribution to the Start Gym Wellness Navigator project! Wishing you a great experience with this application.

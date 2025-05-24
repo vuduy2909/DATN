@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 
 import javax.persistence.Tuple;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -134,6 +135,45 @@ public class CustomerServiceImpl implements ICustomerService {
             Account account = accountOpt.get();
             account.setEncryptPassword(encodedPassword);
             accountRepository.save(account);
+        }
+    }
+
+    @Override
+    public void updateCustomerProfile(String username, Map<String, String> profileData) {
+        Customer customer = customerRepository.findByAccountUserName(username);
+        if (customer != null) {
+            // Update email
+            if (profileData.get("customerEmail") != null) {
+                customer.setCustomerEmail(profileData.get("customerEmail"));
+            }
+            
+            // Update phone
+            if (profileData.get("customerPhone") != null) {
+                customer.setCustomerPhone(profileData.get("customerPhone"));
+            }
+            
+            // Update address
+            if (profileData.get("customerAddress") != null) {
+                customer.setCustomerAddress(profileData.get("customerAddress"));
+            }
+            
+            // Update gender
+            if (profileData.get("customerGender") != null) {
+                customer.setCustomerGender(profileData.get("customerGender"));
+            }
+            
+            // Update date of birth
+            if (profileData.get("customerDateOfBirth") != null && !profileData.get("customerDateOfBirth").trim().isEmpty()) {
+                try {
+                    java.time.LocalDate localDate = java.time.LocalDate.parse(profileData.get("customerDateOfBirth"));
+                    java.sql.Date dateOfBirth = java.sql.Date.valueOf(localDate);
+                    customer.setDateOfBirth(dateOfBirth);
+                } catch (Exception e) {
+                    // Handle date parsing error - skip update
+                }
+            }
+            
+            customerRepository.save(customer);
         }
     }
 }

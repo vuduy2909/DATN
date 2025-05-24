@@ -13,10 +13,14 @@ import {
     Avatar,
     Box,
     Alert,
-    CircularProgress
+    CircularProgress,
+    MenuItem,
+    Select,
+    FormControl,
+    InputLabel
 } from '@mui/material';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCamera, faKey } from '@fortawesome/free-solid-svg-icons';
+import { faCamera, faKey, faUser } from '@fortawesome/free-solid-svg-icons';
 import { request } from '../utils/axiosInstance';
 import styles from '../components/UserInformation/UserInformation.module.css'
 
@@ -33,6 +37,15 @@ const Account = () => {
         confirmPassword: ''
     });
     
+    // Profile edit states
+    const [profileData, setProfileData] = useState({
+        customerEmail: '',
+        customerPhone: '',
+        customerAddress: '',
+        customerGender: '',
+        customerDateOfBirth: ''
+    });
+    
     // Avatar states
     const [selectedFile, setSelectedFile] = useState(null);
     const [previewUrl, setPreviewUrl] = useState(null);
@@ -43,6 +56,15 @@ const Account = () => {
                 const res = await request.get('/customer/detail')
                 setUserData(res)
                 setPreviewUrl(res.customerImg)
+                
+                // Set profile data for editing
+                setProfileData({
+                    customerEmail: res.customerEmail || '',
+                    customerPhone: res.customerPhone || '',
+                    customerAddress: res.customerAddress || '',
+                    customerGender: res.customerGender || '',
+                    customerDateOfBirth: res.customerDateOfBirth || ''
+                });
             } catch (error) {
                 console.log("Error fetching user information", error);
             }
@@ -52,6 +74,60 @@ const Account = () => {
             fetchUserData();
         }
     }, [user])
+
+    // Handle profile data change
+    const handleProfileChange = (field, value) => {
+        setProfileData(prev => ({ ...prev, [field]: value }));
+        setMessage({ type: '', text: '' });
+    };
+
+    // Handle profile update
+    const handleProfileSubmit = async (e) => {
+        e.preventDefault();
+        
+        // Validate email
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(profileData.customerEmail)) {
+            setMessage({ type: 'error', text: 'Please enter a valid email address' });
+            return;
+        }
+        
+        // Validate phone
+        if (!/^\d{10,11}$/.test(profileData.customerPhone)) {
+            setMessage({ type: 'error', text: 'Phone number must be 10-11 digits' });
+            return;
+        }
+        
+        // Validate date of birth (must be >16 years old)
+        if (profileData.customerDateOfBirth) {
+            const birthDate = new Date(profileData.customerDateOfBirth);
+            const today = new Date();
+            const age = today.getFullYear() - birthDate.getFullYear();
+            const monthDiff = today.getMonth() - birthDate.getMonth();
+            
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+                age--;
+            }
+            
+            if (age < 16) {
+                setMessage({ type: 'error', text: 'You must be at least 16 years old' });
+                return;
+            }
+        }
+
+        setLoading(true);
+        try {
+            await request.put('/customer/update-profile', profileData);
+            
+            setMessage({ type: 'success', text: 'Profile updated successfully!' });
+            setUserData(prev => ({ ...prev, ...profileData }));
+        } catch (error) {
+            setMessage({ type: 'error', text: 'Failed to update profile. Please try again.' });
+            console.log("Error updating profile", error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     // Handle avatar upload
     const handleFileSelect = (event) => {
@@ -141,7 +217,7 @@ const Account = () => {
         <div>
             <Header />
             <div className={styles.container}>
-                <Container component="main" maxWidth="md">
+                <Container component="main" maxWidth="lg">
                     <Typography variant="h4" component="h1" gutterBottom style={{ textAlign: 'center', marginBottom: '30px' }}>
                         Account Settings
                     </Typography>
@@ -154,7 +230,7 @@ const Account = () => {
                     
                     <Grid container spacing={3}>
                         {/* Avatar Section */}
-                        <Grid item xs={12} md={6}>
+                        <Grid item xs={12} md={4}>
                             <Card>
                                 <CardContent>
                                     <Typography variant="h6" component="div" gutterBottom style={{ display: 'flex', alignItems: 'center' }}>
@@ -200,8 +276,90 @@ const Account = () => {
                             </Card>
                         </Grid>
                         
+                        {/* Profile Information Section */}
+                        <Grid item xs={12} md={4}>
+                            <Card>
+                                <CardContent>
+                                    <Typography variant="h6" component="div" gutterBottom style={{ display: 'flex', alignItems: 'center' }}>
+                                        <FontAwesomeIcon icon={faUser} style={{ marginRight: '10px', color: 'var(--color-red-body)' }} />
+                                        Personal Information
+                                    </Typography>
+                                    
+                                    <Box component="form" onSubmit={handleProfileSubmit} sx={{ mt: 2 }}>
+                                        <TextField
+                                            fullWidth
+                                            type="email"
+                                            label="Email"
+                                            value={profileData.customerEmail}
+                                            onChange={(e) => handleProfileChange('customerEmail', e.target.value)}
+                                            margin="normal"
+                                            required
+                                        />
+                                        
+                                        <TextField
+                                            fullWidth
+                                            type="tel"
+                                            label="Phone Number"
+                                            value={profileData.customerPhone}
+                                            onChange={(e) => handleProfileChange('customerPhone', e.target.value)}
+                                            margin="normal"
+                                            required
+                                            helperText="10-11 digits"
+                                        />
+                                        
+                                        <TextField
+                                            fullWidth
+                                            label="Address"
+                                            value={profileData.customerAddress}
+                                            onChange={(e) => handleProfileChange('customerAddress', e.target.value)}
+                                            margin="normal"
+                                            multiline
+                                            rows={2}
+                                        />
+                                        
+                                        <FormControl fullWidth margin="normal">
+                                            <InputLabel>Gender</InputLabel>
+                                            <Select
+                                                value={profileData.customerGender}
+                                                onChange={(e) => handleProfileChange('customerGender', e.target.value)}
+                                                label="Gender"
+                                            >
+                                                <MenuItem value="Male">Male</MenuItem>
+                                                <MenuItem value="Female">Female</MenuItem>
+                                                <MenuItem value="Other">Other</MenuItem>
+                                            </Select>
+                                        </FormControl>
+                                        
+                                        <TextField
+                                            fullWidth
+                                            type="date"
+                                            label="Date of Birth"
+                                            value={profileData.customerDateOfBirth}
+                                            onChange={(e) => handleProfileChange('customerDateOfBirth', e.target.value)}
+                                            margin="normal"
+                                            InputLabelProps={{ shrink: true }}
+                                            helperText="Must be at least 16 years old"
+                                            inputProps={{
+                                                max: new Date(new Date().getFullYear() - 16, new Date().getMonth(), new Date().getDate()).toISOString().split('T')[0]
+                                            }}
+                                        />
+                                        
+                                        <Button
+                                            type="submit"
+                                            fullWidth
+                                            variant="contained"
+                                            disabled={loading}
+                                            sx={{ mt: 3, backgroundColor: 'var(--color-red-body)' }}
+                                        >
+                                            {loading ? <CircularProgress size={20} /> : 'Update Profile'}
+                                        </Button>
+                                    </Box>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+                        
                         {/* Password Change Section */}
-                        <Grid item xs={12} md={6}>
+                        <Grid item xs={12} md={4}>
                             <Card>
                                 <CardContent>
                                     <Typography variant="h6" component="div" gutterBottom style={{ display: 'flex', alignItems: 'center' }}>

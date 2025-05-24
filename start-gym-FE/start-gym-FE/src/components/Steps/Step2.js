@@ -61,7 +61,7 @@ const Step2 = ({ formData, handleChange, handleNext, handlePrevious }) => {
         if (gender === 'Nữ') genderValue = 'Female';
 
         if (heightValue > 0 && weightValue > 0 && !isNaN(heightValue) && !isNaN(weightValue)) {
-            const bmiValue = (weightValue / Math.pow(heightValue/100, 2)).toFixed(1);
+            const bmiValue = (weightValue / Math.pow(heightValue/100, 2)).toFixed(2);
             handleChange({
                 target: {
                     name: 'bmi',

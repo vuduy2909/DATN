@@ -9,7 +9,7 @@ const Sidebar = ({ onCategoryChange, selectedCategory: propSelectedCategory }) =
   });
   
   const [categories, setCategories] = useState([
-    "Recommend", 
+    "My Course", 
     "All"
   ]);
 
@@ -26,8 +26,8 @@ const Sidebar = ({ onCategoryChange, selectedCategory: propSelectedCategory }) =
       try {
         const res = await request.get('/course-type');
         const courseTypes = res.map(type => type.courseTypeName);
-        // Add "Recommend" and "All" at the beginning of the list
-        setCategories(["Recommend", "All", ...courseTypes]);
+        // Add "My Course" and "All" at the beginning of the list
+        setCategories(["My Course", "All", ...courseTypes]);
       } catch (error) {
         console.error("Error fetching course types:", error);
       }
@@ -54,7 +54,7 @@ const Sidebar = ({ onCategoryChange, selectedCategory: propSelectedCategory }) =
           key={category}
           className={`${styles.item} ${
             selected === category ? styles.selected : ""
-          } ${category === "Recommend" ? styles.recommend : ""}`}
+          } ${category === "My Course" ? styles.recommend : ""}`}
           onClick={() => handleClick(category)}
         >
           {category}

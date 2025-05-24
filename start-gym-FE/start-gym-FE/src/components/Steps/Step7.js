@@ -252,7 +252,7 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
             { label: "Giới tính", value: userMetrics.gender || formData.gender },
             { label: "Chiều cao", value: `${userMetrics.height || formData.height} cm` },
             { label: "Cân nặng", value: `${userMetrics.weight || formData.weight} kg` },
-            { label: "BMI", value: userMetrics.bmi || (formData.weight / Math.pow(formData.height/100, 2)).toFixed(1) },
+            { label: "BMI", value: userMetrics.bmi ? Number(userMetrics.bmi).toFixed(2) : (formData.weight / Math.pow(formData.height/100, 2)).toFixed(2) },
             { label: "Loại hình thể", value: userMetrics.body_type || formData.bodyType || "Normal" },
             { label: "Nghề nghiệp", value: mapOccupation(userMetrics.occupation) || mapOccupation(formData.occupation) || "Sinh viên" },
             { label: "Môi trường làm việc", value: mapWorkEnvironment(userMetrics.work_environment) || mapWorkEnvironment(formData.workEnvironment) || "Văn phòng" },

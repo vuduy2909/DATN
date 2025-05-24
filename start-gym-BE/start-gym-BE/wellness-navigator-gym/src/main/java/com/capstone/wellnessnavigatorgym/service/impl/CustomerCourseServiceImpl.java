@@ -82,4 +82,35 @@ public class CustomerCourseServiceImpl implements ICustomerCourseService {
         
         return customerCourseRepository.findByCustomer_CustomerIdAndRecommendedStatusIsTrue(customer.getCustomerId());
     }
+    
+    @Override
+    public boolean isCustomerEnrolledInCourse(Integer customerId, Integer courseId) {
+        List<CustomerCourse> existingCourses = customerCourseRepository.findByCustomer_CustomerId(customerId);
+        return existingCourses.stream()
+                .anyMatch(cc -> cc.getCourse().getCourseId().equals(courseId));
+    }
+    
+    @Override
+    public void addCourseForCustomer(Integer courseId, Integer customerId) {
+        // Validate customer
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new IllegalArgumentException("Customer not found with ID: " + customerId));
+        
+        // Validate course
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new IllegalArgumentException("Course not found with ID: " + courseId));
+        
+        // Check if already enrolled
+        if (isCustomerEnrolledInCourse(customerId, courseId)) {
+            throw new IllegalArgumentException("Customer is already enrolled in this course");
+        }
+        
+        // Create new customer course record
+        CustomerCourse customerCourse = new CustomerCourse();
+        customerCourse.setCustomer(customer);
+        customerCourse.setCourse(course);
+        customerCourse.setRecommendedStatus(false); // User self-enrolled, not recommended
+        
+        customerCourseRepository.save(customerCourse);
+    }
 }

@@ -20,6 +20,7 @@ const Collections = () => {
 
   const { user } = useAuth();
   const [userData, setUserData] = useState({ recommendedCourses: [] });
+  const [myCourses, setMyCourses] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -27,41 +28,88 @@ const Collections = () => {
       try {
         setLoading(true);
         
-        // User details API call - contains recommended courses in response
-        const detailRes = await request.get("/customer/detail");
-        console.log("User details:", detailRes);
-        
-        // Check if we have recommended courses in the user details
-        const hasRecommendationsInDetails = detailRes?.recommendedCourses?.some(
-          course => course.recommendedStatus === true && course.courseId === 5
-        );
-        
-        console.log("Has recommendations in details:", hasRecommendationsInDetails);
-
-        // Set the state with user data
-        setUserData(detailRes);
-        
-        // Always set to Recommend tab if we're in this scenario - the course is there
-        console.log('Setting category to Recommend - recommend was clicked');
-        setSelectedCategory("Recommend");
-        localStorage.setItem('selectedCategory', 'Recommend');
-        localStorage.setItem('hasRecommendation', 'true');
+        if (user) {
+          // Fetch user details for recommended courses
+          const detailRes = await request.get("/customer/detail");
+          console.log("User details:", detailRes);
+          
+          // Fetch all user's courses (both recommended and self-enrolled)
+          const myCoursesRes = await request.get("/customer-course/my-courses");
+          console.log("My courses:", myCoursesRes);
+          
+          // Set the user data and courses
+          setUserData(detailRes);
+          setMyCourses(myCoursesRes?.courses || []);
+          
+          // If user has any courses, auto switch to My Course tab
+          if (myCoursesRes?.courses && myCoursesRes.courses.length > 0) {
+            console.log('User has courses, setting category to My Course');
+            setSelectedCategory("My Course");
+            localStorage.setItem('selectedCategory', 'My Course');
+          }
+        } else {
+          setUserData({ recommendedCourses: [] });
+          setMyCourses([]);
+        }
         
       } catch (error) {
         console.error("Error fetching user information", error);
         setUserData({ recommendedCourses: [] });
+        setMyCourses([]);
       } finally {
         setLoading(false);
       }
     };
 
-    if (user) {
-      fetchUserData();
-    }
+    fetchUserData();
   }, [user]);
 
+  // Combine recommended courses and user's enrolled courses for the My Course tab
+  const allUserCourses = React.useMemo(() => {
+    if (!user) return [];
+    
+    // Start with user's enrolled courses
+    const userEnrolledCourses = myCourses.map(course => ({
+      courseId: course.courseId,
+      courseName: course.courseName,
+      description: course.description,
+      duration: course.duration,
+      image: course.image,
+      isRecommended: course.isRecommended,
+      joinType: course.joinType,
+      courseType: course.courseType
+    }));
+    
+    // Add any recommended courses from user details that aren't already in enrolled courses
+    const recommendedFromDetails = userData.recommendedCourses || [];
+    const enrolledCourseIds = userEnrolledCourses.map(c => c.courseId);
+    
+    const additionalRecommended = recommendedFromDetails
+      .filter(rec => !enrolledCourseIds.includes(rec.courseId))
+      .map(rec => ({
+        ...rec,
+        isRecommended: true,
+        joinType: 'Recommended'
+      }));
+    
+    return [...userEnrolledCourses, ...additionalRecommended];
+  }, [myCourses, userData.recommendedCourses, user]);
+
   console.log("Current category:", selectedCategory);
-  console.log("Available recommended courses:", userData.recommendedCourses);
+  console.log("All user courses for My Course tab:", allUserCourses);
+
+  const handleCourseJoinSuccess = (courseId) => {
+    // Refresh user courses after successful join
+    if (user) {
+      request.get("/customer-course/my-courses")
+        .then(response => {
+          setMyCourses(response?.courses || []);
+        })
+        .catch(error => {
+          console.error("Error refreshing courses after join:", error);
+        });
+    }
+  };
 
   return (
     <div style={{ backgroundColor: "#f0ece8" }}>
@@ -71,8 +119,9 @@ const Collections = () => {
         <div style={{ flex: 1, maxWidth: "calc(100% - 250px)" }}>
           <Collections_card
             selectedCategory={selectedCategory}
-            recommendedCourses={userData.recommendedCourses}
+            recommendedCourses={allUserCourses}
             loading={loading}
+            onCourseJoinSuccess={handleCourseJoinSuccess}
           />
         </div>
       </div>

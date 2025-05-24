@@ -143,7 +143,9 @@ const UserInformation = () => {
                                                     BMI
                                                 </Typography>
                                                 <div variant="body2" className={styles.card_tracking_data_icon}>
-                                                    <p className={styles.card_tracking_data}>{recommendedCourse?.bmi || 0}</p>
+                                                    <p className={styles.card_tracking_data}>
+                                                        {recommendedCourse?.bmi ? Number(recommendedCourse.bmi).toFixed(2) : '0.00'}
+                                                    </p>
                                                     <div className={styles.card_tracking_icon_bg}><FontAwesomeIcon icon={faDumbbell} className={styles.card_tracking_icon} /></div>
                                                 </div>
                                             </CardContent>
