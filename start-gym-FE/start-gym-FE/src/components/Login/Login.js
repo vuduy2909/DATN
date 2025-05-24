@@ -3,7 +3,7 @@ import axios from 'axios';
 import styles from './Login.module.css'
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../AuthContext';
-import { ThemeProvider, Container, CssBaseline, Box, Avatar, Typography, TextField, FormControlLabel, Checkbox, Button, Grid, Link, createTheme } from '@mui/material';
+import { TextField, Button } from '@mui/material';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 
@@ -14,8 +14,6 @@ const Login = () => {
     const [password, setPassword] = useState('');
     const [passwordError, setPasswordError] = useState('');
     const navigate = useNavigate();
-
-    const defaultTheme = createTheme();
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -115,93 +113,97 @@ const Login = () => {
     };
 
     return (
-        <div>
-            <div className={styles.myContainer}>
-                <div className={styles.myCol}>
-                    <h1 className={styles.myTitle}>
-                        <div className={styles.centered_text}>Unleash Your</div>
-                        <div className={styles.centered_text}>Potential</div>
-                        <span className={styles.text_red}>with StartGym AI</span>
-                    </h1>
-                    <p className={styles.mySubtitle}>
-                        Discover the future of fitness with our AI-powered platform.
-                        Personalized workouts, smart nutrition, and innovative solutions await you.
-                        Embark on a journey to a healthier, stronger you – where technology meets transformation.
-                        Your fitness evolution starts here.
+        <div className={styles.container}>
+            {/* Left Side - Marketing Content */}
+            <div className={styles.leftSide}>
+                <div className={styles.contentWrapper}>
+                    <h1 className={styles.title}>Unleash Your</h1>
+                    <h1 className={styles.title}>Potential</h1>
+                    <h1 className={styles.titleRed}><span className={styles.startGymText}>with StartGym AI</span></h1>
+                    <p className={styles.subtitle}>
+                        Discover the future of fitness with our AI-powered platform. Personalized workouts, smart nutrition, and innovative solutions await you. Embark on a journey to a healthier, stronger you – where technology meets transformation. Your fitness evolution starts here.
                     </p>
                 </div>
-                <div className={styles.myCard}>
-                    <div className={styles.myCardBody}>
-                        <ThemeProvider theme={defaultTheme}>
-                            <Container component="main" maxWidth="xs">
-                                <CssBaseline />
-                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                    <Avatar sx={{ m: 1, bgcolor: 'var(--color-red-body)' }}>
-                                        <LockOutlinedIcon />
-                                    </Avatar>
-                                    <Typography component="h1" variant="h5">
-                                        Sign in
-                                    </Typography>
-                                    <Box component="form" Validate sx={{ mt: 1, width: '100%' }} onSubmit={handleLogin}>
-                                        <TextField
-                                            margin="normal"
-                                            required
-                                            fullWidth
-                                            id="email"
-                                            name="email"
-                                            label="User name"
-                                            value={username}
-                                            onChange={(e) => setUsername(e.target.value)}
-                                            autoFocus
-                                            error={!!usernameError}
-                                            helperText={usernameError}
-                                        />
-                                        <TextField
-                                            margin="normal"
-                                            required
-                                            fullWidth
-                                            id="password"
-                                            name="password"
-                                            label="Password"
-                                            value={password}
-                                            onChange={(e) => setPassword(e.target.value)}
-                                            type="password"
-                                            autoComplete="current-password"
-                                            error={!!passwordError}
-                                            helperText={passwordError}
-                                        />
-                                        <FormControlLabel control={<Checkbox value="remember" color="primary" />} label="Remember me" />
-                                        <Button type="submit" fullWidth variant="contained" sx={{ mt: 3, mb: 2 }}>
-                                            Sign In
-                                        </Button>
-                                        <Grid container>
-                                            <Grid item xs>
-                                                <Link onClick={handleNavigateToRegister} className={styles.link} variant="body2">
-                                                    Forgot password?
-                                                </Link>
-                                            </Grid>
-                                            <Grid item>
-                                                <Link onClick={handleNavigateToRegister} className={styles.link} variant="body2">
-                                                    {"Don't have an account? Sign Up"}
-                                                </Link>
-                                            </Grid>
-                                            <Grid>
-                                                <GoogleOAuthProvider clientId="407042400394-382jp0sktf2dn0eqjg4m9c2ujkc4lgqq.apps.googleusercontent.com">
-                                                    <GoogleLogin
-                                                        onSuccess={handleGoogleLoginSuccess}
-                                                        onFailure={handleGoogleLoginFailure}
-                                                        cookiePolicy={'single_host_origin'}
-                                                        useOneTap
-                                                    />
-                                                </GoogleOAuthProvider>
+            </div>
 
-                                            </Grid>
-                                        </Grid>
-                                    </Box>
-                                </Box>
-                            </Container>
-                        </ThemeProvider>
+            {/* Right Side - Login Form */}
+            <div className={styles.rightSide}>
+                <div className={styles.formContainer}>
+                    <div className={styles.formHeader}>
+                        <div className={styles.iconWrapper}>
+                            <LockOutlinedIcon />
+                        </div>
+                        <h2 className={styles.formTitle}>Sign in</h2>
                     </div>
+
+                    <form onSubmit={handleLogin} className={styles.form}>
+                        <div className={styles.formField}>
+                            <TextField
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
+                                fullWidth
+                                id="username"
+                                label="User name *"
+                                variant="outlined"
+                                size="small"
+                                required
+                                error={!!usernameError}
+                                helperText={usernameError}
+                            />
+                        </div>
+
+                        <div className={styles.formField}>
+                            <TextField
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                fullWidth
+                                id="password"
+                                type="password"
+                                label="Password *"
+                                variant="outlined"
+                                size="small"
+                                required
+                                error={!!passwordError}
+                                helperText={passwordError}
+                            />
+                        </div>
+
+                        <div className={styles.checkboxWrapper}>
+                            <label className={styles.checkboxLabel}>
+                                <input type="checkbox" className={styles.checkbox} />
+                                Remember me
+                            </label>
+                        </div>
+
+                        <Button 
+                            type="submit" 
+                            fullWidth 
+                            variant="contained" 
+                            className={styles.submitButton}
+                        >
+                            SIGN IN
+                        </Button>
+
+                        <div className={styles.links}>
+                            <span onClick={handleNavigateToRegister} className={styles.link}>
+                                Forgot password?
+                            </span>
+                            <span onClick={handleNavigateToRegister} className={styles.link}>
+                                Don't have an account? Sign Up
+                            </span>
+                        </div>
+
+                        <div className={styles.googleLogin}>
+                            <GoogleOAuthProvider clientId="407042400394-382jp0sktf2dn0eqjg4m9c2ujkc4lgqq.apps.googleusercontent.com">
+                                <GoogleLogin
+                                    onSuccess={handleGoogleLoginSuccess}
+                                    onFailure={handleGoogleLoginFailure}
+                                    cookiePolicy={'single_host_origin'}
+                                    useOneTap
+                                />
+                            </GoogleOAuthProvider>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>

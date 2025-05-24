@@ -14,10 +14,17 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import javax.validation.Valid;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 
 @RestController
@@ -27,6 +34,9 @@ public class CustomerController {
 
     @Autowired
     private ICustomerService customerService;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @GetMapping("/list")
     public ResponseEntity<Page<Customer>> findAllCustomer(@RequestParam(value = "type", required = false) Optional<String> type,
@@ -114,5 +124,99 @@ public class CustomerController {
         }
 
         return new ResponseEntity<>(customerUserDetailDto, HttpStatus.OK);
+    }
+
+    @PostMapping("/upload-avatar")
+    public ResponseEntity<?> uploadAvatar(@RequestParam("avatar") MultipartFile file) {
+        try {
+            // Validate file
+            if (file.isEmpty()) {
+                return ResponseEntity.badRequest().body("Please select a file to upload");
+            }
+            
+            // Check file size (5MB limit)
+            if (file.getSize() > 5 * 1024 * 1024) {
+                return ResponseEntity.badRequest().body("File size must be less than 5MB");
+            }
+            
+            // Check file type
+            String contentType = file.getContentType();
+            if (contentType == null || !contentType.startsWith("image/")) {
+                return ResponseEntity.badRequest().body("Please select an image file");
+            }
+            
+            // Get current user
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String username = authentication.getName();
+            
+            // Create upload directory if it doesn't exist
+            String uploadDir = "uploads/avatars/";
+            Path uploadPath = Paths.get(uploadDir);
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath);
+            }
+            
+            // Generate unique filename
+            String originalFileName = file.getOriginalFilename();
+            String fileExtension = originalFileName.substring(originalFileName.lastIndexOf("."));
+            String newFileName = "avatar_" + username + "_" + System.currentTimeMillis() + fileExtension;
+            
+            // Save file
+            Path filePath = uploadPath.resolve(newFileName);
+            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+            
+            // Update customer avatar in database
+            String avatarUrl = "/uploads/avatars/" + newFileName;
+            customerService.updateCustomerAvatar(username, avatarUrl);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Avatar uploaded successfully");
+            response.put("avatarUrl", avatarUrl);
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("Failed to upload avatar: " + e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("An error occurred: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<?> changePassword(@RequestBody Map<String, String> passwordData) {
+        try {
+            String oldPassword = passwordData.get("oldPassword");
+            String newPassword = passwordData.get("newPassword");
+            
+            if (oldPassword == null || newPassword == null || 
+                oldPassword.trim().isEmpty() || newPassword.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("Old password and new password are required");
+            }
+            
+            if (newPassword.length() < 6) {
+                return ResponseEntity.badRequest().body("New password must be at least 6 characters long");
+            }
+            
+            // Get current user
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String username = authentication.getName();
+            
+            // Verify old password
+            if (!customerService.verifyCurrentPassword(username, oldPassword)) {
+                return ResponseEntity.badRequest().body("Current password is incorrect");
+            }
+            
+            // Update password
+            String encodedNewPassword = passwordEncoder.encode(newPassword);
+            customerService.updatePassword(username, encodedNewPassword);
+            
+            return ResponseEntity.ok(new MessageResponse("Password changed successfully"));
+            
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("Failed to change password: " + e.getMessage());
+        }
     }
 }

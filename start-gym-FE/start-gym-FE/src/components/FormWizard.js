@@ -111,13 +111,17 @@ const FormWizard = () => {
         training_goals: formData.trainingGoal,
         occupation: formData.occupation,
         work_environment: formData.workEnvironment,
-        health_issues: formData.healthIssues ? formData.healthIssues.join(',') : '',
         chest_circumference: formData.chestSize, 
         waist_circumference: formData.waistSize,
         customerId: formData.customerId
       };
       
-      console.log('Submitting converted form data:', apiFormData);
+      console.log('FormWizard: Submitting form data:', apiFormData);
+      console.log('FormWizard: training_history =', apiFormData.training_history);
+      console.log('FormWizard: training_frequency =', apiFormData.training_frequency);
+      console.log('FormWizard: training_goals =', apiFormData.training_goals);
+      console.log('FormWizard: occupation =', apiFormData.occupation);
+      console.log('FormWizard: work_environment =', apiFormData.work_environment);
       
       try {
         // Gọi API để gửi dữ liệu và nhận đề xuất

@@ -6,6 +6,7 @@ import Step3 from '../Steps/Step3';
 import Step4 from '../Steps/Step4';
 import Step5 from '../Steps/Step5';
 import Step6 from '../Steps/Step6';
+import Step7 from '../Steps/Step7';
 
 import { useAuth } from '../../AuthContext'
 import { request } from '../../utils/axiosInstance';
@@ -14,6 +15,9 @@ import { useNavigate } from 'react-router-dom';
 const Question = () => {
     const { user } = useAuth();
     const [userData, setUserData] = useState([]);
+    const [recommendationResult, setRecommendationResult] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
 
     const navigate = useNavigate()
 
@@ -56,9 +60,69 @@ const Question = () => {
         }));
     };
 
-    const handleNext = () => {
+    const handleNext = async (resultFromStep6) => {
         if (currentStep === 6) {
-            handleSubmit();
+            if (resultFromStep6) {
+                console.log('Question.js: Received result from Step6:', resultFromStep6);
+                
+                // Check if we have formData from Step6 response
+                if (resultFromStep6.formData && resultFromStep6.recommendedCourses) {
+                    console.log('Question.js: Found formData and course, preparing Step7 data');
+                    
+                    try {
+                        // Import UserFormService for Step7 call
+                        const UserFormService = (await import('../../services/UserFormService')).default;
+                        
+                        // Convert formData to JSON string for API call
+                        const formDataJson = JSON.stringify(resultFromStep6.formData);
+                        const recommendedCourseId = resultFromStep6.recommendedCourses.courseId;
+                        
+                        console.log('Question.js: Calling Step7 with formData and courseId:', formDataJson, recommendedCourseId);
+                        
+                        // Get complete recommendation data with userMetrics including vòng eo/ngực
+                        const step7Data = await UserFormService.getRecommendationStep7DataNew(formDataJson, recommendedCourseId);
+                        console.log('Question.js: Received complete Step7 data:', step7Data);
+                        
+                        // Set the complete recommendation result for Step7
+                        setRecommendationResult(step7Data);
+                        
+                    } catch (error) {
+                        console.error('Question.js: Error fetching Step7 data:', error);
+                        
+                        // Fall back to basic recommendation result
+                        const basicRecommendationResult = {
+                            recommendedCourse: resultFromStep6.recommendedCourses,
+                            userMetrics: resultFromStep6.formData || {}, // Use formData as userMetrics fallback
+                            explanation: 'Không thể tải thông tin chi tiết. Dữ liệu cơ bản vẫn có sẵn.',
+                            actions: {
+                                formData: resultFromStep6.formData,
+                                recommendedCourseId: resultFromStep6.recommendedCourses?.courseId
+                            }
+                        };
+                        
+                        console.log('Question.js: Using fallback recommendation result:', basicRecommendationResult);
+                        setRecommendationResult(basicRecommendationResult);
+                    }
+                } else {
+                    // No formData, use basic result
+                    console.log('Question.js: No formData found, using basic result');
+                    const basicRecommendationResult = {
+                        recommendedCourse: resultFromStep6.recommendedCourses,
+                        userMetrics: {},
+                        explanation: 'Kết quả đề xuất cơ bản dựa trên dữ liệu form.',
+                        actions: {
+                            formData: null,
+                            recommendedCourseId: resultFromStep6.recommendedCourses?.courseId
+                        }
+                    };
+                    
+                    setRecommendationResult(basicRecommendationResult);
+                }
+                
+                setCurrentStep(7);
+            } else {
+                handleSubmit();
+            }
         } else {
             setCurrentStep(currentStep + 1);
         }
@@ -66,6 +130,10 @@ const Question = () => {
 
     const handlePrevious = () => {
         setCurrentStep(currentStep - 1);
+    };
+
+    const handleGoToCollections = () => {
+        navigate('/collections');
     };
 
     const handleSubmit = async () => {
@@ -81,25 +149,35 @@ const Question = () => {
             return;
         }
         
+        setLoading(true);
+        setError('');
+        
         try {
             console.log("Submitting survey data...");
             const survey = await collectionService.postRecommend(formData);
             console.log("Survey response:", survey);
             
             if (survey && survey.recommendedCourses && survey.recommendedCourses.length > 0) {
-                navigate('/collections');
+                setRecommendationResult({
+                    recommendedCourse: survey.recommendedCourses[0],
+                    userMetrics: survey.userMetrics || {},
+                    userDataId: survey.userDataId
+                });
+                setCurrentStep(7); // Move to step 7 instead of navigating
             } else {
                 console.error("No recommended courses returned:", survey);
-                alert(survey?.message || 'Không có khóa học phù hợp!');
+                setError(survey?.message || 'Không có khóa học phù hợp!');
             }
         } catch (error) {
             console.error('Error submitting survey data:', error);
             if (error.response) {
                 console.error('Server error response:', error.response.data);
-                alert(`Lỗi: ${error.response.data?.message || 'Có lỗi xảy ra khi gửi dữ liệu!'}`);
+                setError(`Lỗi: ${error.response.data?.message || 'Có lỗi xảy ra khi gửi dữ liệu!'}`);
             } else {
-                alert('Có lỗi xảy ra khi gửi dữ liệu!');
+                setError('Có lỗi xảy ra khi gửi dữ liệu!');
             }
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -128,6 +206,17 @@ const Question = () => {
             case 6:
                 return (
                     <Step6 formData={formData} handleChange={handleChange} handleNext={handleNext} handlePrevious={handlePrevious} currentStep={currentStep} />
+                );
+            case 7:
+                return (
+                    <Step7
+                        formData={formData}
+                        handlePrevious={handlePrevious}
+                        handleGoToCollections={handleGoToCollections}
+                        recommendationResult={recommendationResult}
+                        loading={loading}
+                        error={error}
+                    />
                 );
             default:
                 return null;

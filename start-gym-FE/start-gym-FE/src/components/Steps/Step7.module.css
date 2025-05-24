@@ -253,4 +253,15 @@
 .logValue {
   font-weight: 500;
   color: #CF4044;
+}
+
+.highlightedLogItem {
+  background-color: rgba(207, 64, 68, 0.05);
+  border-left: 3px solid #CF4044;
+  font-weight: bold;
+}
+
+.highlightedLogItem .logValue {
+  font-size: 110%;
+  font-weight: 700;
 } 

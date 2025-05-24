@@ -2,13 +2,11 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import styles from './Register.module.css'
-import { Avatar, Button, CssBaseline, TextField, FormControlLabel, Checkbox, Link, Grid, Box, Typography, Container, RadioGroup, Radio, FormControl, FormLabel, InputLabel, Select, MenuItem } from '@mui/material';
-import { createTheme, ThemeProvider } from '@mui/material/styles';
-import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import { TextField, FormControl, InputLabel, Select, MenuItem, Button } from '@mui/material';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { DemoContainer } from '@mui/x-date-pickers/internals/demo';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 
 const Register = () => {
     const [name, setName] = useState('');
@@ -23,9 +21,6 @@ const Register = () => {
     const [phoneError, setPhoneError] = useState('');
 
     const [dateOfBirth, setDateOfBirth] = useState(null);
-
-    const [idCard, setIdCard] = useState('');
-    const [idCardError, setIdCardError] = useState('');
 
     const [address, setAddress] = useState('');
     const [addressError, setAddressError] = useState('');
@@ -45,8 +40,6 @@ const Register = () => {
         navigate('/login')
     };
 
-    const defaultTheme = createTheme();
-
     const handleNameChange = (e) => {
         const value = e.target.value;
         setName(value);
@@ -60,12 +53,12 @@ const Register = () => {
         }
     };
 
-    const handleUsernameChange = (e) => { // THÊM ĐIỀU KIỆN KO TRÙNG
+    const handleUsernameChange = (e) => {
         const value = e.target.value;
         setUsername(value);
 
         if (value.length < 3 || value.length > 50) {
-            setUsernameError('Họ tên phải có độ dài từ 3 đến 50 ký tự');
+            setUsernameError('Tên đăng nhập phải có độ dài từ 3 đến 50 ký tự');
         } else {
             setUsernameError('');
         }
@@ -78,7 +71,7 @@ const Register = () => {
         if (!/^\d+$/.test(value)) {
             setPhoneError('Vui lòng chỉ nhập số');
         } else if (value.length !== 10) {
-            setPhoneError('Number phải chứa 10 số')
+            setPhoneError('Số điện thoại phải chứa 10 số')
         } else {
             const prefixes = /^(086|096|097|098|038|037|036|035|034|033|032|091|094|088|081|082|083|084|085|070|076|077|078|079|089|090|093|092|052|056|058|099|059|087)/;
             if (!prefixes.test(value.substr(0, 3))) {
@@ -86,21 +79,6 @@ const Register = () => {
             } else {
                 setPhoneError('');
             }
-        }
-    }
-
-    const handleIdCardChange = (e) => {
-        const value = e.target.value;
-        setIdCard(value);
-
-        if (!/^\d+$/.test(value)) {
-            setIdCardError('Vui lòng chỉ nhập số');
-        } else if (value.length !== 12) {
-            setIdCardError('Vui lòng nhập đủ 12 số');
-        // } else if (!/^(001|002|004|006|008|010|011|012|014|015|017|019|020|022|024|025|026|027|030|031|033|034|035|036|037|038|040|042|044|045|046|048|049|051|052|054|056|058|060|062|064|066|067|068|070|072|074|075|077|079|080|082|083|084|086|087|089|091|092|093|094|095|096)([0-9])(00|0[0-9]|1[0-9]|2[0-9]|3[0-9]|4[0-9]|5[0-9]|6[0-9]|7[0-9]|8[0-9]|9[0-9])([0-9]{6})$/.test(value)) {
-        //     setIdCardError('Số căn cước công dân không hợp lệ');
-        } else {
-            setIdCardError('');
         }
     }
 
@@ -117,7 +95,7 @@ const Register = () => {
         }
     }
 
-    const handleEmailChange = (e) => { // THEM KIEM TRA TRUNG TAI KHOAN EMAIL
+    const handleEmailChange = (e) => {
         const value = e.target.value;
         setEmail(value)
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -125,7 +103,7 @@ const Register = () => {
         if (!emailRegex.test(value)) {
             setEmailError('Email không đúng định dạng')
         } else if (value.length > 30) {
-            setEmailError('Email qua dai (> 30 ký tự)')
+            setEmailError('Email quá dài (> 30 ký tự)')
         } else {
             setEmailError('')
         }
@@ -155,15 +133,29 @@ const Register = () => {
     }
 
     const handleRegister = async (e) => {
+        e.preventDefault();
         try {
+            // Validate form trước khi submit
+            if (!name || !username || !gender || !phone || !dateOfBirth || !address || !email || !password || !confirmPassword) {
+                alert('Vui lòng điền đầy đủ thông tin');
+                return;
+            }
+
+            if (nameError || usernameError || phoneError || addressError || emailError || passwordError || confirmPasswordError) {
+                alert('Vui lòng sửa các lỗi trong form');
+                return;
+            }
+
+            // Format date of birth
+            const formattedDate = dateOfBirth ? dateOfBirth.format('YYYY-MM-DD') : null;
+
             const userData = {
                 name: name,
                 username: username,
-                gender: gender,
-                dateOfBirth: dateOfBirth,
+                gender: gender === true ? 'Male' : 'Female',
+                dateOfBirth: formattedDate,
                 address: address,
                 phone: phone,
-                idCard: idCard,
                 email: email,
                 password: password
             };
@@ -171,190 +163,208 @@ const Register = () => {
             const response = await axios.post('http://localhost:8080/api/v1/public/signup', userData);
 
             if (response.status === 200) {
-                // navigate('/login');
+                alert('Đăng ký thành công!');
+                navigate('/login');
             } else {
                 console.error('Đăng ký không thành công');
+                alert('Đăng ký không thành công. Vui lòng thử lại.');
             }
         } catch (error) {
             console.error('Đã xảy ra lỗi:', error);
+            if (error.response && error.response.data) {
+                alert('Lỗi: ' + error.response.data.message || 'Đăng ký thất bại');
+            } else {
+                alert('Đã xảy ra lỗi. Vui lòng thử lại.');
+            }
         }
     };
 
     return (
-        <div className={styles.myContainer}>
-            <div className={styles.myCol}>
-                <h1 className={styles.myTitle}>
-                    The best offer <br />
-                    <span className={styles.text_red}>for your business</span>
-                </h1>
-                <p className={styles.mySubtitle}>
-                    Lorem ipsum dolor sit amet consectetur adipisicing elit.
-                    Eveniet, itaque accusantium odio, soluta, corrupti aliquam
-                    quibusdam tempora at cupiditate quis eum maiores libero
-                    veritatis? Dicta facilis sint aliquid ipsum atque?
-                </p>
-            </div>
-
-            <div className={styles.myCard}>
-                <div className={styles.myCardBody}>
-                    <ThemeProvider theme={defaultTheme}>
-                        <Container component="main" maxWidth="xs">
-                            <CssBaseline />
-                            <Box sx={{ marginTop: 8, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                <Avatar sx={{ m: 1, bgcolor: 'var(--color-red-body);' }}>
-                                    <LockOutlinedIcon />
-                                </Avatar>
-                                <Typography component="h1" variant="h5">
-                                    Sign up
-                                </Typography>
-                                <Box component="form" Validate sx={{ mt: 3 }} onSubmit={handleRegister}>
-                                    <Grid container spacing={2}>
-                                        <Grid item xs={12} sm={6}>
-                                            <TextField
-                                                value={name}
-                                                onChange={handleNameChange}
-                                                fullWidth
-                                                id="name"
-                                                label="Full name"
-                                                required
-                                                error={!!nameError}
-                                                helperText={nameError}
-                                            />
-                                        </Grid>
-                                        <Grid item xs={12} sm={6}>
-                                            <TextField
-                                                value={username}
-                                                onChange={handleUsernameChange}
-                                                fullWidth
-                                                id="username"
-                                                label="User name"
-                                                required
-                                                error={!!usernameError}
-                                                helperText={usernameError}
-                                            />
-                                        </Grid>
-                                        <Grid item xs={12} sm={4}>
-                                            <FormControl fullWidth required>
-                                                <InputLabel htmlFor="gender">Gender</InputLabel>
-                                                <Select
-                                                    label="Gender"
-                                                    value={gender}
-                                                    onChange={(e) => setGender(e.target.value)}
-                                                    inputProps={{
-                                                        name: 'gender',
-                                                        id: 'gender',
-                                                    }}
-                                                >
-                                                    <MenuItem value={true}>Male</MenuItem>
-                                                    <MenuItem value={false}>Female</MenuItem>
-                                                </Select>
-                                            </FormControl>
-                                        </Grid>
-                                        <Grid item xs={12} sm={8}>
-                                            <TextField
-                                                value={phone}
-                                                onChange={handlePhoneNumberChange}
-                                                fullWidth
-                                                id="phone"
-                                                label="Phone number"
-                                                required
-                                                error={!!phoneError}
-                                                helperText={phoneError}
-                                            />
-                                        </Grid>
-                                        <Grid item xs={12} >
-                                            <LocalizationProvider dateAdapter={AdapterDayjs}>
-                                                <DemoContainer components={['DatePicker']}>
-                                                    <DatePicker
-                                                        label="Date"
-                                                        value={dateOfBirth}
-                                                        onChange={(newDate) => setDateOfBirth(newDate)}
-                                                        className={styles.date}
-                                                    />
-                                                </DemoContainer>
-                                            </LocalizationProvider>
-                                        </Grid>
-                                        <Grid item xs={12}>
-                                            <TextField
-                                                value={idCard}
-                                                onChange={handleIdCardChange}
-                                                fullWidth
-                                                id="idCard"
-                                                label="ID card"
-                                                required
-                                                error={!!idCardError}
-                                                helperText={idCardError}
-                                            />
-                                        </Grid>
-                                        <Grid item xs={12}>
-                                            <TextField
-                                                value={address}
-                                                onChange={handleAddressChange}
-                                                fullWidth
-                                                id="address"
-                                                label="Address"
-                                                required
-                                                error={!!addressError}
-                                                helperText={addressError}
-                                            />
-                                        </Grid>
-                                        <Grid item xs={12}>
-                                            <TextField
-                                                value={email}
-                                                onChange={handleEmailChange}
-                                                fullWidth
-                                                id="email"
-                                                label="Email"
-                                                required
-                                                error={!!emailError}
-                                                helperText={emailError}
-                                            />
-                                        </Grid>
-                                        <Grid item xs={12}>
-                                            <TextField
-                                                value={password}
-                                                onChange={handlePasswordChange}
-                                                fullWidth
-                                                id="password"
-                                                type="password"
-                                                label="Password"
-                                                required
-                                                error={!!passwordError}
-                                                helperText={passwordError}
-                                            />
-                                        </Grid>
-                                        <Grid item xs={12}>
-                                            <TextField
-                                                value={confirmPassword}
-                                                onChange={handleConfirmPasswordChange}
-                                                fullWidth
-                                                id="confirmPassword"
-                                                type="password"
-                                                label="Confirm Password"
-                                                required
-                                                error={!!confirmPasswordError}
-                                                helperText={confirmPasswordError}
-                                            />
-                                        </Grid>
-                                    </Grid>
-
-                                    <Button type="submit" fullWidth variant="contained" sx={{ mt: 3, mb: 2 }} onClick={handleRegister}>
-                                        Sign Up
-                                    </Button>
-                                    <Grid container justifyContent="flex-end">
-                                        <Grid item>
-                                            <Link onClick={handleLogin} variant="body2" className={styles.link}>
-                                                Already have an account? Sign in
-                                            </Link>
-                                        </Grid>
-                                    </Grid>
-                                </Box>
-                            </Box>
-                        </Container>
-                    </ThemeProvider>
+        <div className={styles.container}>
+            {/* Left Side - Marketing Content */}
+            <div className={styles.leftSide}>
+                <div className={styles.contentWrapper}>
+                    <h1 className={styles.title}>Transform Your Fitness</h1>
+                    <h1 className={styles.title}>Journey with</h1>
+                    <h1 className={styles.titleRed}><span className={styles.startGymText}>StartGym</span></h1>
+                    <p className={styles.subtitle}>
+                        Discover the future of fitness with our AI-powered platform. Personalized workouts, smart nutrition, and innovative solutions await you. Embark on a journey to a healthier, stronger you – where technology meets transformation. Your fitness evolution starts here.
+                    </p>
                 </div>
             </div>
-        </div >
+
+            {/* Right Side - Registration Form */}
+            <div className={styles.rightSide}>
+                <div className={styles.formContainer}>
+                    <div className={styles.formHeader}>
+                        <div className={styles.iconWrapper}>
+                            <LockOutlinedIcon />
+                        </div>
+                        <h2 className={styles.formTitle}>Sign up</h2>
+                    </div>
+
+                    <form onSubmit={handleRegister} className={styles.form}>
+                        <div className={styles.formRow}>
+                            <div className={styles.formField}>
+                                <TextField
+                                    value={name}
+                                    onChange={handleNameChange}
+                                    fullWidth
+                                    id="name"
+                                    label="Full name * *"
+                                    variant="outlined"
+                                    size="small"
+                                    required
+                                    error={!!nameError}
+                                    helperText={nameError}
+                                />
+                            </div>
+                            <div className={styles.formField}>
+                                <TextField
+                                    value={username}
+                                    onChange={handleUsernameChange}
+                                    fullWidth
+                                    id="username"
+                                    label="User name ..."
+                                    variant="outlined"
+                                    size="small"
+                                    required
+                                    error={!!usernameError}
+                                    helperText={usernameError}
+                                />
+                            </div>
+                        </div>
+
+                        <div className={styles.formRow}>
+                            <div className={styles.formFieldSmall}>
+                                <FormControl fullWidth required size="small">
+                                    <InputLabel id="gender-label">Gender</InputLabel>
+                                    <Select
+                                        labelId="gender-label"
+                                        label="Gender"
+                                        value={gender}
+                                        onChange={(e) => setGender(e.target.value)}
+                                    >
+                                        <MenuItem value={true}>Male</MenuItem>
+                                        <MenuItem value={false}>Female</MenuItem>
+                                    </Select>
+                                </FormControl>
+                            </div>
+                            <div className={styles.formFieldLarge}>
+                                <TextField
+                                    value={phone}
+                                    onChange={handlePhoneNumberChange}
+                                    fullWidth
+                                    id="phone"
+                                    label="Phone number * *"
+                                    variant="outlined"
+                                    size="small"
+                                    required
+                                    error={!!phoneError}
+                                    helperText={phoneError}
+                                />
+                            </div>
+                        </div>
+
+                        <div className={styles.formField}>
+                            <LocalizationProvider dateAdapter={AdapterDayjs}>
+                                <DatePicker
+                                    label="Date of Birth * *"
+                                    value={dateOfBirth}
+                                    onChange={(newDate) => setDateOfBirth(newDate)}
+                                    slotProps={{
+                                        textField: {
+                                            fullWidth: true,
+                                            required: true,
+                                            size: 'small',
+                                            error: !dateOfBirth,
+                                            helperText: !dateOfBirth ? 'Vui lòng chọn ngày sinh' : ''
+                                        }
+                                    }}
+                                />
+                            </LocalizationProvider>
+                        </div>
+
+                        <div className={styles.formField}>
+                            <TextField
+                                value={address}
+                                onChange={handleAddressChange}
+                                fullWidth
+                                id="address"
+                                label="Address * *"
+                                variant="outlined"
+                                size="small"
+                                required
+                                error={!!addressError}
+                                helperText={addressError}
+                            />
+                        </div>
+
+                        <div className={styles.formField}>
+                            <TextField
+                                value={email}
+                                onChange={handleEmailChange}
+                                fullWidth
+                                id="email"
+                                label="Email * *"
+                                variant="outlined"
+                                size="small"
+                                required
+                                error={!!emailError}
+                                helperText={emailError}
+                            />
+                        </div>
+
+                        <div className={styles.formField}>
+                            <TextField
+                                value={password}
+                                onChange={handlePasswordChange}
+                                fullWidth
+                                id="password"
+                                type="password"
+                                label="Password * *"
+                                variant="outlined"
+                                size="small"
+                                required
+                                error={!!passwordError}
+                                helperText={passwordError}
+                            />
+                        </div>
+
+                        <div className={styles.formField}>
+                            <TextField
+                                value={confirmPassword}
+                                onChange={handleConfirmPasswordChange}
+                                fullWidth
+                                id="confirmPassword"
+                                type="password"
+                                label="Confirm Password * *"
+                                variant="outlined"
+                                size="small"
+                                required
+                                error={!!confirmPasswordError}
+                                helperText={confirmPasswordError}
+                            />
+                        </div>
+
+                        <Button 
+                            type="submit" 
+                            fullWidth 
+                            variant="contained" 
+                            className={styles.submitButton}
+                        >
+                            SIGN UP
+                        </Button>
+
+                        <div className={styles.loginLink}>
+                            <span onClick={handleLogin} className={styles.link}>
+                                Already have an account? Sign in
+                            </span>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
     );
 };
 

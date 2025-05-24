@@ -11,6 +11,8 @@ import Recipe from './pages/Recipe';
 import Blog from './pages/Blog';
 import Register from './components/Register/Register';
 import User from './pages/User';
+import Profile from './pages/Profile';
+import Account from './pages/Account';
 import Recommend from './pages/Recommend';
 import AdminPage from './pages/Admin/AdminPage'
 import NewExercise from './pages/Admin/NewExercise';
@@ -25,6 +27,8 @@ function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/user" element={<User />} />
+      <Route path="/profile" element={<Profile />} />
+      <Route path="/account" element={<Account />} />
       <Route path="/about" element={<About />} />
       <Route path="/recipe" element={<Recipe />} />
       <Route path="/blog" element={<Blog />} />

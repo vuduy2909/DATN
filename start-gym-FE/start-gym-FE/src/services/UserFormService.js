@@ -38,9 +38,9 @@ const UserFormService = {
         // Thêm custom header để bỏ qua thông báo từ server
         headers['X-Skip-Alert'] = 'true';
         
-        // Sửa endpoint API để trùng với endpoint trong collectionService
-        console.log('UserFormService: Sending POST request to /track-data-ai/recommend-course');
-        const response = await request.post('/track-data-ai/recommend-course', formData, { headers });
+        // Sửa endpoint API để match với backend controller
+        console.log('UserFormService: Sending POST request to /track-data-ai/process-form-data');
+        const response = await request.post('/track-data-ai/process-form-data', formData, { headers });
         console.log('UserFormService: Received response:', JSON.stringify(response));
         
         // Restore original alert
@@ -186,6 +186,64 @@ const UserFormService = {
       return response;
     } catch (error) {
       console.error('Error uploading CSV data:', error);
+      throw error;
+    }
+  },
+
+  // Method mới cho Step7 với formData và courseId
+  getRecommendationStep7DataNew: async (formDataJson, recommendedCourseId) => {
+    try {
+      console.log('UserFormService: Calling Step7 with formDataJson and courseId:', formDataJson, recommendedCourseId);
+      
+      // Lấy token từ localStorage
+      const token = localStorage.getItem('token');
+      const headers = {};
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      // Call the backend endpoint with formDataJson and recommendedCourseId as query parameters
+      const response = await request.get('/track-data-ai/recommendation-step-7', {
+        params: {
+          formDataJson: formDataJson,
+          recommendedCourseId: recommendedCourseId
+        },
+        headers
+      });
+      
+      console.log('UserFormService: Received Step7 data:', response);
+      return response;
+    } catch (error) {
+      console.error('Error fetching Step7 data:', error);
+      throw error;
+    }
+  },
+
+  // Method để confirm recommendation
+  confirmRecommendation: async (formData, recommendedCourseId) => {
+    try {
+      console.log('UserFormService: Confirming recommendation with formData and courseId:', formData, recommendedCourseId);
+      
+      // Lấy token từ localStorage
+      const token = localStorage.getItem('token');
+      const headers = {};
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const requestData = {
+        formData: formData,
+        recommendedCourseId: recommendedCourseId
+      };
+      
+      const response = await request.post('/track-data-ai/confirm-recommendation', requestData, { headers });
+      
+      console.log('UserFormService: Received confirmation response:', response);
+      return response;
+    } catch (error) {
+      console.error('Error confirming recommendation:', error);
       throw error;
     }
   }

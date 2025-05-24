@@ -19,7 +19,6 @@ public class SignupRequest {
     private Date dateOfBirth;
     private String address;
     private String phone;
-    private String idCard;
     private String email;
     private String password;
 }

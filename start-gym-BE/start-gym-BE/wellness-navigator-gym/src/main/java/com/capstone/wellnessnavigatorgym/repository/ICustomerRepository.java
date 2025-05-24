@@ -125,7 +125,7 @@ public interface ICustomerRepository extends JpaRepository<Customer, Integer> {
             "a.customer_address, a.customer_card_id, a.is_delete, a.is_enable, u.user_id, a.create_time, " +
             "a.email, u.user_data_id, u.age, u.bmi, u.gender, u.training_goals, u.training_history, " +
             "u.heart_disease, u.respiratory_disease, u.recent_injury, u.training_frequency, " +
-            "u.occupation, u.work_environment, u.health_issues " +
+            "u.occupation, u.work_environment " +
             "FROM customer a LEFT JOIN user_data_ai u " +
             "ON a.customer_id = u.customer_id " +
             "ORDER BY a.create_time DESC", nativeQuery = true)

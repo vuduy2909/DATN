@@ -69,7 +69,8 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
                         "/api/v1/track-data-ai/**",
                         "/api/v1/payment/**",
                         "/api/v1/customer/list",
-                        "/api/v1/cart/**")
+                        "/api/v1/cart/**",
+                        "/uploads/**")
                 .permitAll()
                 .antMatchers("/api/v1/customer/**",
                         "/api/v1/customer-type/**",

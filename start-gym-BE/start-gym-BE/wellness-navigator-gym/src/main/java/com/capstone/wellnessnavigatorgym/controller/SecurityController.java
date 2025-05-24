@@ -55,6 +55,9 @@ public class SecurityController {
 
     @Autowired
     private ICustomerService customerService;
+    
+    @Autowired
+    private ICustomerTypeService customerTypeService;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -125,43 +128,84 @@ public class SecurityController {
 
     @PostMapping("/signup")
     public ResponseEntity<?> registerUser(@RequestBody SignupRequest signupRequest) {
-        if (accountService.existsByUsername(signupRequest.getUsername())) {
-            return new ResponseEntity<>(new MessageResponse("The username existed! Please try again!"), HttpStatus.OK);
+        try {
+            // Validate input
+            if (signupRequest.getUsername() == null || signupRequest.getUsername().trim().isEmpty()) {
+                return new ResponseEntity<>(new MessageResponse("Username is required!"), HttpStatus.BAD_REQUEST);
+            }
+            
+            if (signupRequest.getEmail() == null || signupRequest.getEmail().trim().isEmpty()) {
+                return new ResponseEntity<>(new MessageResponse("Email is required!"), HttpStatus.BAD_REQUEST);
+            }
+            
+            if (signupRequest.getPassword() == null || signupRequest.getPassword().trim().isEmpty()) {
+                return new ResponseEntity<>(new MessageResponse("Password is required!"), HttpStatus.BAD_REQUEST);
+            }
+            
+            if (signupRequest.getName() == null || signupRequest.getName().trim().isEmpty()) {
+                return new ResponseEntity<>(new MessageResponse("Full name is required!"), HttpStatus.BAD_REQUEST);
+            }
+
+            // Check if username already exists
+            if (accountService.existsByUsername(signupRequest.getUsername())) {
+                return new ResponseEntity<>(new MessageResponse("The username already exists! Please try again!"), HttpStatus.BAD_REQUEST);
+            }
+
+            // Check if email already exists
+            if (accountService.existsByEmail(signupRequest.getEmail())) {
+                return new ResponseEntity<>(new MessageResponse("The email already exists! Please try again!"), HttpStatus.BAD_REQUEST);
+            }
+
+            // Create Account
+            Account account = new Account();
+            account.setUserName(signupRequest.getUsername());
+            account.setEncryptPassword(passwordEncoder.encode(signupRequest.getPassword()));
+            account.setEmail(signupRequest.getEmail());
+            account.setIsEnable(true);
+            
+            // Assign default USER role
+            Role role = new Role(1, "ROLE_USER");
+            Set<Role> roles = new HashSet<>();
+            roles.add(role);
+            account.setRoles(roles);
+            
+            // Save account first
+            account = accountService.save(account);
+
+            // Generate customer code
+            Customer customerLimit = customerService.customerLimit();
+            String customerCode = ConverterMaxCode.generateNextId(customerLimit.getCustomerCode());
+
+            // Create Customer record automatically
+            Customer customer = new Customer();
+            customer.setCustomerCode(customerCode);
+            customer.setCustomerName(signupRequest.getName());
+            customer.setCustomerEmail(signupRequest.getEmail());
+            customer.setCustomerPhone(signupRequest.getPhone());
+            customer.setCustomerGender(signupRequest.getGender());
+            customer.setDateOfBirth(signupRequest.getDateOfBirth());
+            customer.setCustomerAddress(signupRequest.getAddress());
+            customer.setIsEnable(true);
+            customer.setAccount(account);
+            
+            // Set default customer type (assuming ID 1 is the basic/free type)
+            List<CustomerType> customerTypes = customerTypeService.findAllCustomerType();
+            if (!customerTypes.isEmpty()) {
+                CustomerType defaultType = customerTypes.get(0); // Get first customer type as default
+                customer.setCustomerType(defaultType);
+            }
+            
+            // Note: idCard is removed, so we don't set it
+            
+            // Save customer
+            customerService.save(customer);
+
+            return new ResponseEntity<>(new MessageResponse("Account registration successful!"), HttpStatus.OK);
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ResponseEntity<>(new MessageResponse("Registration failed: " + e.getMessage()), HttpStatus.INTERNAL_SERVER_ERROR);
         }
-
-        if (accountService.existsByEmail(signupRequest.getEmail())) {
-            return new ResponseEntity<>(new MessageResponse("The email existed! Please try again!"), HttpStatus.OK);
-        }
-
-        Account account = new Account();
-        account.setUserName(signupRequest.getUsername());
-        account.setEncryptPassword(passwordEncoder.encode(signupRequest.getPassword()));
-        account.setEmail(signupRequest.getEmail());
-        account.setIsEnable(true);
-        accountService.save(account);
-
-        Role role = new Role(1, "ROLE_USER");
-        Set<Role> tempRoles = account.getRoles();
-        tempRoles.add(role);
-        account.setRoles(tempRoles);
-
-        Customer customerLimit = customerService.customerLimit();
-        signupRequest.setCustomerCode(ConverterMaxCode.generateNextId(customerLimit.getCustomerCode()));
-
-        customerService.save(new Customer(
-                signupRequest.getCustomerCode(),
-                signupRequest.getName(),
-                signupRequest.getEmail(),
-                signupRequest.getPhone(),
-                signupRequest.getGender(),
-                signupRequest.getDateOfBirth(),
-                signupRequest.getIdCard(),
-                signupRequest.getAddress(),
-                true,
-                account
-        ));
-
-        return new ResponseEntity<>(new MessageResponse("Account registration successful!"), HttpStatus.OK);
     }
 
     @PatchMapping("/change-password")

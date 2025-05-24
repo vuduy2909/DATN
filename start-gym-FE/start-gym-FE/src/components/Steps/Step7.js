@@ -34,7 +34,7 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
                     const parsed = JSON.parse(savedData);
                     console.log('Loaded recommendation data from localStorage:', parsed);
                     setLocalRecommendation(parsed);
-                    
+
                     // Verify if we have the necessary data
                     const hasValidData = parsed.recommendedCourse || 
                                         (parsed.userMetrics && Object.keys(parsed.userMetrics).length > 0);
@@ -49,6 +49,16 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
         // Check if we have a valid recommendation result from props
         if (recommendationResult) {
             console.log('Received recommendation results:', recommendationResult);
+            console.log('Recommended course:', recommendationResult.recommendedCourse);
+            console.log('User metrics:', recommendationResult.userMetrics);
+            
+            // Save to localStorage for persistence
+            try {
+                localStorage.setItem('recommendationData', JSON.stringify(recommendationResult));
+                console.log('Saved recommendation data to localStorage');
+            } catch (e) {
+                console.error('Error saving to localStorage:', e);
+            }
             
             // Verify if we have the necessary data from the API
             const hasValidData = recommendationResult.recommendedCourse || 
@@ -67,12 +77,26 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
 
     const handleConfirmRecommendation = async () => {
         console.log('handleConfirmRecommendation called');
-        // Only proceed if we have a userDataId from the API
-        if (!activeRecommendation || !activeRecommendation.userDataId) {
-            console.error('No userDataId available to confirm recommendation');
-            setConfirmError('Không thể xác nhận đề xuất: Thiếu thông tin ID.');
+        
+        // Check if we have the required data from actions
+        if (!activeRecommendation || !activeRecommendation.actions) {
+            console.error('No actions data available to confirm recommendation');
+            setConfirmError('Không thể xác nhận đề xuất: Thiếu thông tin cần thiết.');
             
-            // Even without userDataId, we can navigate to collections
+            // Even without proper data, we can navigate to collections
+            setTimeout(() => {
+                handleGoToCollections();
+            }, 1000);
+            
+            return;
+        }
+        
+        const { formData: actionFormData, recommendedCourseId } = activeRecommendation.actions;
+        
+        if (!actionFormData || !recommendedCourseId) {
+            console.error('Missing formData or recommendedCourseId in actions');
+            setConfirmError('Không thể xác nhận đề xuất: Thiếu dữ liệu form hoặc ID khóa học.');
+            
             setTimeout(() => {
                 handleGoToCollections();
             }, 1000);
@@ -84,27 +108,43 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
         setConfirmError('');
         
         try {
-            // Use the confirmation endpoint from the recommendation result if available
-            const confirmUrl = activeRecommendation.actions?.confirm || 
-                `/track-data-ai/confirm-recommendation/${activeRecommendation.userDataId}`;
-                
-            console.log('Confirming recommendation using endpoint:', confirmUrl);
+            // Import UserFormService
+            const UserFormService = (await import('../../services/UserFormService')).default;
             
-            // Call the confirmation API
-            const response = await request.post(confirmUrl);
+            console.log('Confirming recommendation with formData and courseId:', actionFormData, recommendedCourseId);
+            
+            // Call the confirmation API with formData and courseId
+            const response = await UserFormService.confirmRecommendation(actionFormData, recommendedCourseId);
             console.log('Confirmation response:', response);
             
             // Mark as confirmed and proceed to collections page
             setConfirmed(true);
+            
+            // Show success message with userDataId if available
+            if (response.userDataId) {
+                console.log('User data saved with ID:', response.userDataId);
+            }
+            
             setTimeout(() => {
                 handleGoToCollections();
             }, 1500);
             
         } catch (error) {
             console.error('Error confirming recommendation:', error);
-            setConfirmError('Có lỗi xảy ra khi xác nhận đề xuất. Vui lòng thử lại sau.');
+            let errorMessage = 'Có lỗi xảy ra khi xác nhận đề xuất. Vui lòng thử lại sau.';
             
-            // Even on error, let user proceed to collections
+            // Check for specific error from backend
+            if (error.response && error.response.data) {
+                if (typeof error.response.data === 'string') {
+                    errorMessage = error.response.data;
+                } else if (error.response.data.message) {
+                    errorMessage = error.response.data.message;
+                }
+            }
+            
+            setConfirmError(errorMessage);
+            
+            // Even on error, let user proceed to collections after some time
             setTimeout(() => {
                 handleGoToCollections();
             }, 3000);
@@ -127,6 +167,86 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
 
     // Format backend log data for display
     const formatLogData = () => {
+        // Helper function to map database enum values to user-friendly display text
+        const mapTrainingFrequency = (value) => {
+            if (!value) return "Not specified";
+            
+            // Return the value directly if it's one of the enum values
+            const enumValues = ["Never", "Occasionally", "Moderate", "Regularly", "Advanced"];
+            if (enumValues.includes(value)) {
+                // For user display, we can add descriptions for clarity
+                switch(value) {
+                    case "Never": return "Never (First time)";
+                    case "Occasionally": return "Occasionally (1 session/week)";
+                    case "Moderate": return "Moderate (2-3 sessions/week)";
+                    case "Regularly": return "Regularly (3-4 sessions/week)";
+                    case "Advanced": return "Advanced (5+ sessions/week)";
+                    default: return value;
+                }
+            }
+            
+            // For any non-standard value, try to map it
+            const valueStr = String(value).toUpperCase();
+            if (valueStr.includes("REGULAR")) return "Regularly (3-4 sessions/week)";
+            if (valueStr.includes("NEVER")) return "Never (First time)";
+            if (valueStr.includes("OCCASION")) return "Occasionally (1 session/week)";
+            if (valueStr.includes("MODERATE")) return "Moderate (2-3 sessions/week)";
+            if (valueStr.includes("ADVANCED")) return "Advanced (5+ sessions/week)";
+            
+            return value; // Return as-is if no mapping found
+        };
+        
+        // Map occupation from database enum to user-friendly display
+        const mapOccupation = (value) => {
+            const displayMap = {
+                'Student': 'Sinh viên',
+                'Office worker': 'Văn phòng',
+                'Delivery staff': 'Giao hàng',
+                'Lecturer': 'Giảng viên',
+                'Service staff': 'Nhân viên dịch vụ',
+                'Other': 'Khác'
+            };
+            
+            return displayMap[value] || value;
+        };
+        
+        // Map work environment from database enum to user-friendly display
+        const mapWorkEnvironment = (value) => {
+            const displayMap = {
+                'Office': 'Văn phòng',
+                'Shift work': 'Làm theo ca',
+                'Standing-intensive': 'Đứng nhiều',
+                'Walking-intensive': 'Đi bộ nhiều',
+                'Driving-intensive': 'Lái xe',
+                'Manual labor': 'Lao động tay chân'
+            };
+            
+            return displayMap[value] || value;
+        };
+        
+        // Map training goals from database enum to user-friendly display
+        const mapTrainingGoal = (value) => {
+            // Extract the name part from the enum value (e.g. "7, Weight Loss" -> "Weight Loss")
+            if (value && value.includes(', ')) {
+                const namePart = value.split(', ')[1];
+                
+                // Map English names to Vietnamese if needed
+                const displayMap = {
+                    'Strength Training': 'Tăng cơ',
+                    'Cardiovascular Training': 'Tăng sức bền tim mạch',
+                    'Flexibility and Balance': 'Dẻo dai và thăng bằng',
+                    'Train strength and endurance': 'Tăng sức mạnh và sức bền',
+                    'Mind-Body Wellness': 'Sức khỏe tinh thần',
+                    'Functional Training': 'Huấn luyện chức năng',
+                    'Weight Loss': 'Giảm cân tổng thể'
+                };
+                
+                return displayMap[namePart] || namePart;
+            }
+            
+            return value;
+        };
+        
         const data = [
             { label: "Độ tuổi", value: userMetrics.age || formData.age },
             { label: "Giới tính", value: userMetrics.gender || formData.gender },
@@ -134,20 +254,39 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
             { label: "Cân nặng", value: `${userMetrics.weight || formData.weight} kg` },
             { label: "BMI", value: userMetrics.bmi || (formData.weight / Math.pow(formData.height/100, 2)).toFixed(1) },
             { label: "Loại hình thể", value: userMetrics.body_type || formData.bodyType || "Normal" },
-            { label: "Nghề nghiệp", value: userMetrics.occupation || formData.occupation || "Sinh viên" },
-            { label: "Môi trường làm việc", value: userMetrics.work_environment || formData.workEnvironment || "Office" },
-            { label: "Lịch sử tập luyện", value: userMetrics.training_history || formData.trainingFrequency || "Never" },
-            { label: "Tần suất mong muốn", value: userMetrics.training_frequency || formData.desiredFrequency || "2 sessions/week" },
-            { label: "Mục tiêu tập luyện", value: userMetrics.training_goals || formData.trainingGoal || "Strength Training" },
-            { label: "Vòng eo", value: userMetrics.waist_circumference ? `${userMetrics.waist_circumference} cm` : (formData.waistSize ? `${formData.waistSize} cm` : "Không có") },
-            { label: "Vòng ngực", value: userMetrics.chest_circumference ? `${userMetrics.chest_circumference} cm` : (formData.chestSize ? `${formData.chestSize} cm` : "Không có") }
+            { label: "Nghề nghiệp", value: mapOccupation(userMetrics.occupation) || mapOccupation(formData.occupation) || "Sinh viên" },
+            { label: "Môi trường làm việc", value: mapWorkEnvironment(userMetrics.work_environment) || mapWorkEnvironment(formData.workEnvironment) || "Văn phòng" },
+            { label: "Lịch sử tập luyện", value: mapTrainingFrequency(userMetrics.training_history) || mapTrainingFrequency(formData.trainingFrequency) || "Never" },
+            { label: "Tần suất mong muốn", value: mapTrainingFrequency(userMetrics.training_frequency) || mapTrainingFrequency(formData.desiredFrequency) || "2 sessions/week" },
+            { label: "Mục tiêu tập luyện", value: mapTrainingGoal(userMetrics.training_goals) || mapTrainingGoal(formData.trainingGoal) || "Giảm cân tổng thể" },
         ];
+
+        // Add measurements with more prominence
+        if (userMetrics.waist_circumference || formData.waistSize) {
+            data.push({ 
+                label: "Vòng eo", 
+                value: `${userMetrics.waist_circumference || formData.waistSize} cm`,
+                isHighlighted: true
+            });
+        } else {
+            data.push({ label: "Vòng eo", value: "Không có" });
+        }
+
+        if (userMetrics.chest_circumference || formData.chestSize) {
+            data.push({ 
+                label: "Vòng ngực", 
+                value: `${userMetrics.chest_circumference || formData.chestSize} cm`,
+                isHighlighted: true
+            });
+        } else {
+            data.push({ label: "Vòng ngực", value: "Không có" });
+        }
 
         // Add health information
         if (userMetrics.heart_disease === true || userMetrics.heart_disease === "true") {
             data.push({ label: "Vấn đề tim mạch", value: "Có" });
         }
-
+        
         if (userMetrics.respiratory_disease === true || userMetrics.respiratory_disease === "true") {
             data.push({ label: "Vấn đề hô hấp", value: "Có" });
         }
@@ -219,7 +358,7 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
                                 
                                 <div className={styles.logDataContainer}>
                                     {logData.map((item, index) => (
-                                        <div key={index} className={styles.logItem}>
+                                        <div key={index} className={`${styles.logItem} ${item.isHighlighted ? styles.highlightedLogItem : ''}`}>
                                             <span className={styles.logLabel}>{item.label}:</span>
                                             <span className={styles.logValue}>{item.value}</span>
                                         </div>
@@ -276,7 +415,14 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
                                     </Paper>
                                 ) : (
                                     <Alert severity="info" className={styles.alert}>
-                                        <strong>Không tìm thấy thông tin khóa học đề xuất.</strong> Bạn vẫn có thể xem danh sách khóa học đề xuất bằng cách nhấn nút bên dưới.
+                                        <strong>Không tìm thấy thông tin khóa học đề xuất.</strong> 
+                                        <p>Có thể có lỗi khi lưu dữ liệu hoặc tạo đề xuất. Các lý do có thể bao gồm:</p>
+                                        <ul>
+                                            <li>Dữ liệu không phù hợp với định dạng yêu cầu</li>
+                                            <li>Lỗi kết nối với máy chủ</li>
+                                            <li>Không có khóa học phù hợp với tiêu chí của bạn</li>
+                                        </ul>
+                                        <p>Bạn vẫn có thể xem danh sách khóa học đề xuất bằng cách nhấn nút bên dưới.</p>
                                     </Alert>
                                 )}
                             </div>

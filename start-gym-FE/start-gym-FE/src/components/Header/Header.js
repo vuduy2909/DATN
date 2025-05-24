@@ -65,10 +65,10 @@ const Header = () => {
         // Handle navigation based on the selected setting
         switch (setting) {
             case 'Profile':
-                navigate('/user');
+                navigate('/profile');
                 break;
             case 'Account':
-                navigate('/user');
+                navigate('/account');
                 break;
             case 'Dashboard':
                 navigate('/user');

@@ -9,6 +9,8 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Entity
 @Setter
@@ -29,6 +31,19 @@ public class Course {
     private String image;
     private Boolean status = false;
 
+    // New fields for VIP payment system
+    @Column(name = "price", precision = 10, scale = 0)
+    private BigDecimal price = BigDecimal.ZERO;
+    
+    @Column(name = "is_vip")
+    private Boolean isVip = false;
+    
+    @Column(name = "created_date")
+    private LocalDateTime createdDate = LocalDateTime.now();
+    
+    @Column(name = "updated_date")
+    private LocalDateTime updatedDate = LocalDateTime.now();
+
     @ManyToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "course_type_id")
     private CourseType courseType;
@@ -39,6 +54,11 @@ public class Course {
 
     public Integer getCourseId() {
         return courseId;
+    }
+    
+    @PreUpdate
+    public void preUpdate() {
+        this.updatedDate = LocalDateTime.now();
     }
 }
 

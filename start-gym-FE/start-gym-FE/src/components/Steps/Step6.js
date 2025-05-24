@@ -50,25 +50,114 @@ const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
         });
         
         try {
+            // Helper to map training frequencies to exact enum values required by database
+            const EXACT_ENUM_VALUES = {
+                TRAINING_FREQUENCY: ['Never', 'Occasionally', 'Moderate', 'Regularly', 'Advanced'],
+                OCCUPATION: ['Student', 'Office worker', 'Delivery staff', 'Lecturer', 'Service staff', 'Other'],
+                WORK_ENVIRONMENT: ['Office', 'Shift work', 'Standing-intensive', 'Walking-intensive', 'Driving-intensive', 'Manual labor'],
+                TRAINING_GOALS: ['1, Strength Training', '2, Cardiovascular Training', '3, Flexibility and Balance',
+                    '4, Train strength and endurance', '5, Mind-Body Wellness', '6, Functional Training', '7, Weight Loss']
+            };
+            
+            // Simplified and more reliable mapping function
+            const mapTrainingFrequency = (value) => {
+                if (!value) return 'Moderate'; // Default to exact enum value
+                
+                // Ensure clean string before mapping (no extra spaces)
+                const valueStr = String(value).trim();
+                
+                // Direct mapping to enum values - no case conversion to avoid issues
+                if (valueStr === 'Never') return 'Never';
+                if (valueStr === 'Occasionally') return 'Occasionally';
+                if (valueStr === 'Moderate') return 'Moderate';
+                if (valueStr === 'Regularly') return 'Regularly';
+                if (valueStr === 'Advanced') return 'Advanced';
+                
+                // Legacy fallback mapping if values come in different formats
+                const valueLower = valueStr.toLowerCase();
+                if (valueLower.includes("never")) return 'Never';
+                if (valueLower.includes("occasion")) return 'Occasionally';
+                if (valueLower.includes("moderate")) return 'Moderate';
+                if (valueLower.includes("regular")) return 'Regularly';
+                if (valueLower.includes("advanced")) return 'Advanced';
+                
+                // Numeric value mapping for backwards compatibility
+                if (valueLower.includes("1")) return 'Occasionally';
+                if (valueLower.includes("2")) return 'Moderate';
+                if (valueLower.includes("3")) return 'Regularly';
+                if (valueLower.includes("4") || valueLower.includes("5")) return 'Advanced';
+                
+                // Default to exact enum value
+                return 'Moderate';
+            };
+            
+            // Map occupation values to database ENUM values
+            // ENUM('Student','Office worker','Delivery staff','Lecturer','Service staff','Other')
+            const occupationMap = {
+                'Sinh viên': 'Student',
+                'Văn phòng': 'Office worker',
+                'Giao hàng': 'Delivery staff',
+                'Giảng viên': 'Lecturer',
+                'Nhân viên dịch vụ': 'Service staff',
+                'Khác': 'Other'
+            };
+            
+            // Map work environment values to database ENUM values
+            // ENUM('Office','Shift work','Standing-intensive','Walking-intensive','Driving-intensive','Manual labor')
+            const workEnvironmentMap = {
+                'Văn phòng': 'Office',
+                'Làm theo ca': 'Shift work',
+                'Đứng nhiều': 'Standing-intensive',
+                'Đi bộ nhiều': 'Walking-intensive',
+                'Lái xe': 'Driving-intensive',
+                'Lao động tay chân': 'Manual labor'
+            };
+            
+            // Map training goals values to database ENUM values
+            // ENUM('1, Strength Training','2, Cardiovascular Training','3, Flexibility and Balance',
+            //      '4, Train strength and endurance','5, Mind-Body Wellness','6, Functional Training','7, Weight Loss')
+            const trainingGoalMap = {
+                'Tăng cơ': '1, Strength Training',
+                'Tăng sức bền tim mạch': '2, Cardiovascular Training',
+                'Dẻo dai và thăng bằng': '3, Flexibility and Balance',
+                'Tăng sức mạnh và sức bền': '4, Train strength and endurance',
+                'Sức khỏe tinh thần': '5, Mind-Body Wellness',
+                'Huấn luyện chức năng': '6, Functional Training',
+                'Giảm cân tổng thể': '7, Weight Loss'
+            };
+
             // Prepare API data format
             const apiFormData = {
-                training_history: formData.trainingFrequency, // Lịch sử tập luyện hiện tại
-                training_frequency: formData.desiredFrequency, // Tần suất tập luyện mong muốn
+                // Apply trim() to ensure no whitespace issues for ENUM fields
+                training_history: mapTrainingFrequency(formData.trainingFrequency).trim(),
+                training_frequency: mapTrainingFrequency(formData.desiredFrequency).trim(),
                 age: formData.age,
                 gender: formData.gender,
                 height: formData.height,
                 weight: formData.weight,
                 bmi: formData.weight / Math.pow(formData.height/100, 2), // Tính BMI
-                training_goals: formData.trainingGoal,
-                occupation: formData.occupation,
-                work_environment: formData.workEnvironment,
-                health_issues: formData.healthIssues ? formData.healthIssues.join(',') : '',
+                training_goals: (trainingGoalMap[formData.trainingGoal] || '7, Weight Loss').trim(),
+                occupation: (occupationMap[formData.occupation] || 'Student').trim(),
+                work_environment: (workEnvironmentMap[formData.workEnvironment] || 'Office').trim(),
                 chest_circumference: formData.chestSize, 
                 waist_circumference: formData.waistSize,
                 customerId: formData.customerId
             };
             
             console.log('Calling API directly from Step6 with data:', apiFormData);
+            console.log('Original training history:', formData.trainingFrequency);
+            console.log('Mapped training history:', apiFormData.training_history);
+            console.log('Original desired frequency:', formData.desiredFrequency);
+            console.log('Mapped training frequency:', apiFormData.training_frequency);
+            console.log('Training frequency char codes:', [...apiFormData.training_frequency].map(c => c.charCodeAt(0)));
+            console.log('Original occupation:', formData.occupation);
+            console.log('Mapped occupation:', apiFormData.occupation);
+            console.log('Original work environment:', formData.workEnvironment);
+            console.log('Mapped work environment:', apiFormData.work_environment);
+            console.log('Original training goal:', formData.trainingGoal);
+            console.log('Mapped training goal:', apiFormData.training_goals);
+            console.log('Database enum values must match exactly what is defined in the schema');
+            console.log('Check for: 1. Exact case matching 2. No whitespace 3. No special characters');
             
             // Call API directly from here
             const result = await UserFormService.submitFormData(apiFormData);

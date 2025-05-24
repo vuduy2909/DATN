@@ -4,14 +4,17 @@ import com.capstone.wellnessnavigatorgym.dto.customer.CustomerInfo;
 import com.capstone.wellnessnavigatorgym.dto.customer.CustomerUserDetailDto;
 import com.capstone.wellnessnavigatorgym.entity.Cart;
 import com.capstone.wellnessnavigatorgym.entity.Customer;
+import com.capstone.wellnessnavigatorgym.entity.Account;
 import com.capstone.wellnessnavigatorgym.error.NotFoundById;
 import com.capstone.wellnessnavigatorgym.repository.ICartRepository;
 import com.capstone.wellnessnavigatorgym.repository.ICustomerRepository;
+import com.capstone.wellnessnavigatorgym.repository.IAccountRepository;
 import com.capstone.wellnessnavigatorgym.service.ICustomerService;
 import lombok.SneakyThrows;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import javax.persistence.Tuple;
@@ -23,6 +26,12 @@ public class CustomerServiceImpl implements ICustomerService {
 
     private final ICustomerRepository customerRepository;
     private final ICartRepository cartRepository;
+
+    @Autowired
+    private IAccountRepository accountRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @Autowired
     public CustomerServiceImpl(ICustomerRepository customerRepository, ICartRepository cartRepository) {
@@ -95,5 +104,36 @@ public class CustomerServiceImpl implements ICustomerService {
     @Override
     public Customer findByCart(Cart cart) {
         return customerRepository.findByCart(cart);
+    }
+
+    @Override
+    public void updateCustomerAvatar(String username, String avatarUrl) {
+        Customer customer = customerRepository.findByAccountUserName(username);
+        if (customer != null) {
+            customer.setCustomerImg(avatarUrl);
+            customerRepository.save(customer);
+        }
+    }
+
+    @Override
+    public boolean verifyCurrentPassword(String username, String password) {
+        Optional<Account> accountOpt = accountRepository.findAccountByUserName(username);
+        if (accountOpt.isPresent()) {
+            Account account = accountOpt.get();
+            if (account.getEncryptPassword() != null) {
+                return passwordEncoder.matches(password, account.getEncryptPassword());
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public void updatePassword(String username, String encodedPassword) {
+        Optional<Account> accountOpt = accountRepository.findAccountByUserName(username);
+        if (accountOpt.isPresent()) {
+            Account account = accountOpt.get();
+            account.setEncryptPassword(encodedPassword);
+            accountRepository.save(account);
+        }
     }
 }

@@ -1,7 +1,207 @@
-.link {
-    cursor: pointer;
+.container {
+    display: flex;
+    min-height: 100vh;
+    background-color: #f8f9fa;
+    margin: 0;
+    padding: 0;
 }
 
+/* Left Side - Marketing Content */
+.leftSide {
+    flex: 1;
+    background: white;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    min-height: 100vh;
+    color: #333;
+    padding-top: 150px;
+    padding-left: 10rem;
+}
+
+.contentWrapper {
+    width: 100%;
+    max-width: 600px;
+    text-align: center;
+    margin: 0 auto;
+    padding: 0;
+}
+
+.title {
+    font-size: 3.2rem;
+    font-weight: 700;
+    margin: 0;
+    line-height: 1.1;
+    color: #333;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.titleSecond {
+    font-size: 4rem;
+    font-weight: 700;
+    margin: 0;
+    line-height: 1.1;
+    color: #333;
+}
+
+.startGymText {
+    color: #d35255;
+}
+
+.titleRed {
+    font-size: 4rem;
+    font-weight: 700;
+    margin: 0;
+    line-height: 1.1;
+    color: #d35255;
+    text-align: center;
+}
+
+.subtitle {
+    font-size: 1.2rem;
+    line-height: 1.6;
+    margin-top: 1.5rem;
+    color: #333;
+    text-align: center;
+}
+
+/* Right Side - Registration Form */
+.rightSide {
+    flex: 1;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 2rem;
+    padding-top: 20px;
+    background-color: white;
+}
+
+.formContainer {
+    width: 100%;
+    max-width: 450px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    padding: 2rem;
+}
+
+.formHeader {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.iconWrapper {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 50px;
+    height: 50px;
+    background-color: #d35255;
+    border-radius: 50%;
+    margin-bottom: 1rem;
+    color: white;
+}
+
+.formTitle {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0;
+    color: #333;
+}
+
+.form {
+    width: 100%;
+}
+
+.formRow {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.formField {
+    flex: 1;
+    margin-bottom: 1rem;
+}
+
+.formFieldSmall {
+    flex: 0 0 120px;
+}
+
+.formFieldLarge {
+    flex: 1;
+}
+
+.submitButton {
+    background-color: #d35255 !important;
+    color: white !important;
+    font-weight: 600 !important;
+    padding: 12px !important;
+    margin-top: 1rem !important;
+    margin-bottom: 1rem !important;
+    border-radius: 6px !important;
+    text-transform: none !important;
+    font-size: 1rem !important;
+}
+
+.submitButton:hover {
+    background-color: #b8464a !important;
+}
+
+.loginLink {
+    text-align: center;
+    margin-top: 1rem;
+}
+
+.link {
+    color: #d35255;
+    cursor: pointer;
+    text-decoration: none;
+    font-size: 0.9rem;
+}
+
+.link:hover {
+    text-decoration: underline;
+    color: #b8464a;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .container {
+        flex-direction: column;
+    }
+
+    .leftSide {
+        min-height: 30vh;
+        padding: 1rem;
+    }
+
+    .title,
+    .titleRed {
+        font-size: 2.5rem;
+    }
+
+    .rightSide {
+        padding: 1rem;
+    }
+
+    .formContainer {
+        padding: 1.5rem;
+        box-shadow: none;
+    }
+
+    .formRow {
+        flex-direction: column;
+        gap: 0;
+    }
+
+    .formFieldSmall {
+        flex: 1;
+    }
+}
+
+/* Legacy styles for backwards compatibility */
 .myContainer {
     display: flex;
     padding: 2rem 17rem;

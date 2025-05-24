@@ -27,4 +27,11 @@ public interface ICustomerService {
     CustomerUserDetailDto findUserDetailByUsername(String username);
 
     Customer findByCart(Cart cart);
+
+    // New methods for avatar and password
+    void updateCustomerAvatar(String username, String avatarUrl);
+    
+    boolean verifyCurrentPassword(String username, String password);
+    
+    void updatePassword(String username, String encodedPassword);
 }
