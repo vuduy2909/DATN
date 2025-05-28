@@ -100,7 +100,7 @@ const NewCustomerType = () => {
         <CardContent sx={{ p: 4 }}>
           {/* Header */}
           <Box textAlign="center" mb={3}>
-            <Typography variant="h4" component="h1" fontWeight="bold" color="primary">
+            <Typography variant="h4" component="h1" fontWeight="bold" sx={{ color: '#d35255' }}>
               Create New Customer Type
             </Typography>
             <Typography variant="body1" color="textSecondary" mt={1}>
@@ -185,7 +185,14 @@ const NewCustomerType = () => {
                     size="large"
                     startIcon={<SaveIcon />}
                     disabled={loading}
-                    sx={{ borderRadius: 2, minWidth: 160 }}
+                    sx={{ 
+                        borderRadius: 2, 
+                        minWidth: 160,
+                        bgcolor: '#d35255',
+                        '&:hover': {
+                            bgcolor: '#b8464a'
+                        }
+                    }}
                   >
                     {loading ? 'Creating...' : 'Create Type'}
                   </Button>

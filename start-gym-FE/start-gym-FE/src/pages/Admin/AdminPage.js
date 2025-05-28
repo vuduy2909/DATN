@@ -20,16 +20,22 @@ import {
   People as CustomersIcon,
   Category as CustomerTypeIcon,
   Add as AddIcon,
-  Home as HomeIcon
+  Home as HomeIcon,
+  School as CourseIcon,
+  Comment as CommentIcon,
+  MonetizationOn as RevenueIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import ExerciseComponent from '../../components/Admin/ExerciseComponent/ExerciseComponent';
 import CustomerComponent from '../../components/Admin/CustomersComponent/CustomerComponent';
 import CustomerTypeComponent from '../../components/Admin/CustomerTypeComponent/CustomerTypeComponent';
 import DashboardComponent from '../../components/Admin/DashboardComponent/DashboardComponent';
+import CourseComponent from '../../components/Admin/CourseComponent/CourseComponent';
+import CommentComponent from '../../components/Admin/CommentComponent/CommentComponent';
+import RevenueComponent from '../../components/Admin/RevenueComponent/RevenueComponent';
 import logo from '../../images/logo_start_gym.png';
 
-const drawerWidth = 280;
+const drawerWidth = 220;
 
 const AdminPage = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -40,30 +46,54 @@ const AdminPage = () => {
     navigate('/', { replace: true, state: { fromAdmin: true } });
   };
 
+  const reloadAdminPage = () => {
+    // Reset to dashboard tab and reload the page
+    setActiveTab('dashboard');
+    window.location.reload();
+  };
+
   const menuItems = [
     { 
       key: 'dashboard', 
       label: 'Dashboard', 
       icon: <DashboardIcon />,
-      color: '#1976d2'
+      color: '#d35255'
+    },
+    { 
+      key: 'courses', 
+      label: 'Courses', 
+      icon: <CourseIcon />,
+      color: '#d35255'
     },
     { 
       key: 'exercises', 
       label: 'Exercises', 
       icon: <ExerciseIcon />,
-      color: '#2e7d32'
+      color: '#d35255'
     },
     { 
       key: 'customers', 
       label: 'Customers', 
       icon: <CustomersIcon />,
-      color: '#ed6c02'
+      color: '#d35255'
     },
     { 
       key: 'customerType', 
       label: 'Customer Types', 
       icon: <CustomerTypeIcon />,
-      color: '#9c27b0'
+      color: '#d35255'
+    },
+    { 
+      key: 'comments', 
+      label: 'Comments', 
+      icon: <CommentIcon />,
+      color: '#d35255'
+    },
+    { 
+      key: 'revenue', 
+      label: 'Revenue', 
+      icon: <RevenueIcon />,
+      color: '#d35255'
     }
   ];
 
@@ -71,9 +101,11 @@ const AdminPage = () => {
     switch (activeTab) {
       case 'dashboard':
         return <DashboardComponent />;
+      case 'courses':
+        return <CourseComponent />;
       case 'exercises':
         return (
-          <Box>
+          <Box sx={{ p: 2 }}>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
               <Typography variant="h5" fontWeight="bold">
                 Exercise Management
@@ -82,7 +114,13 @@ const AdminPage = () => {
                 variant="contained"
                 startIcon={<AddIcon />}
                 onClick={() => navigate('/newexercise')}
-                sx={{ borderRadius: 2 }}
+                sx={{ 
+                  borderRadius: 2,
+                  bgcolor: '#d35255',
+                  '&:hover': {
+                    bgcolor: '#b8464a'
+                  }
+                }}
               >
                 Add Exercise
               </Button>
@@ -92,7 +130,7 @@ const AdminPage = () => {
         );
       case 'customers':
         return (
-          <Box>
+          <Box sx={{ p: 2 }}>
             <Typography variant="h5" fontWeight="bold" mb={3}>
               Customer Management
             </Typography>
@@ -101,6 +139,10 @@ const AdminPage = () => {
         );
       case 'customerType':
         return <CustomerTypeComponent />;
+      case 'comments':
+        return <CommentComponent />;
+      case 'revenue':
+        return <RevenueComponent />;
       default:
         return <DashboardComponent />;
     }
@@ -121,10 +163,11 @@ const AdminPage = () => {
           ml: `${drawerWidth}px`,
           bgcolor: 'white',
           color: 'black',
-          boxShadow: 1
+          boxShadow: 1,
+          zIndex: 1200
         }}
       >
-        <Toolbar>
+        <Toolbar sx={{ minHeight: '56px !important' }}>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
             {getCurrentTitle()}
           </Typography>
@@ -132,7 +175,15 @@ const AdminPage = () => {
             startIcon={<HomeIcon />}
             onClick={goToHomepage}
             variant="outlined"
-            sx={{ borderRadius: 2 }}
+            sx={{ 
+              borderRadius: 2,
+              borderColor: '#d35255',
+              color: '#d35255',
+              '&:hover': {
+                borderColor: '#b8464a',
+                bgcolor: 'rgba(211, 82, 85, 0.04)'
+              }
+            }}
           >
             Back to Website
           </Button>
@@ -157,7 +208,7 @@ const AdminPage = () => {
         {/* Logo Section */}
         <Box
           sx={{
-            p: 3,
+            p: 2,
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -168,10 +219,10 @@ const AdminPage = () => {
             component="img"
             src={logo}
             alt="StartGym Logo"
-            onClick={goToHomepage}
+            onClick={reloadAdminPage}
             sx={{
-              width: 80,
-              height: 80,
+              width: 70,
+              height: 70,
               borderRadius: '50%',
               cursor: 'pointer',
               transition: 'transform 0.3s ease',
@@ -180,24 +231,24 @@ const AdminPage = () => {
               }
             }}
           />
-          <Typography variant="h6" fontWeight="bold" mt={2}>
+          <Typography variant="h6" fontWeight="bold" mt={1} sx={{ fontSize: '1rem' }}>
             StartGym Admin
           </Typography>
-          <Typography variant="body2" sx={{ opacity: 0.8 }}>
+          <Typography variant="body2" sx={{ opacity: 0.8, fontSize: '0.8rem' }}>
             Management Portal
           </Typography>
         </Box>
 
         {/* Navigation Menu */}
-        <List sx={{ px: 2, pt: 2 }}>
+        <List sx={{ px: 1, pt: 1 }}>
           {menuItems.map((item) => (
-            <ListItem key={item.key} disablePadding sx={{ mb: 1 }}>
+            <ListItem key={item.key} disablePadding sx={{ mb: 0.3 }}>
               <ListItemButton
                 selected={activeTab === item.key}
                 onClick={() => setActiveTab(item.key)}
                 sx={{
                   borderRadius: 2,
-                  py: 1.5,
+                  py: 1,
                   '&.Mui-selected': {
                     bgcolor: 'rgba(255,255,255,0.15)',
                     '&:hover': {
@@ -209,13 +260,14 @@ const AdminPage = () => {
                   }
                 }}
               >
-                <ListItemIcon sx={{ color: 'white', minWidth: 40 }}>
+                <ListItemIcon sx={{ color: 'white', minWidth: 32 }}>
                   {item.icon}
                 </ListItemIcon>
                 <ListItemText 
                   primary={item.label}
                   primaryTypographyProps={{
-                    fontWeight: activeTab === item.key ? 'bold' : 'normal'
+                    fontWeight: activeTab === item.key ? 'bold' : 'normal',
+                    fontSize: '0.85rem'
                   }}
                 />
               </ListItemButton>
@@ -229,14 +281,12 @@ const AdminPage = () => {
         component="main"
         sx={{
           flexGrow: 1,
-          bgcolor: '#f5f5f5',
+          bgcolor: 'white',
           minHeight: '100vh',
-          ml: `${drawerWidth}px`
+          mt: '56px'
         }}
-      >
-        <Toolbar /> {/* This creates space for the AppBar */}
-        
-        <Container maxWidth="xl" sx={{ py: 3 }}>
+      >        
+        <Box sx={{ p: 0 }}>
           <Paper 
             elevation={0}
             sx={{ 
@@ -246,7 +296,7 @@ const AdminPage = () => {
           >
             {renderTabContent()}
           </Paper>
-        </Container>
+        </Box>
       </Box>
     </Box>
   );

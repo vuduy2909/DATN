@@ -5,8 +5,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import javax.validation.constraints.Max;
-import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
 
 @Getter
@@ -15,12 +13,19 @@ import javax.validation.constraints.NotNull;
 @NoArgsConstructor
 public class CommentDto {
     private Integer commentId;
+    
     @NotNull(message = "Please provide a comment text")
     private String commentText;
-    @NotNull(message = "Please select a rating")
-    @Max(value = 5, message = "Rating must be between 1 and 5")
-    @Min(value = 1, message = "Rating must be between 1 and 5")
-    private Integer rating;
+    
+    @NotNull(message = "Please provide customer ID")
     private String customer;
+    
+    @NotNull(message = "Please provide exercise ID")
     private String exercise;
+    
+    @NotNull(message = "Please provide course ID")
+    private String course;
+    
+    @NotNull(message = "Please provide day ID")
+    private String day;
 }

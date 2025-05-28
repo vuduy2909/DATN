@@ -1,12 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from 'react';
 import { Link } from "react-router-dom";
 import styles from "./Collections_card.module.css";
 import Card from "react-bootstrap/Card";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { collectionService } from "../../service/collectionService";
 import { faStar, faCrown, faInfoCircle, faShoppingCart, faClock, faUser, faDumbbell } from "@fortawesome/free-solid-svg-icons";
-import Button from "@mui/material/Button";
 import { 
+  Button,
   CircularProgress, 
   Snackbar, 
   Alert, 
@@ -22,6 +22,8 @@ import {
 import CourseJoinButton from "../Course/CourseJoinButton";
 import { useAuth } from '../../AuthContext';
 import { request } from '../../utils/axiosInstance';
+import { getCsrfToken } from '../../utils/axiosInstance';
+import { Tooltip } from '@mui/material';
 
 const CollectionCard = ({ 
   id, 
@@ -72,26 +74,6 @@ const CollectionCard = ({
   // Check if this is a purchased VIP course (in My Course context)
   const isPurchasedVip = isUserCourse && courseData && courseData.isVip === true;
   
-  // Debug VIP course detection
-  console.log(`Course ${id} (${title}) debug:`, {
-    courseData,
-    isVipCourse,
-    isPurchasedVip,
-    isUserCourse,
-    hasPrice: courseData?.price,
-    courseDataIsVip: courseData?.isVip
-  });
-
-  // Special debug for course 65
-  if (id === 65) {
-    console.log('=== COURSE 65 DETAILED DEBUG ===');
-    console.log('Raw courseData:', JSON.stringify(courseData, null, 2));
-    console.log('courseData.isVip:', courseData?.isVip, typeof courseData?.isVip);
-    console.log('courseData.price:', courseData?.price, typeof courseData?.price);
-    console.log('isVipCourse calculation:', courseData && courseData.isVip === true && courseData.price && Number(courseData.price) > 0);
-    console.log('Should show VIP buttons?', isVipCourse && !isPurchasedVip);
-  }
-
   const formatPrice = (price) => {
     return new Intl.NumberFormat('vi-VN', {
       style: 'currency',
@@ -124,9 +106,7 @@ const CollectionCard = ({
         returnUrl: window.location.origin + '/payment/result'
       };
 
-      console.log('Payment data:', paymentData);
       const response = await request.post('/payment/create', paymentData);
-      console.log('Payment response:', response);
       
       if (response && response.paymentUrl) {
         showSnackbar('Đang chuyển hướng đến trang thanh toán...', 'info');
@@ -138,8 +118,6 @@ const CollectionCard = ({
       }
 
     } catch (error) {
-      console.error('Payment error:', error);
-      
       let errorMessage = 'Lỗi khi tạo thanh toán. Vui lòng thử lại.';
       
       if (error.response?.data) {
@@ -206,14 +184,11 @@ const CollectionCard = ({
                 onDeleteCourse(id);
             }
             showSnackbar(`Đã xoá khóa học "${title}" thành công! 🗑️`, 'success');
-            console.log('Course deleted successfully:', response);
         } else {
             // Response không có success flag hoặc message
             throw new Error('Không nhận được xác nhận từ server');
         }
     } catch (error) {
-        console.error('Error deleting course:', error);
-        
         let errorMessage = 'Có lỗi xảy ra khi xoá khóa học. Vui lòng thử lại sau.';
         
         if (error.response?.data) {
@@ -684,37 +659,36 @@ const Collections_card = ({ selectedCategory, recommendedCourses, loading, onCou
     try {
       setLoadingCourses(true);
       setError(null);
-      console.log("Starting to fetch courses...");
       const cards = await collectionService.getCards();
-      console.log("API Response:", cards);
       
       if (!cards) {
-        console.error("No cards data received from API");
-        setError("No courses data received");
+        setError("No courses data received from server");
+        setDataCourse([]);
         return;
       }
       
       if (!Array.isArray(cards)) {
-        console.error("Received data is not an array:", cards);
-        setError("Invalid courses data format");
+        setError("Invalid courses data format received");
+        setDataCourse([]);
         return;
       }
 
       if (cards.length === 0) {
-        console.log("Received empty courses array");
-        setError("No courses available");
+        setDataCourse([]);
+        setError(null); // Don't set error for empty array
         return;
       }
 
-      console.log("Successfully loaded", cards.length, "courses");
       setDataCourse(cards);
+      setError(null);
     } catch (error) {
-      console.error("Error details:", {
-        message: error.message,
-        stack: error.stack,
-        response: error.response
-      });
-      setError(error.message || "Error loading courses");
+      const errorMessage = error.response?.status === 500 
+        ? "Server error - please check if the database is running"
+        : error.response?.status === 404
+        ? "Course API endpoint not found"
+        : error.message || "Error loading courses";
+        
+      setError(errorMessage);
       setDataCourse([]);
     } finally {
       setLoadingCourses(false);
@@ -732,8 +706,6 @@ const Collections_card = ({ selectedCategory, recommendedCourses, loading, onCou
       const updatedFilteredCards = filteredCards.filter(course => course.courseId !== courseId);
       setFilteredCards(updatedFilteredCards);
     }
-    
-    console.log(`Course ${courseId} deleted successfully`);
   };
 
   // Load courses when component mounts
@@ -749,10 +721,6 @@ const Collections_card = ({ selectedCategory, recommendedCourses, loading, onCou
   // Filter courses whenever the category changes or courses/recommended courses update
   useEffect(() => {
     if (!dataCourse || dataCourse.length === 0) return;
-    
-    console.log("Filtering with category:", selectedCategory);
-    console.log("Available courses:", dataCourse);
-    console.log("User courses:", userCourses);
     
     let filtered;
     
@@ -774,11 +742,9 @@ const Collections_card = ({ selectedCategory, recommendedCourses, loading, onCou
           isVip: userCourse.isVip || false,
           price: userCourse.price
         }));
-        console.log("Showing user's courses in My Course tab:", filtered);
       } else {
         // No user courses, show empty state
         filtered = [];
-        console.log("No user courses found for My Course tab");
       }
     } else if (selectedCategory === "All") {
       filtered = dataCourse;

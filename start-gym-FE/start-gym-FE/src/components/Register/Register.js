@@ -1,445 +1,568 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import styles from './Register.module.css'
-import { TextField, FormControl, InputLabel, Select, MenuItem, Button, Snackbar, Alert } from '@mui/material';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import styles from './Register.module.css';
+import {
+    Container,
+    Grid,
+    Card,
+    CardContent,
+    TextField,
+    Button,
+    Typography,
+    Box,
+    Avatar,
+    Link,
+    Alert,
+    MenuItem,
+    Divider,
+    createTheme,
+    ThemeProvider
+} from '@mui/material';
+import {
+    PersonAdd,
+    FitnessCenter,
+    LocalFireDepartment
+} from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
 
+// StartGym Theme (same as Login)
+const startGymTheme = createTheme({
+    palette: {
+        primary: {
+            main: '#CF4044',
+            light: '#E55A5E',
+            dark: '#B8363C',
+            contrastText: '#ffffff',
+        },
+        secondary: {
+            main: '#f39c12',
+            light: '#f7b733',
+            dark: '#e67e22',
+        },
+    },
+    typography: {
+        fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+        h3: {
+            fontWeight: 700,
+        },
+        h4: {
+            fontWeight: 600,
+        },
+        h5: {
+            fontWeight: 600,
+        },
+    },
+    components: {
+        MuiButton: {
+            styleOverrides: {
+                root: {
+                    borderRadius: 8,
+                    textTransform: 'none',
+                    fontSize: '1rem',
+                    fontWeight: 600,
+                    padding: '12px 24px',
+                },
+            },
+        },
+        MuiTextField: {
+            styleOverrides: {
+                root: {
+                    '& .MuiOutlinedInput-root': {
+                        borderRadius: 8,
+                        '&:hover fieldset': {
+                            borderColor: '#CF4044',
+                        },
+                        '&.Mui-focused fieldset': {
+                            borderColor: '#CF4044',
+                        },
+                    },
+                    '& .MuiInputLabel-root.Mui-focused': {
+                        color: '#CF4044',
+                    },
+                },
+            },
+        },
+    },
+});
+
 const Register = () => {
-    const [name, setName] = useState('');
-    const [nameError, setNameError] = useState('');
-
+    const [customerName, setCustomerName] = useState('');
+    const [customerAddress, setCustomerAddress] = useState('');
+    const [customerAge, setCustomerAge] = useState('');
+    const [customerPhone, setCustomerPhone] = useState('');
+    const [customerEmail, setCustomerEmail] = useState('');
+    const [customerGender, setCustomerGender] = useState('');
+    const [customerDob, setCustomerDob] = useState(null);
+    const [dobError, setDobError] = useState('');
     const [username, setUsername] = useState('');
-    const [usernameError, setUsernameError] = useState('');
-
-    const [gender, setGender] = useState('');
-
-    const [phone, setPhone] = useState('');
-    const [phoneError, setPhoneError] = useState('');
-
-    const [dateOfBirth, setDateOfBirth] = useState(null);
-    const [dateOfBirthError, setDateOfBirthError] = useState('');
-
-    const [address, setAddress] = useState('');
-    const [addressError, setAddressError] = useState('');
-
-    const [email, setEmail] = useState('');
-    const [emailError, setEmailError] = useState('');
-
     const [password, setPassword] = useState('');
-    const [passwordError, setPasswordError] = useState('');
-
     const [confirmPassword, setConfirmPassword] = useState('');
-    const [confirmPasswordError, setConfirmPasswordError] = useState('');
-
-    // Snackbar state for notifications
-    const [snackbar, setSnackbar] = useState({
-        open: false,
-        message: '',
-        severity: 'info' // 'error', 'warning', 'info', 'success'
-    });
-
+    const [errorMessage, setErrorMessage] = useState('');
+    const [successMessage, setSuccessMessage] = useState('');
+    
+    // Validation states
+    const [emailError, setEmailError] = useState('');
+    const [phoneError, setPhoneError] = useState('');
+    const [passwordError, setPasswordError] = useState('');
+    
+    // Focus states to show helper text only when focused
+    const [emailFocused, setEmailFocused] = useState(false);
+    const [phoneFocused, setPhoneFocused] = useState(false);
+    const [passwordFocused, setPasswordFocused] = useState(false);
+    const [dobFocused, setDobFocused] = useState(false);
+    
     const navigate = useNavigate();
 
-    const showSnackbar = (message, severity = 'info') => {
-        setSnackbar({
-            open: true,
-            message,
-            severity
-        });
+    const handleNavigateToLogin = () => {
+        navigate('/login');
     };
 
-    const handleSnackbarClose = (event, reason) => {
-        if (reason === 'clickaway') {
-            return;
-        }
-        setSnackbar({ ...snackbar, open: false });
-    };
-
-    const handleLogin = async () => {
-        navigate('/login')
-    };
-
-    const handleNameChange = (e) => {
-        const value = e.target.value;
-        setName(value);
-
-        if (value.length < 3 || value.length > 50) {
-            setNameError('Họ tên phải có độ dài từ 3 đến 50 ký tự');
-        } else if (!/^[a-zA-ZÀ-Ỹà-ỹ ]+$/.test(value)) {
-            setNameError('Họ tên không được chứa ký tự đặc biệt hoặc số');
-        } else {
-            setNameError('');
-        }
-    };
-
-    const handleUsernameChange = (e) => {
-        const value = e.target.value;
-        setUsername(value);
-
-        if (value.length < 3 || value.length > 50) {
-            setUsernameError('Tên đăng nhập phải có độ dài từ 3 đến 50 ký tự');
-        } else {
-            setUsernameError('');
-        }
-    };
-
-    const handlePhoneNumberChange = (e) => {
-        const value = e.target.value;
-        setPhone(value);
-
-        if (!/^\d+$/.test(value)) {
-            setPhoneError('Vui lòng chỉ nhập số');
-        } else if (value.length !== 10) {
-            setPhoneError('Số điện thoại phải chứa 10 số')
-        } else {
-            const prefixes = /^(086|096|097|098|038|037|036|035|034|033|032|091|094|088|081|082|083|084|085|070|076|077|078|079|089|090|093|092|052|056|058|099|059|087)/;
-            if (!prefixes.test(value.substr(0, 3))) {
-                setPhoneError('Số điện thoại không hợp lệ, vui lòng kiểm tra lại tiền tố');
-            } else {
-                setPhoneError('');
-            }
-        }
-    }
-
-    const handleDateOfBirthChange = (newDate) => {
-        setDateOfBirth(newDate);
-        
-        if (!newDate) {
-            setDateOfBirthError('Vui lòng chọn ngày sinh');
-            return;
-        }
-
-        // Calculate age
-        const today = dayjs();
-        const birthDate = dayjs(newDate);
-        const age = today.diff(birthDate, 'year');
-        
-        if (age < 16) {
-            setDateOfBirthError('Bạn phải từ 16 tuổi trở lên để đăng ký');
-        } else {
-            setDateOfBirthError('');
-        }
-    };
-
-    const handleAddressChange = (e) => {
-        const value = e.target.value;
-        setAddress(value)
-
-        if (value.length < 5) {
-            setAddressError('Địa chỉ ngắn quá (< 5 ký tự)')
-        } else if (value.length > 100) {
-            setAddressError('Địa chỉ dài quá (> 100 ký tự)')
-        } else {
-            setAddressError('')
-        }
-    }
-
-    const handleEmailChange = (e) => {
-        const value = e.target.value;
-        setEmail(value)
+    // Email validation
+    const validateEmail = (email) => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-        if (!emailRegex.test(value)) {
-            setEmailError('Email không đúng định dạng')
-        } else if (value.length > 30) {
-            setEmailError('Email quá dài (> 30 ký tự)')
-        } else {
-            setEmailError('')
+        if (!email) {
+            setEmailError('Email is required');
+            return false;
         }
-    }
-
-    const handlePasswordChange = (e) => {
-        const value = e.target.value;
-        setPassword(value)
-
-        const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
-        if (!passwordRegex.test(value)) {
-            setPasswordError('Password chưa đủ mạnh. Yêu cầu ít nhất 8 ký tự, chứa ít nhất một chữ cái và một chữ số.');
-        } else {
-            setPasswordError('');
+        if (!emailRegex.test(email)) {
+            setEmailError('Please enter a valid email address');
+            return false;
         }
-    }
+        setEmailError('');
+        return true;
+    };
 
-    const handleConfirmPasswordChange = (e) => {
-        const value = e.target.value;
-        setConfirmPassword(value);
-
-        if (value !== password) {
-            setConfirmPasswordError('Confirm password không trùng khớp')
-        } else {
-            setConfirmPasswordError('')
+    // Phone validation
+    const validatePhone = (phone) => {
+        const phoneRegex = /^(\+84|84|0)[3|5|7|8|9][0-9]{8}$/;
+        if (!phone) {
+            setPhoneError('Phone number is required');
+            return false;
         }
-    }
+        if (!phoneRegex.test(phone)) {
+            setPhoneError('Please enter a valid Vietnamese phone number');
+            return false;
+        }
+        setPhoneError('');
+        return true;
+    };
 
-    const handleRegister = async (e) => {
-        e.preventDefault();
-        try {
-            // Validate form trước khi submit
-            if (!name || !username || !gender || !phone || !dateOfBirth || !address || !email || !password || !confirmPassword) {
-                showSnackbar('Vui lòng điền đầy đủ thông tin', 'warning');
-                return;
-            }
+    // Password validation
+    const validatePassword = (password) => {
+        if (!password) {
+            setPasswordError('Password is required');
+            return false;
+        }
+        if (password.length < 8) {
+            setPasswordError('Password must be at least 8 characters long');
+            return false;
+        }
+        if (!/(?=.*[a-z])/.test(password)) {
+            setPasswordError('Password must contain at least one lowercase letter');
+            return false;
+        }
+        if (!/(?=.*[A-Z])/.test(password)) {
+            setPasswordError('Password must contain at least one uppercase letter');
+            return false;
+        }
+        if (!/(?=.*\d)/.test(password)) {
+            setPasswordError('Password must contain at least one number');
+            return false;
+        }
+        setPasswordError('');
+        return true;
+    };
 
-            if (nameError || usernameError || phoneError || dateOfBirthError || addressError || emailError || passwordError || confirmPasswordError) {
-                showSnackbar('Vui lòng sửa các lỗi trong form', 'warning');
-                return;
-            }
-
-            // Double check age validation
+    const handleDateChange = (newValue) => {
+        setCustomerDob(newValue);
+        setDobError('');
+        
+        if (newValue) {
             const today = dayjs();
-            const birthDate = dayjs(dateOfBirth);
+            const birthDate = dayjs(newValue);
             const age = today.diff(birthDate, 'year');
             
             if (age < 16) {
-                showSnackbar('Bạn phải từ 16 tuổi trở lên để đăng ký', 'warning');
+                setDobError('You must be at least 16 years old to register');
+            }
+        }
+    };
+
+    const handleRegister = async (e) => {
+        e.preventDefault();
+        setErrorMessage('');
+        setSuccessMessage('');
+
+        // Validate all fields
+        const isEmailValid = validateEmail(customerEmail);
+        const isPhoneValid = validatePhone(customerPhone);
+        const isPasswordValid = validatePassword(password);
+
+        // Validate age from date of birth
+        if (customerDob) {
+            const today = dayjs();
+            const birthDate = dayjs(customerDob);
+            const age = today.diff(birthDate, 'year');
+            
+            if (age < 16) {
+                setErrorMessage('You must be at least 16 years old to register');
                 return;
             }
+        }
 
-            // Format date of birth
-            const formattedDate = dateOfBirth ? dateOfBirth.format('YYYY-MM-DD') : null;
+        if (password !== confirmPassword) {
+            setErrorMessage('Mật khẩu xác nhận không khớp');
+            return;
+        }
 
-            const userData = {
-                name: name,
+        // Stop if any validation fails
+        if (!isEmailValid || !isPhoneValid || !isPasswordValid) {
+            setErrorMessage('Please correct the errors above');
+            return;
+        }
+
+        try {
+            const registrationData = {
                 username: username,
-                gender: gender === true ? 'Male' : 'Female',
-                dateOfBirth: formattedDate,
-                address: address,
-                phone: phone,
-                email: email,
-                password: password
+                password: password,
+                customer: {
+                    customer_name: customerName,
+                    customer_address: customerAddress,
+                    customer_age: parseInt(customerAge),
+                    customer_phone: customerPhone,
+                    customer_email: customerEmail,
+                    customer_gender: customerGender,
+                    customer_dob: customerDob ? customerDob.format('YYYY-MM-DD') : null
+                }
             };
 
-            const response = await axios.post('http://localhost:8080/api/v1/public/signup', userData);
+            const response = await axios.post('http://localhost:8080/api/v1/public/register', registrationData);
 
             if (response.status === 200) {
-                showSnackbar('Đăng ký thành công! 🎉', 'success');
-                setTimeout(() => navigate('/login'), 1500); // Delay để user thấy thông báo
-            } else {
-                console.error('Đăng ký không thành công');
-                showSnackbar('Đăng ký không thành công. Vui lòng thử lại.', 'error');
+                setSuccessMessage('Đăng ký thành công! Vui lòng đăng nhập.');
+                setTimeout(() => {
+                    navigate('/login');
+                }, 2000);
             }
         } catch (error) {
             console.error('Đã xảy ra lỗi:', error);
             if (error.response && error.response.data) {
-                showSnackbar('Lỗi: ' + (error.response.data.message || 'Đăng ký thất bại'), 'error');
+                setErrorMessage(error.response.data.message || 'Đăng ký thất bại');
             } else {
-                showSnackbar('Đã xảy ra lỗi. Vui lòng thử lại.', 'error');
+                setErrorMessage('Đăng ký thất bại. Vui lòng thử lại.');
             }
         }
     };
 
-    // Calculate max date (16 years ago from today)
-    const maxDate = dayjs().subtract(16, 'year');
-
     return (
-        <div className={styles.container}>
-            {/* Left Side - Marketing Content */}
-            <div className={styles.leftSide}>
-                <div className={styles.contentWrapper}>
-                    <h1 className={styles.title}>Transform Your Fitness</h1>
-                    <h1 className={styles.title}>Journey with</h1>
-                    <h1 className={styles.titleRed}><span className={styles.startGymText}>StartGym</span></h1>
-                    <p className={styles.subtitle}>
-                        Discover the future of fitness with our AI-powered platform. Personalized workouts, smart nutrition, and innovative solutions await you. Embark on a journey to a healthier, stronger you – where technology meets transformation. Your fitness evolution starts here.
-                    </p>
-                </div>
-            </div>
-
-            {/* Right Side - Registration Form */}
-            <div className={styles.rightSide}>
-                <div className={styles.formContainer}>
-                    <div className={styles.formHeader}>
-                        <div className={styles.iconWrapper}>
-                            <LockOutlinedIcon />
-                        </div>
-                        <h2 className={styles.formTitle}>Sign up</h2>
-                    </div>
-
-                    <form onSubmit={handleRegister} className={styles.form}>
-                        <div className={styles.formRow}>
-                            <div className={styles.formField}>
-                                <TextField
-                                    value={name}
-                                    onChange={handleNameChange}
-                                    fullWidth
-                                    id="name"
-                                    label="Full name * *"
-                                    variant="outlined"
-                                    size="small"
-                                    required
-                                    error={!!nameError}
-                                    helperText={nameError}
-                                />
-                            </div>
-                            <div className={styles.formField}>
-                                <TextField
-                                    value={username}
-                                    onChange={handleUsernameChange}
-                                    fullWidth
-                                    id="username"
-                                    label="User name ..."
-                                    variant="outlined"
-                                    size="small"
-                                    required
-                                    error={!!usernameError}
-                                    helperText={usernameError}
-                                />
-                            </div>
-                        </div>
-
-                        <div className={styles.formRow}>
-                            <div className={styles.formFieldSmall}>
-                                <FormControl fullWidth required size="small">
-                                    <InputLabel id="gender-label">Gender</InputLabel>
-                                    <Select
-                                        labelId="gender-label"
-                                        label="Gender"
-                                        value={gender}
-                                        onChange={(e) => setGender(e.target.value)}
-                                    >
-                                        <MenuItem value={true}>Male</MenuItem>
-                                        <MenuItem value={false}>Female</MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </div>
-                            <div className={styles.formFieldLarge}>
-                                <TextField
-                                    value={phone}
-                                    onChange={handlePhoneNumberChange}
-                                    fullWidth
-                                    id="phone"
-                                    label="Phone number * *"
-                                    variant="outlined"
-                                    size="small"
-                                    required
-                                    error={!!phoneError}
-                                    helperText={phoneError}
-                                />
-                            </div>
-                        </div>
-
-                        <div className={styles.formField}>
-                            <LocalizationProvider dateAdapter={AdapterDayjs}>
-                                <DatePicker
-                                    label="Date of Birth * *"
-                                    value={dateOfBirth}
-                                    onChange={handleDateOfBirthChange}
-                                    maxDate={maxDate}
-                                    slotProps={{
-                                        textField: {
-                                            fullWidth: true,
-                                            required: true,
-                                            size: 'small',
-                                            error: !!dateOfBirthError,
-                                            helperText: dateOfBirthError || 'Phải từ 16 tuổi trở lên'
-                                        }
+        <ThemeProvider theme={startGymTheme}>
+            <LocalizationProvider dateAdapter={AdapterDayjs}>
+                <Box sx={{ 
+                    background: 'linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)',
+                    py: 4
+                }}>
+                    <Container maxWidth="lg">
+                        <Grid container spacing={4}>
+                            {/* Left Side - Marketing Content */}
+                            <Grid item xs={12} md={5}>
+                                <Box 
+                                    sx={{ 
+                                        textAlign: 'center', 
+                                        p: 4,
+                                        background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+                                        borderRadius: 4,
+                                        color: 'black',
+                                        boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1)',
                                     }}
-                                />
-                            </LocalizationProvider>
-                        </div>
+                                >
+                                    <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
+                                        <FitnessCenter sx={{ fontSize: 60, mr: 2, color: 'black' }} />
+                                        <LocalFireDepartment sx={{ fontSize: 60, color: 'black' }} />
+                                    </Box>
+                                    
+                                    <Typography variant="h3" sx={{ mb: 2, fontWeight: 'bold', color: 'black' }}>
+                                        Join the
+                                    </Typography>
+                                    <Typography variant="h3" sx={{ mb: 2, fontWeight: 'bold', color: 'black' }}>
+                                        StartGym
+                                    </Typography>
+                                    <Typography variant="h3" sx={{ mb: 4, fontWeight: 'bold', color: '#CF4044' }}>
+                                        Community
+                                    </Typography>
+                                    
+                                    <Typography variant="h6" sx={{ lineHeight: 1.6, color: 'black', opacity: 0.8 }}>
+                                        Begin your transformation journey with AI-powered fitness solutions. 
+                                        Join thousands of members who've achieved their goals with our 
+                                        personalized approach to health and wellness.
+                                    </Typography>
+                                </Box>
+                            </Grid>
 
-                        <div className={styles.formField}>
-                            <TextField
-                                value={address}
-                                onChange={handleAddressChange}
-                                fullWidth
-                                id="address"
-                                label="Address * *"
-                                variant="outlined"
-                                size="small"
-                                required
-                                error={!!addressError}
-                                helperText={addressError}
-                            />
-                        </div>
+                            {/* Right Side - Registration Form */}
+                            <Grid item xs={12} md={7}>
+                                <Card elevation={12} sx={{ 
+                                    borderRadius: 4,
+                                    boxShadow: '0 20px 40px rgba(0,0,0,0.1)'
+                                }}>
+                                    <CardContent sx={{ p: 3 }}>
+                                        {/* Messages */}
+                                        {errorMessage && (
+                                            <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+                                                {errorMessage}
+                                            </Alert>
+                                        )}
+                                        {successMessage && (
+                                            <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }}>
+                                                {successMessage}
+                                            </Alert>
+                                        )}
 
-                        <div className={styles.formField}>
-                            <TextField
-                                value={email}
-                                onChange={handleEmailChange}
-                                fullWidth
-                                id="email"
-                                label="Email * *"
-                                variant="outlined"
-                                size="small"
-                                required
-                                error={!!emailError}
-                                helperText={emailError}
-                            />
-                        </div>
+                                        {/* Registration Form */}
+                                        <Box component="form" onSubmit={handleRegister}>
+                                            {/* Personal Information Section */}
+                                            <Typography variant="h6" sx={{ mb: 1.5, color: 'primary.main', fontWeight: 'bold', fontSize: '1.1rem' }}>
+                                                Personal Information
+                                            </Typography>
+                                            
+                                            <Grid container spacing={1.5} sx={{ mb: 2 }}>
+                                                <Grid item xs={12}>
+                                                    <TextField
+                                                        fullWidth
+                                                        label="Full Name *"
+                                                        value={customerName}
+                                                        onChange={(e) => setCustomerName(e.target.value)}
+                                                        required
+                                                        variant="outlined"
+                                                        size="small"
+                                                    />
+                                                </Grid>
+                                                
+                                                <Grid item xs={6}>
+                                                    <TextField
+                                                        fullWidth
+                                                        label="Age *"
+                                                        type="number"
+                                                        value={customerAge}
+                                                        onChange={(e) => setCustomerAge(e.target.value)}
+                                                        required
+                                                        variant="outlined"
+                                                        size="small"
+                                                        inputProps={{ min: 1, max: 120 }}
+                                                    />
+                                                </Grid>
+                                                
+                                                <Grid item xs={6}>
+                                                    <TextField
+                                                        select
+                                                        fullWidth
+                                                        label="Gender *"
+                                                        value={customerGender}
+                                                        onChange={(e) => setCustomerGender(e.target.value)}
+                                                        required
+                                                        variant="outlined"
+                                                        size="small"
+                                                    >
+                                                        <MenuItem value="Male">Male</MenuItem>
+                                                        <MenuItem value="Female">Female</MenuItem>
+                                                        <MenuItem value="Other">Other</MenuItem>
+                                                    </TextField>
+                                                </Grid>
+                                                
+                                                <Grid item xs={12}>
+                                                    <DatePicker
+                                                        label="Date of Birth"
+                                                        value={customerDob}
+                                                        onChange={handleDateChange}
+                                                        slots={{
+                                                            textField: TextField
+                                                        }}
+                                                        slotProps={{
+                                                            textField: {
+                                                                fullWidth: true,
+                                                                variant: 'outlined',
+                                                                size: 'small',
+                                                                error: !!dobError,
+                                                                helperText: dobError || (dobFocused ? 'Must be at least 16 years old' : ''),
+                                                                onFocus: () => setDobFocused(true),
+                                                                onBlur: () => setDobFocused(false)
+                                                            }
+                                                        }}
+                                                        maxDate={dayjs().subtract(16, 'year')}
+                                                    />
+                                                </Grid>
+                                            </Grid>
 
-                        <div className={styles.formField}>
-                            <TextField
-                                value={password}
-                                onChange={handlePasswordChange}
-                                fullWidth
-                                id="password"
-                                type="password"
-                                label="Password * *"
-                                variant="outlined"
-                                size="small"
-                                required
-                                error={!!passwordError}
-                                helperText={passwordError}
-                            />
-                        </div>
+                                            {/* Contact Information Section */}
+                                            <Typography variant="h6" sx={{ mb: 1.5, color: 'primary.main', fontWeight: 'bold', fontSize: '1.1rem' }}>
+                                                Contact Information
+                                            </Typography>
+                                            
+                                            <Grid container spacing={1.5} sx={{ mb: 2 }}>
+                                                <Grid item xs={12}>
+                                                    <TextField
+                                                        fullWidth
+                                                        label="Email *"
+                                                        type="email"
+                                                        value={customerEmail}
+                                                        onChange={(e) => {
+                                                            setCustomerEmail(e.target.value);
+                                                            if (e.target.value) validateEmail(e.target.value);
+                                                        }}
+                                                        onFocus={() => setEmailFocused(true)}
+                                                        onBlur={() => {
+                                                            setEmailFocused(false);
+                                                            validateEmail(customerEmail);
+                                                        }}
+                                                        error={!!emailError}
+                                                        helperText={emailError || (emailFocused ? 'Enter a valid email address' : '')}
+                                                        required
+                                                        variant="outlined"
+                                                        size="small"
+                                                    />
+                                                </Grid>
+                                                
+                                                <Grid item xs={12}>
+                                                    <TextField
+                                                        fullWidth
+                                                        label="Phone Number *"
+                                                        value={customerPhone}
+                                                        onChange={(e) => {
+                                                            setCustomerPhone(e.target.value);
+                                                            if (e.target.value) validatePhone(e.target.value);
+                                                        }}
+                                                        onFocus={() => setPhoneFocused(true)}
+                                                        onBlur={() => {
+                                                            setPhoneFocused(false);
+                                                            validatePhone(customerPhone);
+                                                        }}
+                                                        error={!!phoneError}
+                                                        helperText={phoneError || (phoneFocused ? 'Format: 0xxxxxxxxx or +84xxxxxxxxx' : '')}
+                                                        required
+                                                        variant="outlined"
+                                                        size="small"
+                                                    />
+                                                </Grid>
+                                                
+                                                <Grid item xs={12}>
+                                                    <TextField
+                                                        fullWidth
+                                                        label="Address *"
+                                                        value={customerAddress}
+                                                        onChange={(e) => setCustomerAddress(e.target.value)}
+                                                        required
+                                                        variant="outlined"
+                                                        size="small"
+                                                        multiline
+                                                        rows={1}
+                                                    />
+                                                </Grid>
+                                            </Grid>
 
-                        <div className={styles.formField}>
-                            <TextField
-                                value={confirmPassword}
-                                onChange={handleConfirmPasswordChange}
-                                fullWidth
-                                id="confirmPassword"
-                                type="password"
-                                label="Confirm Password * *"
-                                variant="outlined"
-                                size="small"
-                                required
-                                error={!!confirmPasswordError}
-                                helperText={confirmPasswordError}
-                            />
-                        </div>
+                                            {/* Account Information Section */}
+                                            <Typography variant="h6" sx={{ mb: 1.5, color: 'primary.main', fontWeight: 'bold', fontSize: '1.1rem' }}>
+                                                Account Information
+                                            </Typography>
+                                            
+                                            <Grid container spacing={1.5} sx={{ mb: 2 }}>
+                                                <Grid item xs={12}>
+                                                    <TextField
+                                                        fullWidth
+                                                        label="Username *"
+                                                        value={username}
+                                                        onChange={(e) => setUsername(e.target.value)}
+                                                        required
+                                                        variant="outlined"
+                                                        size="small"
+                                                    />
+                                                </Grid>
+                                                
+                                                <Grid item xs={6}>
+                                                    <TextField
+                                                        fullWidth
+                                                        label="Password *"
+                                                        type="password"
+                                                        value={password}
+                                                        onChange={(e) => {
+                                                            setPassword(e.target.value);
+                                                            if (e.target.value) validatePassword(e.target.value);
+                                                        }}
+                                                        onFocus={() => setPasswordFocused(true)}
+                                                        onBlur={() => {
+                                                            setPasswordFocused(false);
+                                                            validatePassword(password);
+                                                        }}
+                                                        error={!!passwordError}
+                                                        helperText={passwordError || (passwordFocused ? 'Min 8 chars, 1 uppercase, 1 lowercase, 1 number' : '')}
+                                                        required
+                                                        variant="outlined"
+                                                        size="small"
+                                                    />
+                                                </Grid>
+                                                
+                                                <Grid item xs={6}>
+                                                    <TextField
+                                                        fullWidth
+                                                        label="Confirm Password *"
+                                                        type="password"
+                                                        value={confirmPassword}
+                                                        onChange={(e) => setConfirmPassword(e.target.value)}
+                                                        required
+                                                        variant="outlined"
+                                                        size="small"
+                                                        error={!!(confirmPassword && password !== confirmPassword)}
+                                                        helperText={confirmPassword && password !== confirmPassword ? 'Passwords do not match' : ''}
+                                                    />
+                                                </Grid>
+                                            </Grid>
 
-                        <Button 
-                            type="submit" 
-                            fullWidth 
-                            variant="contained" 
-                            className={styles.submitButton}
-                        >
-                            SIGN UP
-                        </Button>
+                                            {/* Submit Button */}
+                                            <Button
+                                                type="submit"
+                                                fullWidth
+                                                variant="contained"
+                                                size="medium"
+                                                sx={{ 
+                                                    mb: 2,
+                                                    py: 1.2,
+                                                    background: 'linear-gradient(135deg, #CF4044 0%, #B8363C 100%)',
+                                                    boxShadow: '0 8px 16px rgba(207, 64, 68, 0.3)',
+                                                    '&:hover': {
+                                                        background: 'linear-gradient(135deg, #B8363C 0%, #A62F33 100%)',
+                                                        boxShadow: '0 12px 24px rgba(207, 64, 68, 0.4)',
+                                                    }
+                                                }}
+                                            >
+                                                CREATE ACCOUNT
+                                            </Button>
 
-                        <div className={styles.loginLink}>
-                            <span onClick={handleLogin} className={styles.link}>
-                                Already have an account? Sign in
-                            </span>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            {/* Snackbar for notifications */}
-            <Snackbar 
-                open={snackbar.open} 
-                autoHideDuration={4000} 
-                onClose={handleSnackbarClose}
-                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-            >
-                <Alert 
-                    onClose={handleSnackbarClose} 
-                    severity={snackbar.severity} 
-                    sx={{ width: '100%' }}
-                    variant="filled"
-                >
-                    {snackbar.message}
-                </Alert>
-            </Snackbar>
-        </div>
+                                            {/* Login Link */}
+                                            <Box sx={{ textAlign: 'center' }}>
+                                                <Link 
+                                                    component="button"
+                                                    variant="body2"
+                                                    onClick={handleNavigateToLogin}
+                                                    sx={{ 
+                                                        color: 'primary.main',
+                                                        textDecoration: 'none',
+                                                        '&:hover': { textDecoration: 'underline' }
+                                                    }}
+                                                >
+                                                    Already have an account? Sign In
+                                                </Link>
+                                            </Box>
+                                        </Box>
+                                    </CardContent>
+                                </Card>
+                            </Grid>
+                        </Grid>
+                    </Container>
+                </Box>
+            </LocalizationProvider>
+        </ThemeProvider>
     );
 };
 

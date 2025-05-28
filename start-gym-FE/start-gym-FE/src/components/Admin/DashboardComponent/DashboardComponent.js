@@ -55,25 +55,19 @@ const DashboardComponent = () => {
     useEffect(() => {
         const fetchDashboardData = async () => {
             try {
-                console.log('=== FETCHING DASHBOARD DATA ===');
                 setLoading(true);
                 setError(null);
                 
                 const response = await axiosInstance.get('/admin/dashboard-overview');
-                console.log('Dashboard API response:', response);
-                console.log('Dashboard response data:', response.data);
                 
                 if (response.data) {
                     setDashboardData(response.data);
-                    console.log('Dashboard data set successfully');
                 } else {
-                    console.error('No data in response');
                     setError('No data received from server');
                 }
                 
             } catch (error) {
                 console.error('Dashboard fetch error:', error);
-                console.error('Error response:', error.response);
                 setError(`Error loading dashboard: ${error.message}`);
             } finally {
                 setLoading(false);
@@ -222,16 +216,11 @@ const DashboardComponent = () => {
         );
     }
 
-    console.log('Current dashboardData state:', dashboardData);
-
     if (!dashboardData) {
         return (
             <Box sx={{ p: 3 }}>
                 <Alert severity="warning" sx={{ mb: 2 }}>
                     Không có dữ liệu để hiển thị. Vui lòng kiểm tra kết nối API.
-                </Alert>
-                <Alert severity="info" sx={{ mb: 2 }}>
-                    Debug: dashboardData = {String(dashboardData)}
                 </Alert>
             </Box>
         );

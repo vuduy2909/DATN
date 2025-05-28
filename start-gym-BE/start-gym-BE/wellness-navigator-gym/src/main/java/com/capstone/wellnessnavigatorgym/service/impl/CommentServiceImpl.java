@@ -36,9 +36,10 @@ public class CommentServiceImpl implements ICommentService {
     public void saveComment(Comment comment) {
         commentRepository.insertComment(
                 comment.getCommentText(),
-                comment.getRating(),
                 String.valueOf(comment.getCustomer().getCustomerId()),
-                String.valueOf(comment.getExercise().getExerciseId()));
+                String.valueOf(comment.getExercise().getExerciseId()),
+                String.valueOf(comment.getCourse().getCourseId()),
+                String.valueOf(comment.getDay().getDayId()));
     }
 
 }

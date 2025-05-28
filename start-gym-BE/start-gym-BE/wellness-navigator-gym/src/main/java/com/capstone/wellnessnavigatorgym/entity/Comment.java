@@ -1,11 +1,14 @@
 package com.capstone.wellnessnavigatorgym.entity;
 
 import com.capstone.wellnessnavigatorgym.dto.comment.CommentDto;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 
 import javax.persistence.*;
+import java.time.LocalDateTime;
+
 @Entity
 @Setter
 @Getter
@@ -15,21 +18,61 @@ public class Comment {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer commentId;
+    
+    @Column(name = "comment_text", nullable = false)
     private String commentText;
-    private Integer rating;
-
-    @ManyToOne(cascade = CascadeType.ALL)
-    @JoinColumn(name = "customer_id")
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "customer_id", nullable = false)
     private Customer customer;
 
-    @ManyToOne(cascade = CascadeType.ALL)
-    @JoinColumn(name = "exercise_id")
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "exercise_id", nullable = false)
     private Exercise exercise;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "course_id", nullable = false)
+    private Course course;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "day_id", nullable = false)
+    private Day day;
+    
+    @Column(name = "created_date", nullable = false)
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime createdDate = LocalDateTime.now();
+    
+    @Column(name = "updated_date")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime updatedDate = LocalDateTime.now();
+    
+    @Column(name = "is_reported")
+    private Boolean isReported = false;
+    
+    @Column(name = "report_count")
+    private Integer reportCount = 0;
+    
+    @Column(name = "report_reason")
+    private String reportReason;
 
     public Comment(CommentDto commentDto) {
         this.commentText = commentDto.getCommentText();
-        this.rating = commentDto.getRating();
         this.customer = new Customer(Integer.parseInt(commentDto.getCustomer()));
         this.exercise = new Exercise(Integer.parseInt(commentDto.getExercise()));
+        this.course = new Course(Integer.parseInt(commentDto.getCourse()));
+        this.day = new Day(Integer.parseInt(commentDto.getDay()));
+    }
+    
+    @PreUpdate
+    public void preUpdate() {
+        this.updatedDate = LocalDateTime.now();
+    }
+    
+    @PrePersist
+    public void prePersist() {
+        if (this.createdDate == null) {
+            this.createdDate = LocalDateTime.now();
+        }
+        this.updatedDate = LocalDateTime.now();
     }
 }

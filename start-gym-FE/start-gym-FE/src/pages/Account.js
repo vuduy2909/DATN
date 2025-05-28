@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import Header from '../components/Header/Header'
 import Footer from '../components/Footer/Footer'
 import { useAuth } from '../AuthContext'
@@ -18,17 +18,56 @@ import {
     FormControl,
     InputLabel,
     Snackbar,
-    Alert
+    Alert,
+    Paper,
+    Tabs,
+    Tab,
+    Divider,
+    IconButton,
+    InputAdornment,
+    Skeleton,
+    Chip,
+    Fade,
+    Grow
 } from '@mui/material';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCamera, faKey, faUser } from '@fortawesome/free-solid-svg-icons';
+import {
+    Person,
+    PhotoCamera,
+    Lock,
+    Visibility,
+    VisibilityOff,
+    Save,
+    Edit,
+    Settings,
+    Security,
+    AccountCircle,
+    LocalFireDepartment,
+    Star,
+    FitnessCenter
+} from '@mui/icons-material';
 import { request } from '../utils/axiosInstance';
-import styles from '../components/UserInformation/UserInformation.module.css'
 
 const Account = () => {
     const { user } = useAuth();
     const [userData, setUserData] = useState({});
     const [loading, setLoading] = useState(false);
+    const [loadingUser, setLoadingUser] = useState(true);
+    const [currentTab, setCurrentTab] = useState(0);
+    
+    // StartGym Red Theme Colors with #CF4044
+    const redTheme = {
+        primary: '#CF4044',      // Main red
+        secondary: '#B8363C',    // Darker red
+        accent: '#f39c12',       // Orange accent
+        background: '#fdf2f2',   // Very light red background
+        cardBg: '#ffffff',       // White cards
+        border: '#fadbd8',       // Light red border
+        text: '#2c3e50',         // Dark gray text
+        textLight: '#64748b',    // Light gray text
+        success: '#27ae60',      // Green for success
+        warning: '#f39c12',      // Orange for warning
+        error: '#CF4044'         // Red for errors
+    };
     
     // Snackbar state for notifications
     const [snackbar, setSnackbar] = useState({
@@ -58,6 +97,11 @@ const Account = () => {
         newPassword: '',
         confirmPassword: ''
     });
+    const [showPasswords, setShowPasswords] = useState({
+        old: false,
+        new: false,
+        confirm: false
+    });
     
     // Profile edit states
     const [profileData, setProfileData] = useState({
@@ -75,20 +119,33 @@ const Account = () => {
     useEffect(() => {
         const fetchUserData = async () => {
             try {
+                setLoadingUser(true);
                 const res = await request.get('/customer/detail')
                 setUserData(res)
                 setPreviewUrl(res.customerImg)
                 
+                // Process gender properly - handle both string and boolean values
+                let processedGender = '';
+                if (typeof res.customerGender === 'string') {
+                    // If it's a string, use it directly (like "Male" or "Female")
+                    processedGender = res.customerGender;
+                } else if (typeof res.customerGender === 'boolean') {
+                    // If it's boolean, convert to string
+                    processedGender = res.customerGender === true ? 'Male' : 'Female';
+                }
+                
                 // Set profile data for editing
                 setProfileData({
-                    customerEmail: res.accountEmail || '',
+                    customerEmail: res.customerEmail || '',
                     customerPhone: res.customerPhone || '',
                     customerAddress: res.customerAddress || '',
-                    customerGender: res.customerGender === true ? 'Male' : res.customerGender === false ? 'Female' : res.customerGender || '',
+                    customerGender: processedGender,
                     customerDateOfBirth: res.dateOfBirth ? res.dateOfBirth.split(' ')[0] : ''
                 });
             } catch (error) {
                 console.log("Error fetching user information", error);
+            } finally {
+                setLoadingUser(false);
             }
         }
 
@@ -97,10 +154,40 @@ const Account = () => {
         }
     }, [user])
 
-    // Handle profile data change
-    const handleProfileChange = (field, value) => {
-        setProfileData(prev => ({ ...prev, [field]: value }));
+    // Separate function to refresh user data
+    const refreshUserData = async () => {
+        try {
+            const res = await request.get('/customer/detail');
+            setUserData(res);
+            setPreviewUrl(res.customerImg);
+            
+            // Process gender properly - handle both string and boolean values
+            let processedGender = '';
+            if (typeof res.customerGender === 'string') {
+                // If it's a string, use it directly (like "Male" or "Female")
+                processedGender = res.customerGender;
+            } else if (typeof res.customerGender === 'boolean') {
+                // If it's boolean, convert to string
+                processedGender = res.customerGender === true ? 'Male' : 'Female';
+            }
+            
+            // Update profile form data with fresh data from server
+            setProfileData({
+                customerEmail: res.customerEmail || '',
+                customerPhone: res.customerPhone || '',
+                customerAddress: res.customerAddress || '',
+                customerGender: processedGender,
+                customerDateOfBirth: res.dateOfBirth ? res.dateOfBirth.split(' ')[0] : ''
+            });
+        } catch (error) {
+            console.log("Error refreshing user information", error);
+        }
     };
+
+    // Handle profile data change - Using useCallback to prevent re-creation
+    const handleProfileChange = useCallback((field, value) => {
+        setProfileData(prev => ({ ...prev, [field]: value }));
+    }, []);
 
     // Handle profile update
     const handleProfileSubmit = async (e) => {
@@ -109,13 +196,13 @@ const Account = () => {
         // Validate email
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(profileData.customerEmail)) {
-            showSnackbar('Please enter a valid email address', 'error');
+            showSnackbar('Vui lòng nhập địa chỉ email hợp lệ', 'error');
             return;
         }
         
         // Validate phone
         if (!/^\d{10,11}$/.test(profileData.customerPhone)) {
-            showSnackbar('Phone number must be 10-11 digits', 'error');
+            showSnackbar('Số điện thoại phải có 10-11 chữ số', 'error');
             return;
         }
         
@@ -123,7 +210,7 @@ const Account = () => {
         if (profileData.customerDateOfBirth) {
             const birthDate = new Date(profileData.customerDateOfBirth);
             const today = new Date();
-            const age = today.getFullYear() - birthDate.getFullYear();
+            let age = today.getFullYear() - birthDate.getFullYear();
             const monthDiff = today.getMonth() - birthDate.getMonth();
             
             if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
@@ -131,7 +218,7 @@ const Account = () => {
             }
             
             if (age < 16) {
-                showSnackbar('You must be at least 16 years old', 'error');
+                showSnackbar('Bạn phải từ 16 tuổi trở lên', 'error');
                 return;
             }
         }
@@ -140,10 +227,10 @@ const Account = () => {
         try {
             await request.put('/customer/update-profile', profileData);
             
-            showSnackbar('Profile updated successfully! 🎉', 'success');
-            setUserData(prev => ({ ...prev, ...profileData }));
+            showSnackbar('Cập nhật hồ sơ thành công! 🎉', 'success');
+            await refreshUserData();
         } catch (error) {
-            showSnackbar('Failed to update profile. Please try again.', 'error');
+            showSnackbar('Cập nhật hồ sơ thất bại. Vui lòng thử lại.', 'error');
             console.log("Error updating profile", error);
         } finally {
             setLoading(false);
@@ -155,12 +242,12 @@ const Account = () => {
         const file = event.target.files[0];
         if (file) {
             if (file.size > 5 * 1024 * 1024) { // 5MB limit
-                showSnackbar('File size must be less than 5MB', 'error');
+                showSnackbar('Kích thước file phải nhỏ hơn 5MB', 'error');
                 return;
             }
             
             if (!file.type.startsWith('image/')) {
-                showSnackbar('Please select an image file', 'error');
+                showSnackbar('Vui lòng chọn file hình ảnh', 'error');
                 return;
             }
             
@@ -171,7 +258,7 @@ const Account = () => {
 
     const handleAvatarUpload = async () => {
         if (!selectedFile) {
-            showSnackbar('Please select an image first', 'error');
+            showSnackbar('Vui lòng chọn hình ảnh trước', 'error');
             return;
         }
 
@@ -186,11 +273,11 @@ const Account = () => {
                 },
             });
             
-            showSnackbar('Avatar updated successfully! 🎉', 'success');
-            setUserData(prev => ({ ...prev, customerImg: response.data.avatarUrl }));
+            showSnackbar('Cập nhật ảnh đại diện thành công! 🎉', 'success');
             setSelectedFile(null);
+            await refreshUserData();
         } catch (error) {
-            showSnackbar('Failed to upload avatar. Please try again.', 'error');
+            showSnackbar('Cập nhật ảnh đại diện thất bại. Vui lòng thử lại.', 'error');
             console.log("Error uploading avatar", error);
         } finally {
             setLoading(false);
@@ -198,256 +285,568 @@ const Account = () => {
     };
 
     // Handle password change
-    const handlePasswordChange = (field, value) => {
-        setPasswordData(prev => ({ ...prev, [field]: value }));
-    };
-
     const handlePasswordSubmit = async (e) => {
         e.preventDefault();
         
-        if (passwordData.newPassword !== passwordData.confirmPassword) {
-            showSnackbar('New passwords do not match', 'error');
+        if (!passwordData.oldPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+            showSnackbar('Vui lòng điền đầy đủ thông tin', 'error');
             return;
         }
         
         if (passwordData.newPassword.length < 6) {
-            showSnackbar('New password must be at least 6 characters', 'error');
+            showSnackbar('Mật khẩu mới phải có ít nhất 6 ký tự', 'error');
+            return;
+        }
+        
+        if (passwordData.newPassword !== passwordData.confirmPassword) {
+            showSnackbar('Mật khẩu xác nhận không khớp', 'error');
             return;
         }
 
         setLoading(true);
         try {
-            await request.post('/customer/change-password', {
+            await request.put('/customer/change-password', {
                 oldPassword: passwordData.oldPassword,
                 newPassword: passwordData.newPassword
             });
             
-            showSnackbar('Password changed successfully! 🎉', 'success');
+            showSnackbar('Đổi mật khẩu thành công! 🎉', 'success');
             setPasswordData({ oldPassword: '', newPassword: '', confirmPassword: '' });
+            await refreshUserData();
         } catch (error) {
-            showSnackbar('Failed to change password. Please check your current password.', 'error');
+            showSnackbar('Đổi mật khẩu thất bại. Vui lòng kiểm tra mật khẩu cũ.', 'error');
             console.log("Error changing password", error);
         } finally {
             setLoading(false);
         }
     };
 
-    return (
-        <div>
-            <Header />
-            <div className={styles.container}>
-                <Container component="main" maxWidth="lg">
-                    <Typography variant="h4" component="h1" gutterBottom style={{ textAlign: 'center', marginBottom: '30px' }}>
-                        Account Settings
-                    </Typography>
-                    
+    const togglePasswordVisibility = (field) => {
+        setShowPasswords(prev => ({ ...prev, [field]: !prev[field] }));
+    };
+
+    if (loadingUser) {
+        return (
+            <div>
+                <Header />
+                <Container maxWidth="lg" sx={{ py: 4 }}>
                     <Grid container spacing={3}>
-                        {/* Avatar Section */}
                         <Grid item xs={12} md={4}>
-                            <Card>
-                                <CardContent>
-                                    <Typography variant="h6" component="div" gutterBottom style={{ display: 'flex', alignItems: 'center' }}>
-                                        <FontAwesomeIcon icon={faCamera} style={{ marginRight: '10px', color: 'var(--color-red-body)' }} />
-                                        Profile Picture
+                            <Skeleton variant="rectangular" height={300} sx={{ borderRadius: 2 }} />
+                        </Grid>
+                        <Grid item xs={12} md={8}>
+                            <Skeleton variant="rectangular" height={400} sx={{ borderRadius: 2 }} />
+                        </Grid>
+                    </Grid>
+                </Container>
+                <Footer />
+            </div>
+        );
+    }
+
+    return (
+        <div style={{ backgroundColor: redTheme.background, minHeight: '100vh' }}>
+            <Header />
+            <Container maxWidth="lg" sx={{ py: 4 }}>
+                {/* Header Banner */}
+                <Fade in timeout={800}>
+                    <Card 
+                        elevation={12}
+                        sx={{ 
+                            mb: 4,
+                            background: `linear-gradient(135deg, ${redTheme.primary} 0%, ${redTheme.secondary} 100%)`,
+                            color: 'white',
+                            position: 'relative',
+                            overflow: 'hidden',
+                            borderRadius: 3
+                        }}
+                    >
+                        <CardContent sx={{ p: 4, textAlign: 'center' }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2 }}>
+                                <FitnessCenter sx={{ fontSize: 40, mr: 2 }} />
+                                <Typography variant="h3" sx={{ fontWeight: 'bold' }}>
+                                    Cài đặt tài khoản
+                                </Typography>
+                                <LocalFireDepartment sx={{ fontSize: 40, ml: 2 }} />
+                            </Box>
+                            <Typography variant="h6" sx={{ opacity: 0.9 }}>
+                                Quản lý thông tin cá nhân và bảo mật tài khoản StartGym
+                            </Typography>
+                        </CardContent>
+                    </Card>
+                </Fade>
+
+                <Grid container spacing={4}>
+                    {/* User Info Sidebar */}
+                    <Grid item xs={12} md={4}>
+                        <Grow in timeout={1000}>
+                            <Card 
+                                elevation={8}
+                                sx={{ 
+                                    background: `linear-gradient(135deg, ${redTheme.primary} 0%, ${redTheme.secondary} 100%)`,
+                                    color: 'white',
+                                    textAlign: 'center',
+                                    borderRadius: 3
+                                }}
+                            >
+                                <CardContent sx={{ p: 4 }}>
+                                    <Avatar
+                                        src={userData.customerImg}
+                                        sx={{ 
+                                            width: 100, 
+                                            height: 100, 
+                                            mx: 'auto',
+                                            mb: 2,
+                                            border: '4px solid white',
+                                            boxShadow: '0 8px 24px rgba(0,0,0,0.2)'
+                                        }}
+                                    />
+                                    <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 1 }}>
+                                        {userData.customerName || 'Chưa cập nhật tên'}
                                     </Typography>
-                                    
-                                    <Box display="flex" flexDirection="column" alignItems="center" gap={2}>
-                                        <Avatar
-                                            src={previewUrl || userData.customerImg}
-                                            sx={{ width: 120, height: 120 }}
-                                        />
-                                        
-                                        <input
-                                            accept="image/*"
-                                            style={{ display: 'none' }}
-                                            id="avatar-upload"
-                                            type="file"
-                                            onChange={handleFileSelect}
-                                        />
-                                        <label htmlFor="avatar-upload">
-                                            <Button variant="outlined" component="span">
-                                                Choose Image
-                                            </Button>
-                                        </label>
-                                        
-                                        {selectedFile && (
-                                            <Button
-                                                variant="contained"
-                                                onClick={handleAvatarUpload}
-                                                disabled={loading}
-                                                style={{ backgroundColor: 'var(--color-red-body)' }}
-                                            >
-                                                {loading ? <CircularProgress size={20} /> : 'Upload Avatar'}
-                                            </Button>
-                                        )}
-                                        
-                                        <Typography variant="caption" color="textSecondary">
-                                            Max file size: 5MB. Supported formats: JPG, PNG, GIF
+                                    <Typography variant="body2" sx={{ opacity: 0.9, mb: 2 }}>
+                                        {userData.customerEmail}
+                                    </Typography>
+                                    <Chip 
+                                        icon={<Star />}
+                                        label="StartGym Member"
+                                        sx={{ 
+                                            backgroundColor: 'rgba(255,255,255,0.2)',
+                                            color: 'white',
+                                            fontWeight: 'bold',
+                                            mb: 2,
+                                            backdropFilter: 'blur(10px)'
+                                        }}
+                                    />
+                                    <Box sx={{ 
+                                        backgroundColor: 'rgba(255,255,255,0.2)',
+                                        borderRadius: 2,
+                                        p: 2,
+                                        backdropFilter: 'blur(10px)'
+                                    }}>
+                                        <Typography variant="body2" sx={{ mb: 0.5, opacity: 0.9 }}>
+                                            Loại tài khoản
+                                        </Typography>
+                                        <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                                            {userData.customerTypeName || 'Regular'}
                                         </Typography>
                                     </Box>
                                 </CardContent>
                             </Card>
-                        </Grid>
-                        
-                        {/* Profile Information Section */}
-                        <Grid item xs={12} md={4}>
-                            <Card>
-                                <CardContent>
-                                    <Typography variant="h6" component="div" gutterBottom style={{ display: 'flex', alignItems: 'center' }}>
-                                        <FontAwesomeIcon icon={faUser} style={{ marginRight: '10px', color: 'var(--color-red-body)' }} />
-                                        Personal Information
-                                    </Typography>
-                                    
-                                    <Box component="form" onSubmit={handleProfileSubmit} sx={{ mt: 2 }}>
-                                        <TextField
-                                            fullWidth
-                                            type="email"
-                                            label="Email"
-                                            value={profileData.customerEmail}
-                                            onChange={(e) => handleProfileChange('customerEmail', e.target.value)}
-                                            margin="normal"
-                                            required
-                                        />
-                                        
-                                        <TextField
-                                            fullWidth
-                                            type="tel"
-                                            label="Phone Number"
-                                            value={profileData.customerPhone}
-                                            onChange={(e) => handleProfileChange('customerPhone', e.target.value)}
-                                            margin="normal"
-                                            required
-                                            helperText="10-11 digits"
-                                        />
-                                        
-                                        <TextField
-                                            fullWidth
-                                            label="Address"
-                                            value={profileData.customerAddress}
-                                            onChange={(e) => handleProfileChange('customerAddress', e.target.value)}
-                                            margin="normal"
-                                            multiline
-                                            rows={2}
-                                        />
-                                        
-                                        <FormControl fullWidth margin="normal">
-                                            <InputLabel>Gender</InputLabel>
-                                            <Select
-                                                value={profileData.customerGender}
-                                                onChange={(e) => handleProfileChange('customerGender', e.target.value)}
-                                                label="Gender"
-                                            >
-                                                <MenuItem value="Male">Male</MenuItem>
-                                                <MenuItem value="Female">Female</MenuItem>
-                                                <MenuItem value="Other">Other</MenuItem>
-                                            </Select>
-                                        </FormControl>
-                                        
-                                        <TextField
-                                            fullWidth
-                                            type="date"
-                                            label="Date of Birth"
-                                            value={profileData.customerDateOfBirth}
-                                            onChange={(e) => handleProfileChange('customerDateOfBirth', e.target.value)}
-                                            margin="normal"
-                                            InputLabelProps={{ shrink: true }}
-                                            helperText="Must be at least 16 years old"
-                                            inputProps={{
-                                                max: new Date(new Date().getFullYear() - 16, new Date().getMonth(), new Date().getDate()).toISOString().split('T')[0]
-                                            }}
-                                        />
-                                        
-                                        <Button
-                                            type="submit"
-                                            fullWidth
-                                            variant="contained"
-                                            disabled={loading}
-                                            sx={{ mt: 3, backgroundColor: 'var(--color-red-body)' }}
-                                        >
-                                            {loading ? <CircularProgress size={20} /> : 'Update Profile'}
-                                        </Button>
-                                    </Box>
-                                </CardContent>
-                            </Card>
-                        </Grid>
-                        
-                        {/* Password Change Section */}
-                        <Grid item xs={12} md={4}>
-                            <Card>
-                                <CardContent>
-                                    <Typography variant="h6" component="div" gutterBottom style={{ display: 'flex', alignItems: 'center' }}>
-                                        <FontAwesomeIcon icon={faKey} style={{ marginRight: '10px', color: 'var(--color-red-body)' }} />
-                                        Change Password
-                                    </Typography>
-                                    
-                                    <Box component="form" onSubmit={handlePasswordSubmit} sx={{ mt: 2 }}>
-                                        <TextField
-                                            fullWidth
-                                            type="password"
-                                            label="Current Password"
-                                            value={passwordData.oldPassword}
-                                            onChange={(e) => handlePasswordChange('oldPassword', e.target.value)}
-                                            margin="normal"
-                                            required
-                                        />
-                                        
-                                        <TextField
-                                            fullWidth
-                                            type="password"
-                                            label="New Password"
-                                            value={passwordData.newPassword}
-                                            onChange={(e) => handlePasswordChange('newPassword', e.target.value)}
-                                            margin="normal"
-                                            required
-                                            helperText="Minimum 6 characters"
-                                        />
-                                        
-                                        <TextField
-                                            fullWidth
-                                            type="password"
-                                            label="Confirm New Password"
-                                            value={passwordData.confirmPassword}
-                                            onChange={(e) => handlePasswordChange('confirmPassword', e.target.value)}
-                                            margin="normal"
-                                            required
-                                        />
-                                        
-                                        <Button
-                                            type="submit"
-                                            fullWidth
-                                            variant="contained"
-                                            disabled={loading}
-                                            sx={{ mt: 3, backgroundColor: 'var(--color-red-body)' }}
-                                        >
-                                            {loading ? <CircularProgress size={20} /> : 'Change Password'}
-                                        </Button>
-                                    </Box>
-                                </CardContent>
-                            </Card>
-                        </Grid>
+                        </Grow>
                     </Grid>
 
-                    {/* Snackbar for notifications */}
-                    <Snackbar 
-                        open={snackbar.open} 
-                        autoHideDuration={4000} 
-                        onClose={handleSnackbarClose}
-                        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-                    >
-                        <Alert 
-                            onClose={handleSnackbarClose} 
-                            severity={snackbar.severity} 
-                            sx={{ width: '100%' }}
-                            variant="filled"
-                        >
-                            {snackbar.message}
-                        </Alert>
-                    </Snackbar>
-                </Container>
-            </div>
+                    {/* Settings Content */}
+                    <Grid item xs={12} md={8}>
+                        <Grow in timeout={1200}>
+                            <Paper 
+                                elevation={8} 
+                                sx={{ 
+                                    overflow: 'hidden',
+                                    borderRadius: 3,
+                                    border: `2px solid ${redTheme.border}`
+                                }}
+                            >
+                                <Tabs
+                                    value={currentTab}
+                                    onChange={(e, newValue) => setCurrentTab(newValue)}
+                                    variant="fullWidth"
+                                    sx={{
+                                        backgroundColor: redTheme.primary,
+                                        '& .MuiTab-root': {
+                                            color: 'rgba(255,255,255,0.8)',
+                                            fontWeight: 'bold',
+                                            textTransform: 'none',
+                                            fontSize: '1rem',
+                                            '&.Mui-selected': {
+                                                color: 'white'
+                                            },
+                                            '&:hover': {
+                                                backgroundColor: 'rgba(255,255,255,0.1)'
+                                            }
+                                        },
+                                        '& .MuiTabs-indicator': {
+                                            backgroundColor: 'white',
+                                            height: 3
+                                        }
+                                    }}
+                                >
+                                    <Tab 
+                                        icon={<Person />} 
+                                        label="Hồ sơ" 
+                                        iconPosition="start"
+                                    />
+                                    <Tab 
+                                        icon={<PhotoCamera />} 
+                                        label="Ảnh đại diện" 
+                                        iconPosition="start"
+                                    />
+                                    <Tab 
+                                        icon={<Lock />} 
+                                        label="Mật khẩu" 
+                                        iconPosition="start"
+                                    />
+                                </Tabs>
+
+                                <Box sx={{ p: 0 }}>
+                                    {currentTab === 0 && (
+                                        <Card elevation={0} sx={{ backgroundColor: redTheme.cardBg }}>
+                                            <CardContent sx={{ p: 4 }}>
+                                                <Typography variant="h5" sx={{ mb: 3, color: redTheme.text, fontWeight: 'bold', display: 'flex', alignItems: 'center' }}>
+                                                    <Edit sx={{ mr: 1, color: redTheme.primary }} />
+                                                    Chỉnh sửa thông tin cá nhân
+                                                </Typography>
+
+                                                <Box component="form" onSubmit={handleProfileSubmit}>
+                                                    <Grid container spacing={3}>
+                                                        <Grid item xs={12} md={6}>
+                                                            <TextField
+                                                                key="email-field"
+                                                                fullWidth
+                                                                label="Email"
+                                                                value={profileData.customerEmail}
+                                                                onChange={(e) => handleProfileChange('customerEmail', e.target.value)}
+                                                                variant="outlined"
+                                                                type="email"
+                                                                sx={{
+                                                                    '& .MuiOutlinedInput-root': {
+                                                                        '&:hover fieldset': { borderColor: redTheme.primary },
+                                                                        '&.Mui-focused fieldset': { borderColor: redTheme.primary }
+                                                                    },
+                                                                    '& .MuiInputLabel-root.Mui-focused': { color: redTheme.primary }
+                                                                }}
+                                                            />
+                                                        </Grid>
+                                                        
+                                                        <Grid item xs={12} md={6}>
+                                                            <TextField
+                                                                key="phone-field"
+                                                                fullWidth
+                                                                label="Số điện thoại"
+                                                                value={profileData.customerPhone}
+                                                                onChange={(e) => handleProfileChange('customerPhone', e.target.value)}
+                                                                variant="outlined"
+                                                                sx={{
+                                                                    '& .MuiOutlinedInput-root': {
+                                                                        '&:hover fieldset': { borderColor: redTheme.primary },
+                                                                        '&.Mui-focused fieldset': { borderColor: redTheme.primary }
+                                                                    },
+                                                                    '& .MuiInputLabel-root.Mui-focused': { color: redTheme.primary }
+                                                                }}
+                                                            />
+                                                        </Grid>
+                                                        
+                                                        <Grid item xs={12}>
+                                                            <TextField
+                                                                key="address-field"
+                                                                fullWidth
+                                                                label="Địa chỉ"
+                                                                value={profileData.customerAddress}
+                                                                onChange={(e) => handleProfileChange('customerAddress', e.target.value)}
+                                                                variant="outlined"
+                                                                multiline
+                                                                rows={2}
+                                                                sx={{
+                                                                    '& .MuiOutlinedInput-root': {
+                                                                        '&:hover fieldset': { borderColor: redTheme.primary },
+                                                                        '&.Mui-focused fieldset': { borderColor: redTheme.primary }
+                                                                    },
+                                                                    '& .MuiInputLabel-root.Mui-focused': { color: redTheme.primary }
+                                                                }}
+                                                            />
+                                                        </Grid>
+                                                        
+                                                        <Grid item xs={12} md={6}>
+                                                            <FormControl fullWidth>
+                                                                <InputLabel sx={{ '&.Mui-focused': { color: redTheme.primary } }}>Giới tính</InputLabel>
+                                                                <Select
+                                                                    value={profileData.customerGender}
+                                                                    label="Giới tính"
+                                                                    onChange={(e) => handleProfileChange('customerGender', e.target.value)}
+                                                                    sx={{
+                                                                        '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: redTheme.primary },
+                                                                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: redTheme.primary }
+                                                                    }}
+                                                                >
+                                                                    <MenuItem value="Male">Nam</MenuItem>
+                                                                    <MenuItem value="Female">Nữ</MenuItem>
+                                                                </Select>
+                                                            </FormControl>
+                                                        </Grid>
+                                                        
+                                                        <Grid item xs={12} md={6}>
+                                                            <TextField
+                                                                key="dob-field"
+                                                                fullWidth
+                                                                label="Ngày sinh"
+                                                                value={profileData.customerDateOfBirth}
+                                                                onChange={(e) => handleProfileChange('customerDateOfBirth', e.target.value)}
+                                                                variant="outlined"
+                                                                type="date"
+                                                                InputLabelProps={{ shrink: true }}
+                                                                sx={{
+                                                                    '& .MuiOutlinedInput-root': {
+                                                                        '&:hover fieldset': { borderColor: redTheme.primary },
+                                                                        '&.Mui-focused fieldset': { borderColor: redTheme.primary }
+                                                                    },
+                                                                    '& .MuiInputLabel-root.Mui-focused': { color: redTheme.primary }
+                                                                }}
+                                                            />
+                                                        </Grid>
+                                                        
+                                                        <Grid item xs={12}>
+                                                            <Button
+                                                                type="submit"
+                                                                variant="contained"
+                                                                disabled={loading}
+                                                                startIcon={loading ? <CircularProgress size={20} /> : <Save />}
+                                                                sx={{
+                                                                    background: `linear-gradient(135deg, ${redTheme.primary} 0%, ${redTheme.secondary} 100%)`,
+                                                                    color: 'white',
+                                                                    px: 4,
+                                                                    py: 1.5,
+                                                                    borderRadius: 2,
+                                                                    fontWeight: 'bold',
+                                                                    textTransform: 'none',
+                                                                    boxShadow: `0 4px 15px ${redTheme.primary}40`,
+                                                                    '&:hover': {
+                                                                        background: `linear-gradient(135deg, ${redTheme.secondary} 0%, ${redTheme.accent} 100%)`,
+                                                                        boxShadow: `0 6px 20px ${redTheme.primary}60`
+                                                                    }
+                                                                }}
+                                                            >
+                                                                {loading ? 'Đang cập nhật...' : 'Cập nhật thông tin'}
+                                                            </Button>
+                                                        </Grid>
+                                                    </Grid>
+                                                </Box>
+                                            </CardContent>
+                                        </Card>
+                                    )}
+                                    
+                                    {currentTab === 1 && (
+                                        <Card elevation={0} sx={{ backgroundColor: redTheme.cardBg }}>
+                                            <CardContent sx={{ p: 4, textAlign: 'center' }}>
+                                                <Typography variant="h5" sx={{ mb: 3, color: redTheme.text, fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                    <PhotoCamera sx={{ mr: 1, color: redTheme.primary }} />
+                                                    Thay đổi ảnh đại diện
+                                                </Typography>
+
+                                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                                                    <Box sx={{ position: 'relative' }}>
+                                                        <Avatar
+                                                            src={previewUrl}
+                                                            sx={{ 
+                                                                width: 150, 
+                                                                height: 150,
+                                                                border: `4px solid ${redTheme.primary}`,
+                                                                boxShadow: '0 8px 24px rgba(0,0,0,0.15)'
+                                                            }}
+                                                        />
+                                                        <IconButton
+                                                            component="label"
+                                                            sx={{
+                                                                position: 'absolute',
+                                                                bottom: 0,
+                                                                right: 0,
+                                                                backgroundColor: redTheme.primary,
+                                                                color: 'white',
+                                                                '&:hover': { backgroundColor: redTheme.secondary }
+                                                            }}
+                                                        >
+                                                            <PhotoCamera />
+                                                            <input
+                                                                type="file"
+                                                                hidden
+                                                                accept="image/*"
+                                                                onChange={handleFileSelect}
+                                                            />
+                                                        </IconButton>
+                                                    </Box>
+
+                                                    {selectedFile && (
+                                                        <Alert severity="info" sx={{ mt: 2 }}>
+                                                            Đã chọn: {selectedFile.name}
+                                                        </Alert>
+                                                    )}
+
+                                                    <Button
+                                                        variant="contained"
+                                                        onClick={handleAvatarUpload}
+                                                        disabled={!selectedFile || loading}
+                                                        startIcon={loading ? <CircularProgress size={20} /> : <Save />}
+                                                        sx={{
+                                                            background: `linear-gradient(135deg, ${redTheme.success} 0%, #34d399 100%)`,
+                                                            color: 'white',
+                                                            px: 4,
+                                                            py: 1.5,
+                                                            borderRadius: 2,
+                                                            fontWeight: 'bold',
+                                                            textTransform: 'none',
+                                                            boxShadow: `0 4px 15px ${redTheme.success}40`,
+                                                            '&:hover': {
+                                                                background: `linear-gradient(135deg, #059669 0%, #10b981 100%)`,
+                                                                boxShadow: `0 6px 20px ${redTheme.success}60`
+                                                            }
+                                                        }}
+                                                    >
+                                                        {loading ? 'Đang tải lên...' : 'Cập nhật ảnh đại diện'}
+                                                    </Button>
+
+                                                    <Typography variant="body2" sx={{ color: redTheme.textLight, mt: 2 }}>
+                                                        Chọn ảnh có kích thước nhỏ hơn 5MB
+                                                    </Typography>
+                                                </Box>
+                                            </CardContent>
+                                        </Card>
+                                    )}
+
+                                    {currentTab === 2 && (
+                                        <Card elevation={0} sx={{ backgroundColor: redTheme.cardBg }}>
+                                            <CardContent sx={{ p: 4 }}>
+                                                <Typography variant="h5" sx={{ mb: 3, color: redTheme.text, fontWeight: 'bold', display: 'flex', alignItems: 'center' }}>
+                                                    <Lock sx={{ mr: 1, color: redTheme.primary }} />
+                                                    Đổi mật khẩu
+                                                </Typography>
+
+                                                <Box component="form" onSubmit={handlePasswordSubmit}>
+                                                    <Grid container spacing={3}>
+                                                        <Grid item xs={12}>
+                                                            <TextField
+                                                                fullWidth
+                                                                label="Mật khẩu hiện tại"
+                                                                type={showPasswords.old ? 'text' : 'password'}
+                                                                value={passwordData.oldPassword}
+                                                                onChange={(e) => setPasswordData(prev => ({ ...prev, oldPassword: e.target.value }))}
+                                                                variant="outlined"
+                                                                InputProps={{
+                                                                    endAdornment: (
+                                                                        <InputAdornment position="end">
+                                                                            <IconButton onClick={() => togglePasswordVisibility('old')}>
+                                                                                {showPasswords.old ? <VisibilityOff /> : <Visibility />}
+                                                                            </IconButton>
+                                                                        </InputAdornment>
+                                                                    )
+                                                                }}
+                                                                sx={{
+                                                                    '& .MuiOutlinedInput-root': {
+                                                                        '&:hover fieldset': { borderColor: redTheme.primary },
+                                                                        '&.Mui-focused fieldset': { borderColor: redTheme.primary }
+                                                                    },
+                                                                    '& .MuiInputLabel-root.Mui-focused': { color: redTheme.primary }
+                                                                }}
+                                                            />
+                                                        </Grid>
+                                                        
+                                                        <Grid item xs={12}>
+                                                            <TextField
+                                                                fullWidth
+                                                                label="Mật khẩu mới"
+                                                                type={showPasswords.new ? 'text' : 'password'}
+                                                                value={passwordData.newPassword}
+                                                                onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                                                                variant="outlined"
+                                                                InputProps={{
+                                                                    endAdornment: (
+                                                                        <InputAdornment position="end">
+                                                                            <IconButton onClick={() => togglePasswordVisibility('new')}>
+                                                                                {showPasswords.new ? <VisibilityOff /> : <Visibility />}
+                                                                            </IconButton>
+                                                                        </InputAdornment>
+                                                                    )
+                                                                }}
+                                                                sx={{
+                                                                    '& .MuiOutlinedInput-root': {
+                                                                        '&:hover fieldset': { borderColor: redTheme.primary },
+                                                                        '&.Mui-focused fieldset': { borderColor: redTheme.primary }
+                                                                    },
+                                                                    '& .MuiInputLabel-root.Mui-focused': { color: redTheme.primary }
+                                                                }}
+                                                            />
+                                                        </Grid>
+                                                        
+                                                        <Grid item xs={12}>
+                                                            <TextField
+                                                                fullWidth
+                                                                label="Xác nhận mật khẩu mới"
+                                                                type={showPasswords.confirm ? 'text' : 'password'}
+                                                                value={passwordData.confirmPassword}
+                                                                onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                                                                variant="outlined"
+                                                                InputProps={{
+                                                                    endAdornment: (
+                                                                        <InputAdornment position="end">
+                                                                            <IconButton onClick={() => togglePasswordVisibility('confirm')}>
+                                                                                {showPasswords.confirm ? <VisibilityOff /> : <Visibility />}
+                                                                            </IconButton>
+                                                                        </InputAdornment>
+                                                                    )
+                                                                }}
+                                                                sx={{
+                                                                    '& .MuiOutlinedInput-root': {
+                                                                        '&:hover fieldset': { borderColor: redTheme.primary },
+                                                                        '&.Mui-focused fieldset': { borderColor: redTheme.primary }
+                                                                    },
+                                                                    '& .MuiInputLabel-root.Mui-focused': { color: redTheme.primary }
+                                                                }}
+                                                            />
+                                                        </Grid>
+                                                        
+                                                        <Grid item xs={12}>
+                                                            <Button
+                                                                type="submit"
+                                                                variant="contained"
+                                                                disabled={loading}
+                                                                startIcon={loading ? <CircularProgress size={20} /> : <Security />}
+                                                                sx={{
+                                                                    background: `linear-gradient(135deg, ${redTheme.warning} 0%, #fbbf24 100%)`,
+                                                                    color: 'white',
+                                                                    px: 4,
+                                                                    py: 1.5,
+                                                                    borderRadius: 2,
+                                                                    fontWeight: 'bold',
+                                                                    textTransform: 'none',
+                                                                    boxShadow: `0 4px 15px ${redTheme.warning}40`,
+                                                                    '&:hover': {
+                                                                        background: `linear-gradient(135deg, #f59e0b 0%, #d97706 100%)`,
+                                                                        boxShadow: `0 6px 20px ${redTheme.warning}60`
+                                                                    }
+                                                                }}
+                                                            >
+                                                                {loading ? 'Đang cập nhật...' : 'Đổi mật khẩu'}
+                                                            </Button>
+                                                        </Grid>
+                                                    </Grid>
+                                                </Box>
+                                            </CardContent>
+                                        </Card>
+                                    )}
+                                </Box>
+                            </Paper>
+                        </Grow>
+                    </Grid>
+                </Grid>
+            </Container>
+
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={6000}
+                onClose={handleSnackbarClose}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            >
+                <Alert 
+                    onClose={handleSnackbarClose} 
+                    severity={snackbar.severity}
+                    sx={{ width: '100%' }}
+                    variant="filled"
+                >
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
+
             <Footer />
         </div>
-    )
-}
+    );
+};
 
-export default Account 
+export default Account;

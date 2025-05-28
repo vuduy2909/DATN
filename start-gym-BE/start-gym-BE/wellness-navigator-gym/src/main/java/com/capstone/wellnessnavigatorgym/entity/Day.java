@@ -16,4 +16,9 @@ public class Day {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer dayId;
     private String dayName;
+    
+    // Add constructor with dayId
+    public Day(Integer dayId) {
+        this.dayId = dayId;
+    }
 }

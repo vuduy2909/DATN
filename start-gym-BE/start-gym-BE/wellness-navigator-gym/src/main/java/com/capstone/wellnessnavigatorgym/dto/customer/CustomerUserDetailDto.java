@@ -18,11 +18,12 @@ public class CustomerUserDetailDto {
     String customerCode;
     String customerName;
     String customerPhone;
-    Boolean customerGender;
+    String customerGender;
     Date dateOfBirth;
     String idCard;
     String customerAddress;
     String customerImg;
+    String customerEmail;
     String customerTypeName;
     String username;
     String accountEmail;
@@ -33,16 +34,13 @@ public class CustomerUserDetailDto {
             Tuple firstTuple = tuples.get(0);
 
             // Handle customer_gender conversion safely
-            Boolean customerGender = null;
+            String customerGender = null;
             Object genderValue = firstTuple.get("customer_gender");
             if (genderValue != null) {
                 if (genderValue instanceof Boolean) {
-                    customerGender = (Boolean) genderValue;
-                } else if (genderValue instanceof Number) {
-                    customerGender = ((Number) genderValue).intValue() > 0;
+                    customerGender = ((Boolean) genderValue) ? "Male" : "Female";
                 } else if (genderValue instanceof String) {
-                    customerGender = "true".equalsIgnoreCase((String) genderValue) || 
-                                   "1".equals((String) genderValue);
+                    customerGender = (String) genderValue;
                 }
             }
 
@@ -56,6 +54,7 @@ public class CustomerUserDetailDto {
                     firstTuple.get("id_card", String.class),
                     firstTuple.get("customer_address", String.class),
                     firstTuple.get("customer_img", String.class),
+                    firstTuple.get("customer_email", String.class),
                     firstTuple.get("customer_type_name", String.class),
                     firstTuple.get("user_name", String.class),
                     firstTuple.get("email", String.class),

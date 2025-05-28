@@ -142,9 +142,14 @@ public class CustomerServiceImpl implements ICustomerService {
     public void updateCustomerProfile(String username, Map<String, String> profileData) {
         Customer customer = customerRepository.findByAccountUserName(username);
         if (customer != null) {
-            // Update email
+            // Update email in both customer and account tables for consistency
             if (profileData.get("customerEmail") != null) {
                 customer.setCustomerEmail(profileData.get("customerEmail"));
+                
+                // Also update account email if account exists
+                if (customer.getAccount() != null) {
+                    customer.getAccount().setEmail(profileData.get("customerEmail"));
+                }
             }
             
             // Update phone

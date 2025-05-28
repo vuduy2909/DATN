@@ -100,7 +100,7 @@ public interface ICustomerRepository extends JpaRepository<Customer, Integer> {
     void deleteCustomerId(@Param("id") Integer id);
 
     @Query(value = "SELECT c.customer_id, c.customer_code, c.customer_name, c.customer_phone, c.customer_gender, " +
-            "c.date_of_birth, c.id_card, c.customer_address, c.customer_img, ct.customer_type_name, a.user_name, " +
+            "c.date_of_birth, c.id_card, c.customer_address, c.customer_img, c.customer_email, ct.customer_type_name, a.user_name, " +
             "a.email, u.user_data_id, u.age, u.bmi, u.gender, u.training_goals, u.training_history, " +
             "cc.recommended_status, co.course_id, co.course_name, co.description, co.duration, co.image, co.status, " +
             "cty.course_type_name "+

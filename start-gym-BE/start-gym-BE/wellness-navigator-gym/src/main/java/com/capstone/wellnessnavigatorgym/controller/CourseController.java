@@ -11,6 +11,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 
 @RestController
 @RequestMapping("/api/v1/course")
@@ -22,11 +24,17 @@ public class CourseController {
 
     @GetMapping("")
     public ResponseEntity<List<Course>> getAllCourse() {
-        List<Course> courseList = this.courseService.findAll();
-        if (courseList.isEmpty()) {
-            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+        try {
+            List<Course> courseList = this.courseService.findAll();
+            
+            if (courseList.isEmpty()) {
+                return new ResponseEntity<>(courseList, HttpStatus.OK);
+            }
+            
+            return new ResponseEntity<>(courseList, HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
-        return new ResponseEntity<>(courseList, HttpStatus.OK);
     }
 
     @GetMapping("/{id}")

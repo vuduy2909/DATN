@@ -7,10 +7,10 @@ export const axiosInstance = axios.create({
 export const get = async (url, options = {}) => {
     try {
         const response = await axiosInstance.get(url, options);
-        return response.data || [];
+        return response.data;
     } catch (err) {
         console.error(`GET request failed for ${url}:`, err);
-        return [];
+        throw err;
     }
 };
 
@@ -54,15 +54,16 @@ export const remove = async (url, options = {}) => {
     }
 };
 
-// Mỗi request đều setting sẵn r - bỏ 1 lần ở đây và không dùng axios => dùng request để gọi api
+// Request interceptor - chỉ log khi debug mode
 axiosInstance.interceptors.request.use((config) => {
     const token = localStorage.getItem('token');
 
     if (token && token !== 'null' && token !== 'undefined') {
         config.headers.Authorization = `Bearer ${token}`;
-        console.log('Setting Authorization header:', `Bearer ${token.substring(0, 20)}...`);
-    } else {
-        console.log('No valid token found for request');
+        // Chỉ log khi cần debug
+        if (process.env.NODE_ENV === 'development' && window.localStorage.getItem('debugMode') === 'true') {
+            console.log('Setting Authorization header:', `Bearer ${token.substring(0, 20)}...`);
+        }
     }
     return config;
 });
@@ -79,8 +80,10 @@ axiosInstance.interceptors.response.use(
         return response;
     },
     (error) => {
-        // Chỉ log chi tiết khi cần debug
-        if (process.env.NODE_ENV === 'development') {
+        // Chỉ log chi tiết khi debug mode
+        const debugMode = process.env.NODE_ENV === 'development' && window.localStorage.getItem('debugMode') === 'true';
+        
+        if (debugMode) {
             console.log('API Error:', error);
             console.log('Current URL:', window.location.pathname);
             console.log('Error status:', error?.response?.status);
@@ -89,8 +92,6 @@ axiosInstance.interceptors.response.use(
         
         // Xử lý lỗi xác thực
         if (error?.response?.status === 401) {
-            console.log('Mã lỗi 401: Chưa xác thực');
-            
             const currentPath = window.location.pathname;
             
             // Kiểm tra xem có phải trang công khai không
@@ -101,30 +102,26 @@ axiosInstance.interceptors.response.use(
                 currentPath === '/about' ||
                 currentPath === '/recipe' ||
                 currentPath === '/blog' ||
-                currentPath.startsWith('/collections') ||  // Tất cả trang collections
-                currentPath.match(/^\/collections\/\d+\/days\/\d+$/);  // Trang workout cụ thể
+                currentPath.startsWith('/collections') ||
+                currentPath.match(/^\/collections\/\d+\/days\/\d+$/);
             
             // Kiểm tra xem có phải API call từ AuthContext hoặc AdminRoute không
             const isAuthCheck = error.config?.url?.includes('/users/info');
             
             // Chỉ xóa token và redirect nếu không phải trang công khai và không phải auth check
             if (!isPublicPage && !isAuthCheck) {
-                console.log('Redirecting to login from protected page:', currentPath);
+                if (debugMode) {
+                    console.log('Redirecting to login from protected page:', currentPath);
+                }
                 localStorage.removeItem('token');
                 localStorage.removeItem('isAdmin');
                 window.location.href = '/login';
-            } else {
-                console.log('Staying on current page - either public page or auth check');
-                // Nếu là auth check và token không hợp lệ, chỉ log không redirect
-                if (isAuthCheck) {
-                    console.log('Auth check failed - token may be expired');
-                }
             }
-            return Promise.reject(error);  // Trả về error để component có thể handle
+            return Promise.reject(error);
         }
         
-        // Các lỗi khác - chỉ log khi cần
-        if (error?.response?.status === 400 || error?.response?.status === 404) {
+        // Các lỗi khác - chỉ log khi debug mode
+        if (debugMode && (error?.response?.status === 400 || error?.response?.status === 404)) {
             console.log(`Lỗi ${error.response.status}: ${error.response.data?.message || 'Unknown error'}`);
         }
         

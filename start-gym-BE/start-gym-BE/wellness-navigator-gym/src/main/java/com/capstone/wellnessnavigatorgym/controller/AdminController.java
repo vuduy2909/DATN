@@ -3,9 +3,13 @@ package com.capstone.wellnessnavigatorgym.controller;
 import com.capstone.wellnessnavigatorgym.entity.Customer;
 import com.capstone.wellnessnavigatorgym.entity.CustomerType;
 import com.capstone.wellnessnavigatorgym.entity.VipPayment;
+import com.capstone.wellnessnavigatorgym.entity.Comment;
+import com.capstone.wellnessnavigatorgym.entity.Course;
 import com.capstone.wellnessnavigatorgym.repository.ICustomerRepository;
 import com.capstone.wellnessnavigatorgym.repository.ICustomerTypeRepository;
 import com.capstone.wellnessnavigatorgym.repository.IVipPaymentRepository;
+import com.capstone.wellnessnavigatorgym.repository.ICourseRepository;
+import com.capstone.wellnessnavigatorgym.repository.ICommentRepository;
 import com.capstone.wellnessnavigatorgym.service.PaymentStatusService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -37,6 +41,12 @@ public class AdminController {
     @Autowired
     private ICustomerTypeRepository customerTypeRepository;
 
+    @Autowired
+    private ICourseRepository courseRepository;
+
+    @Autowired
+    private ICommentRepository commentRepository;
+
     /**
      * Test endpoint đơn giản
      */
@@ -65,6 +75,7 @@ public class AdminController {
             
             System.out.println("Total customers found: " + allCustomers.size());
             
+            // Tự động lấy tất cả customer types từ database
             Map<String, Long> userTypeStats = allCustomers.stream()
                 .filter(c -> c.getCustomerType() != null)
                 .collect(Collectors.groupingBy(
@@ -72,20 +83,54 @@ public class AdminController {
                     Collectors.counting()
                 ));
             
+            // Lấy tất cả customer types từ database để đảm bảo hiển thị đầy đủ
+            List<CustomerType> allCustomerTypes = customerTypeRepository.findAllOrderByPriceAsc();
+            
             Map<String, Object> userStats = new HashMap<>();
             userStats.put("total", (long) allCustomers.size());
-            userStats.put("regular", userTypeStats.getOrDefault("Regular", 0L));
-            userStats.put("premium", userTypeStats.getOrDefault("Premium", 0L));
-            userStats.put("vip", userTypeStats.getOrDefault("VIP", 0L));
+            
+            // Thêm thống kê cho tất cả customer types có trong database
+            Map<String, Long> customerTypeBreakdown = new HashMap<>();
+            for (CustomerType type : allCustomerTypes) {
+                String typeName = type.getCustomerTypeName();
+                Long count = userTypeStats.getOrDefault(typeName, 0L);
+                customerTypeBreakdown.put(typeName.toLowerCase().replace(" ", "_"), count);
+                System.out.println("Customer type: " + typeName + " - Count: " + count);
+            }
+            
+            // Backward compatibility - keep old field names
+            userStats.put("regular", customerTypeBreakdown.getOrDefault("regular", 0L));
+            userStats.put("premium", customerTypeBreakdown.getOrDefault("premium", 0L));
+            userStats.put("vip", customerTypeBreakdown.getOrDefault("vip", 0L));
+            
+            // Add new dynamic customer types
+            userStats.put("customerTypeBreakdown", customerTypeBreakdown);
+            userStats.put("allCustomerTypes", allCustomerTypes.stream()
+                .map(type -> {
+                    Map<String, Object> typeInfo = new HashMap<>();
+                    typeInfo.put("id", type.getCustomerTypeId());
+                    typeInfo.put("name", type.getCustomerTypeName());
+                    typeInfo.put("count", userTypeStats.getOrDefault(type.getCustomerTypeName(), 0L));
+                    typeInfo.put("price", type.getPrice());
+                    return typeInfo;
+                })
+                .collect(Collectors.toList()));
             
             response.put("userStats", userStats);
             
-            // Thống kê khóa học (cần implement sau khi có Course entity)
+            // Thống kê khóa học - sử dụng dữ liệu thực từ database
+            Long totalCourses = courseRepository.count();
+            Long activeCourses = courseRepository.countActiveCourses();
+            Long hiddenCourses = courseRepository.countHiddenCourses();
+            
+            System.out.println("Course stats - Total: " + totalCourses + ", Active: " + activeCourses + ", Hidden: " + hiddenCourses);
+            
             Map<String, Object> courseStats = new HashMap<>();
-            courseStats.put("active", 24); // Tạm thời hardcode
-            courseStats.put("hidden", 3);
-            courseStats.put("newThisWeek", 2);
-            courseStats.put("newThisMonth", 8);
+            courseStats.put("active", activeCourses != null ? activeCourses : 0L);
+            courseStats.put("hidden", hiddenCourses != null ? hiddenCourses : 0L);
+            courseStats.put("total", totalCourses != null ? totalCourses : 0L);
+            courseStats.put("newThisWeek", 2L); // Placeholder - có thể implement sau nếu có trường created_date
+            courseStats.put("newThisMonth", 8L); // Placeholder - có thể implement sau nếu có trường created_date
             
             response.put("courseStats", courseStats);
             
@@ -657,6 +702,293 @@ public class AdminController {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error updating all customer types: " + e.getMessage());
+        }
+    }
+
+    // ==================== COURSE MANAGEMENT ENDPOINTS ====================
+    
+    /**
+     * Lấy tất cả courses để debug
+     */
+    @GetMapping("/courses")
+    public ResponseEntity<?> getAllCoursesAdmin() {
+        try {
+            List<Course> courses = courseRepository.findAll();
+            
+            // Convert to response format
+            List<Map<String, Object>> coursesResponse = courses.stream()
+                .map(course -> {
+                    Map<String, Object> courseInfo = new HashMap<>();
+                    courseInfo.put("courseId", course.getCourseId());
+                    courseInfo.put("courseName", course.getCourseName());
+                    courseInfo.put("description", course.getDescription());
+                    courseInfo.put("duration", course.getDuration());
+                    courseInfo.put("image", course.getImage());
+                    courseInfo.put("status", course.getStatus());
+                    courseInfo.put("averageRating", course.getAverageRating());
+                    
+                    // Course type info
+                    if (course.getCourseType() != null) {
+                        Map<String, Object> typeInfo = new HashMap<>();
+                        typeInfo.put("courseTypeId", course.getCourseType().getCourseTypeId());
+                        typeInfo.put("courseTypeName", course.getCourseType().getCourseTypeName());
+                        courseInfo.put("courseType", typeInfo);
+                    }
+                    
+                    return courseInfo;
+                })
+                .collect(Collectors.toList());
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("courses", coursesResponse);
+            response.put("totalCourses", courses.size());
+            response.put("activeCourses", courses.stream().filter(c -> c.getStatus() != null && c.getStatus()).count());
+            response.put("hiddenCourses", courses.stream().filter(c -> c.getStatus() == null || !c.getStatus()).count());
+            response.put("timestamp", LocalDateTime.now());
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error getting courses: " + e.getMessage());
+        }
+    }
+
+    // ==================== COMMENT MANAGEMENT ENDPOINTS ====================
+    
+    /**
+     * Lấy tất cả comments
+     */
+    @GetMapping("/comments")
+    public ResponseEntity<?> getAllComments() {
+        try {
+            List<Comment> comments = commentRepository.findAll();
+            
+            // Convert to response format với thông tin đầy đủ
+            List<Map<String, Object>> commentsResponse = comments.stream()
+                .map(comment -> {
+                    Map<String, Object> commentInfo = new HashMap<>();
+                    commentInfo.put("commentId", comment.getCommentId());
+                    commentInfo.put("commentText", comment.getCommentText());
+                    commentInfo.put("createdAt", comment.getCreatedDate());
+                    commentInfo.put("updatedAt", comment.getUpdatedDate());
+                    commentInfo.put("isReported", comment.getIsReported());
+                    commentInfo.put("reportCount", comment.getReportCount());
+                    commentInfo.put("reportReason", comment.getReportReason());
+                    
+                    // Customer info
+                    if (comment.getCustomer() != null) {
+                        Map<String, Object> customerInfo = new HashMap<>();
+                        customerInfo.put("customerId", comment.getCustomer().getCustomerId());
+                        customerInfo.put("customerName", comment.getCustomer().getCustomerName());
+                        customerInfo.put("customerImg", comment.getCustomer().getCustomerImg());
+                        commentInfo.put("customer", customerInfo);
+                    }
+                    
+                    // Exercise info
+                    if (comment.getExercise() != null) {
+                        Map<String, Object> exerciseInfo = new HashMap<>();
+                        exerciseInfo.put("exerciseId", comment.getExercise().getExerciseId());
+                        exerciseInfo.put("exerciseName", comment.getExercise().getExerciseName());
+                        commentInfo.put("exercise", exerciseInfo);
+                    }
+                    
+                    // Course info
+                    if (comment.getCourse() != null) {
+                        Map<String, Object> courseInfo = new HashMap<>();
+                        courseInfo.put("courseId", comment.getCourse().getCourseId());
+                        courseInfo.put("courseName", comment.getCourse().getCourseName());
+                        commentInfo.put("course", courseInfo);
+                    }
+                    
+                    // Day info
+                    if (comment.getDay() != null) {
+                        Map<String, Object> dayInfo = new HashMap<>();
+                        dayInfo.put("dayId", comment.getDay().getDayId());
+                        dayInfo.put("dayName", comment.getDay().getDayName());
+                        commentInfo.put("day", dayInfo);
+                    }
+                    
+                    return commentInfo;
+                })
+                .collect(Collectors.toList());
+            
+            return ResponseEntity.ok(commentsResponse);
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error getting comments: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Lấy reported comments
+     */
+    @GetMapping("/comments/reported")
+    public ResponseEntity<?> getReportedComments() {
+        try {
+            // Lấy comments có isReported = true hoặc reportCount > 0
+            List<Comment> allComments = commentRepository.findAll();
+            List<Comment> reportedComments = allComments.stream()
+                .filter(comment -> comment.getIsReported() != null && comment.getIsReported() ||
+                                 comment.getReportCount() != null && comment.getReportCount() > 0)
+                .collect(Collectors.toList());
+            
+            // Convert to response format tương tự như getAllComments
+            List<Map<String, Object>> commentsResponse = reportedComments.stream()
+                .map(comment -> {
+                    Map<String, Object> commentInfo = new HashMap<>();
+                    commentInfo.put("commentId", comment.getCommentId());
+                    commentInfo.put("commentText", comment.getCommentText());
+                    commentInfo.put("createdAt", comment.getCreatedDate());
+                    commentInfo.put("isReported", comment.getIsReported());
+                    commentInfo.put("reportCount", comment.getReportCount());
+                    commentInfo.put("reportReason", comment.getReportReason());
+                    
+                    // Customer info
+                    if (comment.getCustomer() != null) {
+                        Map<String, Object> customerInfo = new HashMap<>();
+                        customerInfo.put("customerId", comment.getCustomer().getCustomerId());
+                        customerInfo.put("customerName", comment.getCustomer().getCustomerName());
+                        customerInfo.put("customerImg", comment.getCustomer().getCustomerImg());
+                        commentInfo.put("customer", customerInfo);
+                    }
+                    
+                    // Exercise info
+                    if (comment.getExercise() != null) {
+                        Map<String, Object> exerciseInfo = new HashMap<>();
+                        exerciseInfo.put("exerciseId", comment.getExercise().getExerciseId());
+                        exerciseInfo.put("exerciseName", comment.getExercise().getExerciseName());
+                        commentInfo.put("exercise", exerciseInfo);
+                    }
+                    
+                    // Course info
+                    if (comment.getCourse() != null) {
+                        Map<String, Object> courseInfo = new HashMap<>();
+                        courseInfo.put("courseId", comment.getCourse().getCourseId());
+                        courseInfo.put("courseName", comment.getCourse().getCourseName());
+                        commentInfo.put("course", courseInfo);
+                    }
+                    
+                    // Day info
+                    if (comment.getDay() != null) {
+                        Map<String, Object> dayInfo = new HashMap<>();
+                        dayInfo.put("dayId", comment.getDay().getDayId());
+                        dayInfo.put("dayName", comment.getDay().getDayName());
+                        commentInfo.put("day", dayInfo);
+                    }
+                    
+                    return commentInfo;
+                })
+                .collect(Collectors.toList());
+            
+            return ResponseEntity.ok(commentsResponse);
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error getting reported comments: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Xóa comment
+     */
+    @DeleteMapping("/comments/{commentId}")
+    public ResponseEntity<?> deleteComment(@PathVariable Integer commentId) {
+        try {
+            Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new RuntimeException("Comment not found with ID: " + commentId));
+            
+            commentRepository.delete(comment);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Comment deleted successfully");
+            response.put("deletedCommentId", commentId);
+            response.put("timestamp", LocalDateTime.now());
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error deleting comment: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Dismiss report (placeholder - cần implement report system)
+     */
+    @PostMapping("/comments/{commentId}/dismiss-report")
+    public ResponseEntity<?> dismissCommentReport(@PathVariable Integer commentId) {
+        try {
+            // Tạm thời return success - có thể implement report dismissal logic sau
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Report dismissed successfully");
+            response.put("commentId", commentId);
+            response.put("timestamp", LocalDateTime.now());
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error dismissing report: " + e.getMessage());
+        }
+    }
+
+    // ==================== REVENUE MANAGEMENT ENDPOINTS ====================
+    
+    /**
+     * Lấy tất cả revenue transactions (successful payments)
+     */
+    @GetMapping("/revenue-transactions")
+    public ResponseEntity<?> getRevenueTransactions() {
+        try {
+            // Lấy tất cả payments thành công
+            List<VipPayment> successfulPayments = vipPaymentRepository
+                .findByPaymentStatusOrderByCreatedDateDesc(VipPayment.PaymentStatus.SUCCESS);
+            
+            // Convert to response format
+            List<Map<String, Object>> transactionsResponse = successfulPayments.stream()
+                .map(payment -> {
+                    Map<String, Object> transactionInfo = new HashMap<>();
+                    transactionInfo.put("paymentId", payment.getPaymentId());
+                    transactionInfo.put("amount", payment.getAmount().doubleValue());
+                    transactionInfo.put("paymentStatus", payment.getPaymentStatus().name());
+                    transactionInfo.put("createdDate", payment.getCreatedDate());
+                    transactionInfo.put("completedDate", payment.getCompletedDate());
+                    
+                    // Customer info
+                    if (payment.getCustomer() != null) {
+                        Map<String, Object> customerInfo = new HashMap<>();
+                        customerInfo.put("customerId", payment.getCustomer().getCustomerId());
+                        customerInfo.put("customerName", payment.getCustomer().getCustomerName());
+                        customerInfo.put("customerImg", payment.getCustomer().getCustomerImg());
+                        transactionInfo.put("customer", customerInfo);
+                    }
+                    
+                    // Course info
+                    if (payment.getCourse() != null) {
+                        Map<String, Object> courseInfo = new HashMap<>();
+                        courseInfo.put("courseId", payment.getCourse().getCourseId());
+                        courseInfo.put("courseName", payment.getCourse().getCourseName());
+                        courseInfo.put("courseImage", payment.getCourse().getImage());
+                        transactionInfo.put("course", courseInfo);
+                    }
+                    
+                    return transactionInfo;
+                })
+                .collect(Collectors.toList());
+            
+            return ResponseEntity.ok(transactionsResponse);
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error getting revenue transactions: " + e.getMessage());
         }
     }
 } 

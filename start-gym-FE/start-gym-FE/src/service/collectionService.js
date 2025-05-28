@@ -1,8 +1,22 @@
 import { request } from '../utils/axiosInstance';
 // GET FULL COURSE
 export const getCards = async () => {
-    const res = await request.get('/course');
-    return res;
+    try {
+        const res = await request.get('/course');
+        
+        if (!res) {
+            return [];
+        }
+        
+        if (!Array.isArray(res)) {
+            return [];
+        }
+        
+        return res;
+    } catch (error) {
+        console.error('Error in getCards:', error);
+        throw error;
+    }
 };
 
 // GET DETAIL OF A COURSE -> JUST GET DAYS IN COMPONENT

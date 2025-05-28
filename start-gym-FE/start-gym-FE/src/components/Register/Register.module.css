@@ -46,7 +46,7 @@
 }
 
 .startGymText {
-    color: #d35255;
+    color: #CF4044;
 }
 
 .titleRed {
@@ -54,7 +54,7 @@
     font-weight: 700;
     margin: 0;
     line-height: 1.1;
-    color: #d35255;
+    color: #CF4044;
     text-align: center;
 }
 
@@ -97,7 +97,7 @@
     justify-content: center;
     width: 50px;
     height: 50px;
-    background-color: #d35255;
+    background-color: #CF4044;
     border-radius: 50%;
     margin-bottom: 1rem;
     color: white;
@@ -134,7 +134,7 @@
 }
 
 .submitButton {
-    background-color: #d35255 !important;
+    background-color: #CF4044 !important;
     color: white !important;
     font-weight: 600 !important;
     padding: 12px !important;
@@ -146,7 +146,7 @@
 }
 
 .submitButton:hover {
-    background-color: #b8464a !important;
+    background-color: #B8363C !important;
 }
 
 .loginLink {
@@ -155,7 +155,7 @@
 }
 
 .link {
-    color: #d35255;
+    color: #CF4044;
     cursor: pointer;
     text-decoration: none;
     font-size: 0.9rem;
@@ -163,7 +163,7 @@
 
 .link:hover {
     text-decoration: underline;
-    color: #b8464a;
+    color: #B8363C;
 }
 
 /* Responsive Design */
@@ -337,4 +337,21 @@
 
 .date {
     width: 100% !important;
+}
+
+.marketingBox {
+    /* Removed sticky positioning to allow natural scrolling */
+    /* position: sticky; */
+    /* top: 40px; */
+    /* align-self: flex-start; */
+    /* z-index: 1; */
+    transition: all 0.3s ease;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .marketingBox {
+        position: static;
+        top: auto;
+    }
 }

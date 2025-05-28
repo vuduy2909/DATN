@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../AuthContext';
+import { useLocation } from 'react-router-dom';
+import Collections_card from '../components/Collections_card/Collections_card';
+import { request } from '../utils/axiosInstance';
 import Header from "../components/Header/Header";
 import Footer from "../components/Footer/Footer";
-import Collections_card from "../components/Collections_card/Collections_card";
 import Sidebar from "../components/Sidebar/Sidebar";
-import { useAuth } from "../AuthContext";
-import { request } from "../utils/axiosInstance";
 
 const Collections = () => {
   // Initialize from localStorage if available, otherwise use "All"
@@ -30,51 +31,36 @@ const Collections = () => {
         
         // Kiểm tra token trước khi gọi API
         const token = localStorage.getItem('token');
-      console.log('=== Collections Debug ===');
-      console.log('User:', user);
-      console.log('Token exists:', !!token);
       
         if (user && token) {
           try {
             // Fetch user details for recommended courses
-          console.log('Fetching user details...');
             const detailRes = await request.get("/customer/detail");
-          console.log("User details response:", detailRes);
             
             // Fetch all user's courses (both recommended and self-enrolled)
-          console.log('Fetching my courses...');
             const myCoursesRes = await request.get("/customer-course/my-courses");
-          console.log("My courses response:", myCoursesRes);
-          console.log("My courses array:", myCoursesRes?.courses);
-          console.log("Number of courses:", myCoursesRes?.courses?.length || 0);
             
             // Set the user data and courses
-          setUserData(detailRes || { recommendedCourses: [] });
+            setUserData(detailRes || { recommendedCourses: [] });
             setMyCourses(myCoursesRes?.courses || []);
             
             // If user has any courses, auto switch to My Course tab
             if (myCoursesRes?.courses && myCoursesRes.courses.length > 0) {
-              console.log('User has courses, setting category to My Course');
               setSelectedCategory("My Course");
               localStorage.setItem('selectedCategory', 'My Course');
           } else {
-            console.log('User has no courses');
             }
           } catch (apiError) {
-            console.log("API error, user might not be logged in:", apiError);
-          console.log("API error details:", apiError.response);
             // Không set error state, chỉ log để user có thể xem collections công khai
             setUserData({ recommendedCourses: [] });
             setMyCourses([]);
           }
         } else {
-          console.log("No user or token, showing public collections only");
           setUserData({ recommendedCourses: [] });
           setMyCourses([]);
         }
         
       } catch (error) {
-        console.error("Error fetching user information", error);
         setUserData({ recommendedCourses: [] });
         setMyCourses([]);
       } finally {
@@ -89,7 +75,6 @@ const Collections = () => {
   // Listen for successful VIP payment completion
   useEffect(() => {
     const handlePaymentSuccess = () => {
-      console.log('Payment success detected, refreshing course data...');
       fetchUserData();
     };
 
@@ -99,7 +84,6 @@ const Collections = () => {
     const paymentSuccess = localStorage.getItem('vipPaymentSuccess');
     
     if (paymentStatus === 'success' || paymentSuccess === 'true') {
-      console.log('Detected successful VIP payment, refreshing data...');
       // Clear the flag
       localStorage.removeItem('vipPaymentSuccess');
       // Remove URL parameters
@@ -126,19 +110,12 @@ const Collections = () => {
 
   // Combine recommended courses and user's enrolled courses for the My Course tab
   const allUserCourses = React.useMemo(() => {
-    console.log('=== allUserCourses Debug ===');
-    console.log('User exists:', !!user);
-    console.log('myCourses:', myCourses);
-    console.log('userData.recommendedCourses:', userData.recommendedCourses);
-    
     if (!user) {
-      console.log('No user, returning empty array');
       return [];
     }
     
     // Start with user's enrolled courses
     const userEnrolledCourses = myCourses.map(course => {
-      console.log('Processing course:', course);
       return {
       courseId: course.courseId,
       courseName: course.courseName,
@@ -154,8 +131,6 @@ const Collections = () => {
       };
     });
     
-    console.log('userEnrolledCourses after mapping:', userEnrolledCourses);
-    
     // Add any recommended courses from user details that aren't already in enrolled courses
     const recommendedFromDetails = userData.recommendedCourses || [];
     const enrolledCourseIds = userEnrolledCourses.map(c => c.courseId);
@@ -168,16 +143,10 @@ const Collections = () => {
         joinType: 'Recommended'
       }));
     
-    console.log('additionalRecommended:', additionalRecommended);
-    
     const finalCourses = [...userEnrolledCourses, ...additionalRecommended];
-    console.log('Final allUserCourses:', finalCourses);
     
     return finalCourses;
   }, [myCourses, userData.recommendedCourses, user]);
-
-  console.log("Current category:", selectedCategory);
-  console.log("All user courses for My Course tab:", allUserCourses);
 
   const handleCourseJoinSuccess = (courseId) => {
     // Refresh user courses after successful join
@@ -187,14 +156,14 @@ const Collections = () => {
           setMyCourses(response?.courses || []);
         })
         .catch(error => {
-          console.error("Error refreshing courses after join:", error);
         });
     }
   };
 
   return (
-    <div style={{ backgroundColor: "#f0ece8" }}>
+    <div style={{ backgroundColor: "#f0ece8", minHeight: "100vh" }}>
       <Header />
+      
       <div style={{ display: "flex", padding: "15px" }}>
         <Sidebar onCategoryChange={handleCategoryChange} selectedCategory={selectedCategory} />
         <div style={{ flex: 1, maxWidth: "calc(100% - 250px)" }}>

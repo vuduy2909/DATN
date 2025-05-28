@@ -168,7 +168,7 @@ const CustomerTypeComponent = () => {
     }
 
     return (
-        <Box sx={{ padding: 3 }}>
+        <Box sx={{ padding: 2 }}>
             {/* Header */}
             <Box 
                 display="flex" 
@@ -177,7 +177,7 @@ const CustomerTypeComponent = () => {
                 marginBottom={3}
                 sx={{
                     background: 'white',
-                    padding: 3,
+                    padding: 2,
                     borderRadius: 2,
                     boxShadow: 1
                 }}
@@ -189,9 +189,14 @@ const CustomerTypeComponent = () => {
                 <Box display="flex" gap={2}>
                     <Button 
                         variant="contained"
-                        color="primary"
                         startIcon={<AddIcon />}
                         onClick={() => navigate('/admin/customer-types/new')}
+                        sx={{ 
+                            bgcolor: '#d35255',
+                            '&:hover': {
+                                bgcolor: '#b8464a'
+                            }
+                        }}
                     >
                         Add Customer Type
                     </Button>
@@ -211,6 +216,14 @@ const CustomerTypeComponent = () => {
                         startIcon={<RefreshIcon />}
                         onClick={fetchCustomerTypes}
                         disabled={isLoading}
+                        sx={{
+                            borderColor: '#d35255',
+                            color: '#d35255',
+                            '&:hover': {
+                                borderColor: '#b8464a',
+                                bgcolor: 'rgba(211, 82, 85, 0.04)'
+                            }
+                        }}
                     >
                         Refresh
                     </Button>

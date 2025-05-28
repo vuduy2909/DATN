@@ -39,6 +39,10 @@ public class Course {
     @Column(name = "is_vip")
     private Boolean isVip = false;
     
+    // Rating system for courses - simplified to just average rating
+    @Column(name = "average_rating", precision = 3, scale = 2)
+    private Double averageRating = 0.0;
+    
     @Column(name = "created_date")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdDate = LocalDateTime.now();
