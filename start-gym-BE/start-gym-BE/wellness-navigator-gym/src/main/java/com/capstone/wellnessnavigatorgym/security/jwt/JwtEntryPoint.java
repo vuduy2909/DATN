@@ -20,6 +20,6 @@ public class JwtEntryPoint implements AuthenticationEntryPoint {
     public void commence(HttpServletRequest request, HttpServletResponse response, AuthenticationException authException)
             throws IOException, ServletException {
         logger.error("Not authenticated error Message {}", authException.getMessage());
-        response.sendError(HttpServletResponse.SC_ACCEPTED, "Error -> Not authenticated");
+        response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Error -> Not authenticated");
     }
 }

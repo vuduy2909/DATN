@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useLocation } from "react-router-dom";
 import { Link } from "react-router-dom";
-import { Button, Popover, Typography } from "@mui/material";
+import { Button, Popover, Typography, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions } from "@mui/material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faArrowRight,
@@ -16,56 +16,193 @@ import { request } from "../../utils/axiosInstance";
 
 const List_Day = () => {
   const [days, setDays] = useState(null);
-  const { courseId, dayId } = useParams();
+  const [courseData, setCourseData] = useState(null);
+  const { courseId } = useParams();
   const containerRef = useRef(null);
   const [selectedCard, setSelectedCard] = useState(1);
   const [anchorEl, setAnchorEl] = useState(document.body);
   const [lastScrollTop, setLastScrollTop] = useState(0);
   const [userIdData, setUserIdData] = useState(null);
+  const [customerId, setCustomerId] = useState(null);
+  const [actualUsername, setActualUsername] = useState(null);
 
   const [reviewPopupOpen, setReviewPopupOpen] = useState(false);
+  
+  // Snackbar state for notifications
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'info' // 'error', 'warning', 'info', 'success'
+  });
+
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    dayId: null,
+    currentStatus: false
+  });
 
   const closeReviewPopup = () => {
     setReviewPopupOpen(false);
   };
 
+  const showSnackbar = (message, severity = 'info') => {
+    setSnackbar({
+      open: true,
+      message,
+      severity
+    });
+  };
+
+  const handleSnackbarClose = (event, reason) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+    setSnackbar({ ...snackbar, open: false });
+  };
+
+  const showConfirmDialog = (dayId, currentStatus) => {
+    setConfirmDialog({
+      open: true,
+      dayId,
+      currentStatus
+    });
+  };
+
+  const handleConfirmClose = () => {
+    setConfirmDialog({
+      open: false,
+      dayId: null,
+      currentStatus: false
+    });
+  };
+
+  const handleConfirmAttendance = () => {
+    if (confirmDialog.dayId !== null) {
+      toggleDayCompletion(confirmDialog.dayId, confirmDialog.currentStatus);
+    }
+    handleConfirmClose();
+  };
+
   const { user } = useAuth();
-  const [userData, setUserData] = useState([]);
 
   useEffect(() => {
     const fetchUserData = async () => {
       try {
         const res = await request.get("/customer/detail");
-        setUserData(res);
         const lastRecommendedCourse =
-          res.recommendedCourses[res.recommendedCourses.length - 1];
+          res.recommendedCourses && res.recommendedCourses.length > 0
+            ? res.recommendedCourses[res.recommendedCourses.length - 1]
+            : null;
         console.log("lastRecommendedCourse", lastRecommendedCourse);
-        setUserIdData(lastRecommendedCourse.userDataId);
+        if (lastRecommendedCourse) {
+          setUserIdData(lastRecommendedCourse.userDataId);
+        }
+        setCustomerId(res.customerId);
+        console.log("CustomerId from API:", res.customerId);
+
+        // Attempt to get username from response
+        if (res.account && res.account.userName) {
+          setActualUsername(res.account.userName);
+          console.log("Actual username from API (res.account.userName):", res.account.userName);
+        } else if (res.userName) {
+          setActualUsername(res.userName);
+          console.log("Actual username from API (res.userName):", res.userName);
+        } else if (user && typeof user === 'object' && user.username) {
+          // Fallback to username from useAuth if user is an object
+          setActualUsername(user.username);
+          console.log("Actual username from useAuth user object:", user.username);
+        } else {
+          console.warn("Username not found in /customer/detail response or useAuth user object.");
+        }
+
       } catch (error) {
         console.log("Error fetching user information", error);
+        
+        // Fallback: extract user info from JWT token or use default
+        if (user && typeof user === 'string') {
+          // If user is JWT token, try to decode or use a default customerId
+          console.log("Using fallback customerId = 1 for testing");
+          setCustomerId(1); // Default for testing
+        } else if (user && user.customerId) {
+          setCustomerId(user.customerId);
+        }
       }
     };
 
-    if (user) {
+    if (user && (typeof user === 'string' || user.username)) {
       fetchUserData();
     }
   }, [user]);
 
   useEffect(() => {
     const getDaysOfCourse = async () => {
+      console.log('=== DEBUGGING DAY COMPLETION SYSTEM ===');
+      console.log('CourseId:', courseId, 'CustomerId:', customerId);
+      console.log('User:', user);
+      
       try {
-        const daysOfCourse = await collectionService.getDays(courseId);
-        setDays(daysOfCourse.days);
+        console.log('Attempting to load days with completion for courseId:', courseId, 'customerId:', customerId);
+        // Sử dụng API mới để lấy days với completion status
+        const courseWithCompletion = await collectionService.getDaysWithCompletion(courseId, customerId);
+        console.log('API response courseWithCompletion:', courseWithCompletion);
+        console.log('Days array from API:', courseWithCompletion.days);
+        console.log('Number of days:', courseWithCompletion.days?.length);
+        courseWithCompletion.days?.forEach((day, index) => {
+          console.log(`Day ${index + 1}:`, day);
+        });
+        setCourseData(courseWithCompletion);
+        setDays(courseWithCompletion.days);
+        console.log('Days with completion loaded successfully:', courseWithCompletion);
       } catch (err) {
-        console.log(err);
+        console.log('Error loading days with completion:', err);
+        console.log('Error details:', err.response?.data, err.response?.status);
+        // Fallback to old API if new one fails
+        try {
+          console.log('Falling back to old API...');
+          const daysOfCourse = await collectionService.getDays(courseId);
+          console.log('Old API response:', daysOfCourse);
+          
+          // Tạo mock completion data cho testing
+          const mockCourseData = {
+            courseId: parseInt(courseId),
+            courseName: daysOfCourse.courseName || 'Test Course',
+            days: daysOfCourse.days || [],
+            totalDays: daysOfCourse.days?.length || 0,
+            completedDays: 0,
+            completionPercentage: 0.0
+          };
+          
+          // Thêm isCompleted = false cho tất cả ngày
+          if (mockCourseData.days) {
+            mockCourseData.days = mockCourseData.days.map(day => ({
+              ...day,
+              isCompleted: false
+            }));
+          }
+          
+          setCourseData(mockCourseData);
+          setDays(mockCourseData.days);
+          console.log('Days loaded successfully (fallback with mock completion):', mockCourseData);
+        } catch (fallbackErr) {
+          console.log('Error loading days (fallback):', fallbackErr);
+        }
       }
     };
-    getDaysOfCourse();
-  }, [courseId]);
+    
+    if (courseId) {
+      getDaysOfCourse();
+    }
+  }, [courseId, customerId]);
 
   console.log(days);
 
   const submitReview = async (effectiveness) => {
+    if (!user || !user.username || !userIdData) {
+      console.log('User not logged in or userIdData not available');
+      return;
+    }
+
     try {
       const course = userIdData;
 
@@ -99,20 +236,74 @@ const List_Day = () => {
     setAnchorEl(null);
   };
 
-  const handleScroll = () => {
+  const handleScroll = useCallback(() => {
     const st = window.scrollY;
-
-    // if (st < lastScrollTop || lastScrollTop === 0) {
-    //   openPopup();
-    // } else {
-    //   closePopup();
-    // }
-
-    setLastScrollTop(st);
-  };
+    console.log('Scroll position:', st);
+  }, []);
 
   const showReviewPopup = () => {
     setReviewPopupOpen(true);
+  };
+
+  const toggleDayCompletion = async (dayId, currentStatus) => {
+    if (!user || !customerId) {
+      console.log('User not logged in hoặc thiếu customerId, không thể điểm danh', { userPresent: !!user, customerId });
+      return;
+    }
+
+    try {
+      // Show loading state if needed
+      setDays(prevDays => 
+        prevDays.map(day => 
+          day.dayId === dayId 
+            ? { ...day, isLoading: true }
+            : day
+        )
+      );
+
+      // Make the API call
+      await collectionService.toggleDayCompletion(customerId, parseInt(courseId), dayId);
+      
+      // Optimistically update the UI
+      setDays(prevDays => 
+        prevDays.map(day => 
+          day.dayId === dayId 
+            ? { ...day, isCompleted: !currentStatus, isLoading: false }
+            : day
+        )
+      );
+      
+      // Refresh the complete data
+      const courseWithCompletion = await collectionService.getDaysWithCompletion(courseId, customerId);
+      
+      // Update both course data and days
+      setCourseData(courseWithCompletion);
+      setDays(courseWithCompletion.days);
+      
+      // Show success message
+      const successMessage = !currentStatus ? 
+        `Điểm danh Day ${dayId} thành công! ✅` : 
+        `Đã hủy điểm danh Day ${dayId}`;
+      showSnackbar(successMessage, 'success');
+      
+      console.log(`Day ${dayId} completion toggled successfully`);
+    } catch (error) {
+      console.error('Error toggling day completion:', error);
+      
+      // Revert the optimistic update on error
+      setDays(prevDays => 
+        prevDays.map(day => 
+          day.dayId === dayId 
+            ? { ...day, isCompleted: currentStatus, isLoading: false }
+            : day
+        )
+      );
+      
+      // Hiển thị thông báo lỗi từ backend
+      const errorMessage = error.response?.data?.message || 
+                         'Không thể cập nhật trạng thái điểm danh. Vui lòng thử lại.';
+      showSnackbar(errorMessage, 'error');
+    }
   };
 
   useEffect(() => {
@@ -138,7 +329,7 @@ const List_Day = () => {
         />
       </Button>
 
-      {isReviewPopupVisible && (
+      {isReviewPopupVisible && user && user.username && (
         <Button
           onClick={showReviewPopup}
           style={{ color: "#fff", fontSize: "17px", marginLeft: "10px" }}
@@ -164,22 +355,26 @@ const List_Day = () => {
           horizontal: "left",
         }}
       >
-        <div className={styles.popup}>
-          <div className={styles.popupContent}>
-            <Typography variant="h6">Choose Days</Typography>
-            <Button className={styles.popupClose} onClick={closePopup}>
-              <FontAwesomeIcon icon={faXmark} style={{ color: "#37383c" }} />
-            </Button>
-            <div className={styles.popupDays}>
-              {days &&
-                Array.isArray(days) &&
-                days.map((day) => (
+        <div className={styles.popupContent}>
+          <Typography variant="h6">Choose Days</Typography>
+          {courseData && user && user.username && (
+            <Typography variant="body2" className={styles.progressInfo}>
+              Tiến độ: {courseData.completedDays}/{courseData.totalDays} ngày ({courseData.completionPercentage?.toFixed(1)}%)
+            </Typography>
+          )}
+          <Button className={styles.popupClose} onClick={closePopup}>
+            <FontAwesomeIcon icon={faXmark} style={{ color: "#37383c" }} />
+          </Button>
+          <div className={styles.popupDays}>
+            {days &&
+              Array.isArray(days) &&
+              days.map((day) => (
+                <div key={day.dayId} className={styles.dayContainer}>
                   <Link
-                    key={day.dayId}
                     to={`/collections/${courseId}/days/${day.dayId}`}
                     className={`${styles.popupDay} ${
                       selectedCard === day.dayId ? styles.selectedCard : ""
-                    } `}
+                    } ${day.isCompleted ? styles.completedDay : styles.incompleteDay}`}
                     onClick={() => {
                       handleCardClick(day.dayId);
                       closePopup();
@@ -187,21 +382,101 @@ const List_Day = () => {
                   >
                     {day.dayName}
                   </Link>
-                ))}
-            </div>
+                  {/* DEBUGGING: Log user and customerId */}
+                  {console.log("Debug Button Display: ", { user, customerId, dayId: day.dayId })}
+                  {customerId && (
+                    <button
+                      className={`${styles.completionButton} ${
+                        day.isCompleted ? styles.completedButton : styles.incompleteButton
+                      } ${day.isLoading ? styles.loadingButton : ''}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (!day.isLoading && !day.isCompleted) {
+                          showConfirmDialog(day.dayId, day.isCompleted);
+                        } else if (day.isCompleted) {
+                          showSnackbar("Ngày này đã được điểm danh rồi", 'warning');
+                        }
+                      }}
+                      disabled={day.isLoading || day.isCompleted}
+                      title={day.isCompleted ? "Đã điểm danh" : "Chưa điểm danh"}
+                    >
+                      {day.isLoading ? "..." : (day.isCompleted ? "✓" : "○")}
+                    </button>
+                  )}
+                </div>
+              ))}
           </div>
         </div>
       </Popover>
 
-      <Popover open={reviewPopupOpen} onClose={closeReviewPopup}>
-        <div className={styles.reviewPopup}>
-          <Typography variant="h6">Review Course Effectiveness</Typography>
-          <div className={styles.reviewButtons}>
-            <Button onClick={() => submitReview(true)}>Yes</Button>
-            <Button onClick={() => submitReview(false)}>No</Button>
+      {user && user.username && (
+        <Popover open={reviewPopupOpen} onClose={closeReviewPopup}>
+          <div className={styles.reviewPopup}>
+            <Typography variant="h6">Review Course Effectiveness</Typography>
+            <div className={styles.reviewButtons}>
+              <Button onClick={() => submitReview(true)}>Yes</Button>
+              <Button onClick={() => submitReview(false)}>No</Button>
+            </div>
           </div>
-        </div>
-      </Popover>
+        </Popover>
+      )}
+
+      {/* Confirmation Dialog */}
+      <Dialog
+        open={confirmDialog.open}
+        onClose={handleConfirmClose}
+        aria-labelledby="confirm-dialog-title"
+        PaperProps={{
+          style: {
+            borderRadius: '12px',
+            padding: '8px'
+          }
+        }}
+      >
+        <DialogTitle id="confirm-dialog-title" sx={{ textAlign: 'center', paddingBottom: 1 }}>
+          🏋️‍♀️ Xác nhận điểm danh
+        </DialogTitle>
+        <DialogContent sx={{ textAlign: 'center', paddingY: 2 }}>
+          <Typography variant="body1">
+            Bạn có muốn điểm danh Day {confirmDialog.dayId} không?
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center', gap: 1, paddingBottom: 2 }}>
+          <Button 
+            onClick={handleConfirmClose}
+            variant="outlined"
+            sx={{ borderRadius: '8px', minWidth: '80px' }}
+          >
+            Hủy
+          </Button>
+          <Button 
+            onClick={handleConfirmAttendance}
+            variant="contained"
+            color="primary"
+            sx={{ borderRadius: '8px', minWidth: '80px' }}
+          >
+            Điểm danh
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar for notifications */}
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={4000} 
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={handleSnackbarClose} 
+          severity={snackbar.severity} 
+          sx={{ width: '100%' }}
+          variant="filled"
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </div>
   );
 };

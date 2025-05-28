@@ -10,6 +10,8 @@ import {
   Paper,
   IconButton,
   TablePagination,
+  Snackbar,
+  Alert,
 } from '@mui/material';
 import { Delete as DeleteIcon, Edit as EditIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
@@ -26,6 +28,28 @@ const ExerciseComponent = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Snackbar state for notifications
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'info'
+  });
+
+  const showSnackbar = (message, severity = 'info') => {
+    setSnackbar({
+      open: true,
+      message,
+      severity
+    });
+  };
+
+  const handleSnackbarClose = (event, reason) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+    setSnackbar({ ...snackbar, open: false });
+  };
 
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
@@ -94,9 +118,10 @@ const ExerciseComponent = () => {
       } else {
         setExerciseData([]);
       }
+      showSnackbar('Exercise deleted successfully! 🗑️', 'success');
     } catch (error) {
       console.error('Error deleting exercise:', error);
-      alert('Failed to delete exercise');
+      showSnackbar('Failed to delete exercise', 'error');
     }
   };
 
@@ -166,6 +191,23 @@ const ExerciseComponent = () => {
         onPageChange={handleChangePage}
         onRowsPerPageChange={handleChangeRowsPerPage}
       />
+
+      {/* Snackbar for notifications */}
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={4000} 
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={handleSnackbarClose} 
+          severity={snackbar.severity} 
+          sx={{ width: '100%' }}
+          variant="filled"
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </TableContainer>
   );
 };

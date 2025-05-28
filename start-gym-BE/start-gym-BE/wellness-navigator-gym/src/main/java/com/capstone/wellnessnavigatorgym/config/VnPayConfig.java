@@ -11,9 +11,9 @@ import java.util.*;
 
 public class VnPayConfig {
     public static String vnp_PayUrl = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html";
-    public static String vnp_ReturnUrl = "http://localhost:3000/carts/payment";
-    public static String vnp_TmnCode = "41UFM0W8";
-    public static String vnp_HashSecret = "MKQNZUGMTQSBZDFOGQNCPGBKEABRGHQF";
+    public static String vnp_ReturnUrl = "http://localhost:3000/payment/result";
+    public static String vnp_TmnCode = "79ERASY7";
+    public static String vnp_HashSecret = "O299ND65PKLJDHW5WKS0P4L7LM4M9KNM";
     public static String vnp_apiUrl = "https://sandbox.vnpayment.vn/merchant_webapi/api/transaction";
     public static String vnp_Version = "2.1.0";
     public static String vnp_Command = "pay";
@@ -34,7 +34,7 @@ public class VnPayConfig {
         return digest;
     }
 
-    public static String Sha256(String message) {
+    public static String sha256(String message) {
         String digest = null;
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
@@ -68,7 +68,7 @@ public class VnPayConfig {
                 sb.append("&");
             }
         }
-        return hmacSHA512(vnp_HashSecret,sb.toString());
+        return hmacSHA512(vnp_HashSecret, sb.toString());
     }
 
     public static String hmacSHA512(final String key, final String data) {
@@ -99,10 +99,10 @@ public class VnPayConfig {
         try {
             ipAdress = request.getHeader("X-FORWARDED-FOR");
             if (ipAdress == null) {
-                ipAdress = request.getLocalAddr();
+                ipAdress = request.getRemoteAddr();
             }
-        } catch (Exception e) {
-            ipAdress = "Invalid IP:" + e.getMessage();
+        } catch (Exception ex) {
+            ipAdress = "Invalid IP:" + ex.getMessage();
         }
         return ipAdress;
     }

@@ -25,32 +25,19 @@ const Login = () => {
 
             console.log("Login response:", response.data);
             console.log("User role:", response.data.roles);
-            console.log("Role type:", typeof response.data.roles);
-            console.log("Role value:", JSON.stringify(response.data.roles));
             
             if (response.status === 200) {
                 const token = response.data.token;
                 localStorage.setItem('token', token);
+                setUser(token);
                 
-                // Set user and check admin status in one step
+                // Set admin status and redirect accordingly
                 if (response.data.roles == 'ROLE_ADMIN') {
-                    console.log("User is ADMIN, setting flags and redirecting...");
-                    
-                    // Đặt cờ để ngăn logic điều hướng khác ghi đè
+                    console.log("User is ADMIN, setting admin status and redirecting...");
                     localStorage.setItem('isAdmin', 'true');
-                    localStorage.setItem('forceAdminRedirect', 'true');
-                    sessionStorage.setItem('blockHomeRedirect', 'true');
-                    
-                    // Lưu token
-                    setUser(token);
-                    
-                    // QUAN TRỌNG: Sử dụng setTimeout để đảm bảo các state được lưu
-                    setTimeout(() => {
-                        // Sử dụng window.location.replace thay vì navigate từ React Router
-                        window.location.replace('/admin');
-                    }, 100);
+                    navigate('/admin', { replace: true });
                 } else {
-                    setUser(token);
+                    console.log("User is not admin, redirecting to home...");
                     localStorage.setItem('isAdmin', 'false');
                     navigate('/', { replace: true });
                 }
@@ -78,25 +65,14 @@ const Login = () => {
             if (googleResponse.status === 200) {
                 const token = googleResponse.data.token;
                 localStorage.setItem('token', token);
+                setUser(token);
                 
                 if (googleResponse.data.roles === 'ROLE_ADMIN') {
-                    console.log("Google login: User is ADMIN, setting flags and redirecting...");
-                    
-                    // Đặt cờ để ngăn logic điều hướng khác ghi đè
+                    console.log("Google login: User is ADMIN, setting admin status and redirecting...");
                     localStorage.setItem('isAdmin', 'true');
-                    localStorage.setItem('forceAdminRedirect', 'true');
-                    sessionStorage.setItem('blockHomeRedirect', 'true');
-                    
-                    // Lưu token
-                    setUser(token);
-                    
-                    // QUAN TRỌNG: Sử dụng setTimeout để đảm bảo các state được lưu
-                    setTimeout(() => {
-                        // Sử dụng window.location.replace thay vì navigate từ React Router
-                        window.location.replace('/admin');
-                    }, 100);
+                    navigate('/admin', { replace: true });
                 } else {
-                    setUser(token);
+                    console.log("Google login: User is not admin, redirecting to home...");
                     localStorage.setItem('isAdmin', 'false');
                     navigate('/', { replace: true });
                 }

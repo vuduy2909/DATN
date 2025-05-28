@@ -30,7 +30,6 @@ const FormWizard = () => {
     desiredFrequency: '',
     occupation: '',
     workEnvironment: '',
-    healthIssues: [],
     chestSize: '',
     waistSize: '',
     bodyImage: null,
@@ -332,13 +331,13 @@ const FormWizard = () => {
   }, []);
 
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
-      <Paper elevation={3} sx={{ p: 4, borderRadius: 2 }}>
+    <Container maxWidth="md" sx={{ py: 1 }}>
+      <Paper elevation={3} sx={{ p: 2, borderRadius: 2 }}>
         <Typography variant="h4" align="center" gutterBottom color="primary">
           KYO-GYM Assessment
         </Typography>
         
-        <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 4 }}>
+        <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 2 }}>
           {steps.map((label) => (
             <Step key={label}>
               <StepLabel>{label}</StepLabel>

@@ -108,10 +108,7 @@ public class BuildDecisionTree {
             "chest_circumference",
             "body_type",
             "occupation",
-            "work_environment",
-            "heart_disease",
-            "respiratory_disease",
-            "recent_injury"
+            "work_environment"
         );
     }
 
@@ -424,16 +421,7 @@ public class BuildDecisionTree {
             logger.info("Added default value 'Normal' for body_type attribute");
         }
         
-        // Health attributes defaults
-        if (!userData.containsKey("heart_disease") || userData.get("heart_disease") == null) {
-            userData.put("heart_disease", false);
-        }
-        if (!userData.containsKey("respiratory_disease") || userData.get("respiratory_disease") == null) {
-            userData.put("respiratory_disease", false);
-        }
-        if (!userData.containsKey("recent_injury") || userData.get("recent_injury") == null) {
-            userData.put("recent_injury", false);
-        }
+
         
         // Training goals default if missing
         if (!userData.containsKey("training_goals") || userData.get("training_goals") == null) {

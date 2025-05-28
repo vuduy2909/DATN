@@ -25,6 +25,9 @@ public class JwtFilter extends OncePerRequestFilter {
 
     @Autowired
     private JwtUtility jwtUtility;
+    
+    @Autowired
+    private JwtTokenProvider jwtTokenProvider;
 
     @Autowired
     private UserDetailService userDetailService;
@@ -34,15 +37,37 @@ public class JwtFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         try {
             String jwt = parseJwt(request);
-            if (jwt != null && jwtUtility.validateJwtToken(jwt)) {
-                String username = jwtUtility.getUserNameFromJwtToken(jwt);
+            logger.debug("JWT Token: {}", jwt != null ? "Present" : "Not found");
+            
+            if (jwt != null) {
+                boolean isValid = jwtUtility.validateJwtToken(jwt);
+                String username = null;
+                
+                if (isValid) {
+                    username = jwtUtility.getUserNameFromJwtToken(jwt);
+                    logger.debug("JWT Token validated with JwtUtility for user: {}", username);
+                } else {
+                    // Try with JwtTokenProvider
+                    isValid = jwtTokenProvider.validateToken(jwt);
+                    if (isValid) {
+                        username = jwtTokenProvider.getUsernameFromToken(jwt);
+                        logger.debug("JWT Token validated with JwtTokenProvider for user: {}", username);
+                    }
+                }
+                
+                logger.debug("JWT Token validation result: {}", isValid);
+                
+                if (isValid && username != null) {
+                    UserDetails userDetails = userDetailService.loadUserByUsername(username);
+                    UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                            userDetails, null, userDetails.getAuthorities());
+                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
-                UserDetails userDetails = userDetailService.loadUserByUsername(username);
-                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                        userDetails, null, userDetails.getAuthorities());
-                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                    logger.debug("User authentication set successfully for: {}", username);
+                } else {
+                    logger.warn("JWT Token validation failed with both providers");
+                }
             }
         } catch (Exception e) {
             logger.error("Cannot set user authentication: {}", e);

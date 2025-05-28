@@ -121,9 +121,6 @@ public class TrackDataAiController {
         private String body_type;
         private String occupation;
         private String work_environment;
-        private Boolean heart_disease;
-        private Boolean respiratory_disease;
-        private Boolean recent_injury;
         private Integer customerId;
         
         // Getters
@@ -140,10 +137,23 @@ public class TrackDataAiController {
         public String getBody_type() { return body_type; }
         public String getOccupation() { return occupation; }
         public String getWork_environment() { return work_environment; }
-        public Boolean getHeart_disease() { return heart_disease; }
-        public Boolean getRespiratory_disease() { return respiratory_disease; }
-        public Boolean getRecent_injury() { return recent_injury; }
         public Integer getCustomerId() { return customerId; }
+        
+        // Setters
+        public void setTraining_history(String training_history) { this.training_history = training_history; }
+        public void setTraining_frequency(String training_frequency) { this.training_frequency = training_frequency; }
+        public void setAge(Integer age) { this.age = age; }
+        public void setGender(String gender) { this.gender = gender; }
+        public void setHeight(Double height) { this.height = height; }
+        public void setWeight(Double weight) { this.weight = weight; }
+        public void setBmi(Double bmi) { this.bmi = bmi; }
+        public void setChest_circumference(Double chest_circumference) { this.chest_circumference = chest_circumference; }
+        public void setWaist_circumference(Double waist_circumference) { this.waist_circumference = waist_circumference; }
+        public void setTraining_goals(String training_goals) { this.training_goals = training_goals; }
+        public void setBody_type(String body_type) { this.body_type = body_type; }
+        public void setOccupation(String occupation) { this.occupation = occupation; }
+        public void setWork_environment(String work_environment) { this.work_environment = work_environment; }
+        public void setCustomerId(Integer customerId) { this.customerId = customerId; }
     }
     
     public static class UserDataDTO {
@@ -160,9 +170,6 @@ public class TrackDataAiController {
         private String body_type;
         private String occupation;
         private String work_environment;
-        private Boolean heart_disease;
-        private Boolean respiratory_disease;
-        private Boolean recent_injury;
         private Integer customerId;
         private Integer recommendedCourseId;
         
@@ -193,12 +200,6 @@ public class TrackDataAiController {
         public void setOccupation(String occupation) { this.occupation = occupation; }
         public String getWork_environment() { return work_environment; }
         public void setWork_environment(String work_environment) { this.work_environment = work_environment; }
-        public Boolean getHeart_disease() { return heart_disease; }
-        public void setHeart_disease(Boolean heart_disease) { this.heart_disease = heart_disease; }
-        public Boolean getRespiratory_disease() { return respiratory_disease; }
-        public void setRespiratory_disease(Boolean respiratory_disease) { this.respiratory_disease = respiratory_disease; }
-        public Boolean getRecent_injury() { return recent_injury; }
-        public void setRecent_injury(Boolean recent_injury) { this.recent_injury = recent_injury; }
         public Integer getCustomerId() { return customerId; }
         public void setCustomerId(Integer customerId) { this.customerId = customerId; }
         public Integer getRecommendedCourseId() { return recommendedCourseId; }
@@ -248,6 +249,108 @@ public class TrackDataAiController {
         public Double getWaist_circumference_after() { return waist_circumference_after; }
         public void setWaist_circumference_after(Double waist_circumference_after) { this.waist_circumference_after = waist_circumference_after; }
     }
+
+    // DTO cho việc lưu tạm dữ liệu form wizard
+    public static class FormWizardDraftDTO {
+        private Integer customerId;
+        private Integer currentStep;
+        
+        // Step 1: Thông tin cơ bản
+        private Integer age;
+        private String gender;
+        private Double height;
+        private Double weight;
+        private Double bmi;
+        
+        // Step 2: Đo lường cơ thể
+        private Double chest_circumference;
+        private Double waist_circumference;
+        
+        // Step 3: Mục tiêu tập luyện
+        private String training_goals;
+        
+        // Step 4: Lịch sử tập luyện và tần suất
+        private String training_history;
+        private String training_frequency;
+        
+        // Step 5: Thông tin nghề nghiệp
+        private String occupation;
+        private String work_environment;
+        
+        // Step 6: Phân tích hình ảnh
+        private String body_type;
+        private String imageAnalysis;
+        private String imageRecommendations;
+        private String imageBase64; // Lưu ảnh dưới dạng base64 để hiển thị lại
+        
+        // Step 7: Khóa học được đề xuất
+        private Integer recommendedCourseId;
+        private String recommendedCourseName;
+        
+        // Metadata
+        private String createdAt;
+        private String updatedAt;
+        
+        // Constructors
+        public FormWizardDraftDTO() {}
+        
+        // Getters and Setters
+        public Integer getCustomerId() { return customerId; }
+        public void setCustomerId(Integer customerId) { this.customerId = customerId; }
+        public Integer getCurrentStep() { return currentStep; }
+        public void setCurrentStep(Integer currentStep) { this.currentStep = currentStep; }
+        
+        public Integer getAge() { return age; }
+        public void setAge(Integer age) { this.age = age; }
+        public String getGender() { return gender; }
+        public void setGender(String gender) { this.gender = gender; }
+        public Double getHeight() { return height; }
+        public void setHeight(Double height) { this.height = height; }
+        public Double getWeight() { return weight; }
+        public void setWeight(Double weight) { this.weight = weight; }
+        public Double getBmi() { return bmi; }
+        public void setBmi(Double bmi) { this.bmi = bmi; }
+        
+        public Double getChest_circumference() { return chest_circumference; }
+        public void setChest_circumference(Double chest_circumference) { this.chest_circumference = chest_circumference; }
+        public Double getWaist_circumference() { return waist_circumference; }
+        public void setWaist_circumference(Double waist_circumference) { this.waist_circumference = waist_circumference; }
+        
+        public String getTraining_goals() { return training_goals; }
+        public void setTraining_goals(String training_goals) { this.training_goals = training_goals; }
+        
+        public String getTraining_history() { return training_history; }
+        public void setTraining_history(String training_history) { this.training_history = training_history; }
+        public String getTraining_frequency() { return training_frequency; }
+        public void setTraining_frequency(String training_frequency) { this.training_frequency = training_frequency; }
+        
+        public String getOccupation() { return occupation; }
+        public void setOccupation(String occupation) { this.occupation = occupation; }
+        public String getWork_environment() { return work_environment; }
+        public void setWork_environment(String work_environment) { this.work_environment = work_environment; }
+        
+        public String getBody_type() { return body_type; }
+        public void setBody_type(String body_type) { this.body_type = body_type; }
+        public String getImageAnalysis() { return imageAnalysis; }
+        public void setImageAnalysis(String imageAnalysis) { this.imageAnalysis = imageAnalysis; }
+        public String getImageRecommendations() { return imageRecommendations; }
+        public void setImageRecommendations(String imageRecommendations) { this.imageRecommendations = imageRecommendations; }
+        public String getImageBase64() { return imageBase64; }
+        public void setImageBase64(String imageBase64) { this.imageBase64 = imageBase64; }
+        
+        public Integer getRecommendedCourseId() { return recommendedCourseId; }
+        public void setRecommendedCourseId(Integer recommendedCourseId) { this.recommendedCourseId = recommendedCourseId; }
+        public String getRecommendedCourseName() { return recommendedCourseName; }
+        public void setRecommendedCourseName(String recommendedCourseName) { this.recommendedCourseName = recommendedCourseName; }
+        
+        public String getCreatedAt() { return createdAt; }
+        public void setCreatedAt(String createdAt) { this.createdAt = createdAt; }
+        public String getUpdatedAt() { return updatedAt; }
+        public void setUpdatedAt(String updatedAt) { this.updatedAt = updatedAt; }
+    }
+
+    // In-memory storage cho draft data (có thể thay bằng database sau)
+    private static final Map<Integer, FormWizardDraftDTO> draftStorage = new HashMap<>();
 
     @GetMapping("/{id}")
     public ResponseEntity<String> getTrackDataAiById(@PathVariable Integer id) {
@@ -412,14 +515,21 @@ public class TrackDataAiController {
             logger.info("Using default body type: Normal");
         }
         
+        logger.info("=== BODY TYPE ENUM CONVERSION ===");
+        logger.info("Body type from DTO: '{}'", bodyType);
+        
         try {
+            // Sử dụng fromDatabaseValue để convert
             BodyType bodyTypeEnum = BodyType.fromDatabaseValue(bodyType.trim());
             userDataAi.setBody_type(bodyTypeEnum);
-            logger.info("Set body type enum: {} (database value: {})", bodyTypeEnum.name(), bodyTypeEnum.getDatabaseValue());
+            logger.info("✅ Successfully converted body type '{}' to enum: {} (database value: {})", 
+                bodyType, bodyTypeEnum.name(), bodyTypeEnum.getDatabaseValue());
         } catch (Exception e) {
-            logger.warn("Failed to map body type '{}', using default Normal", bodyType);
+            logger.warn("⚠️ Failed to map body type '{}', using default Normal. Error: {}", bodyType, e.getMessage());
             userDataAi.setBody_type(BodyType.NORMAL);
         }
+        
+        logger.info("=== END BODY TYPE ENUM CONVERSION ===");
         
         // Set occupation as String (not enum in user_data_ai table)
         final String occupation = dto.getOccupation() != null && !dto.getOccupation().trim().isEmpty() 
@@ -433,11 +543,6 @@ public class TrackDataAiController {
         userDataAi.setWork_environment(workEnvironment);
         logger.info("Set work environment string: '{}'", workEnvironment);
         
-        // Set health conditions
-        userDataAi.setHeart_disease(dto.getHeart_disease() != null ? dto.getHeart_disease() : false);
-        userDataAi.setRespiratory_disease(dto.getRespiratory_disease() != null ? dto.getRespiratory_disease() : false);
-        userDataAi.setRecent_injury(dto.getRecent_injury() != null ? dto.getRecent_injury() : false);
-
         userDataAi.setCustomer(customer);
         
         // Save the recommended course if available
@@ -476,14 +581,47 @@ public class TrackDataAiController {
         dto.setWaist_circumference(formData.getWaist_circumference());
 
         dto.setTraining_goals(formData.getTraining_goals());
-        dto.setBody_type(formData.getBody_type());
+        
+        // *** XỬ LÝ BODY TYPE: ƯU TIÊN CLAUDE API ***
+        String bodyTypeFromInput = formData.getBody_type();
+        
+        logger.info("=== BODY TYPE PROCESSING ===");
+        logger.info("Body type received from form: '{}'", bodyTypeFromInput);
+        
+        // Kiểm tra xem có phải là kết quả từ Claude API không
+        // Claude API thường trả về: "Thin", "Skinny Fat", "Overweight", "Normal", "Fit"
+        String[] claudeBodyTypes = {"Thin", "Skinny Fat", "Overweight", "Normal", "Fit"};
+        boolean isFromClaude = false;
+        
+        if (bodyTypeFromInput != null && !bodyTypeFromInput.trim().isEmpty()) {
+            String cleanBodyType = bodyTypeFromInput.trim();
+            
+            // Kiểm tra xem có phải từ Claude API không
+            for (String claudeType : claudeBodyTypes) {
+                if (claudeType.equalsIgnoreCase(cleanBodyType)) {
+                    isFromClaude = true;
+                    bodyTypeFromInput = claudeType; // Chuẩn hóa case
+                    break;
+                }
+            }
+        }
+        
+        if (isFromClaude) {
+            logger.info("✅ Body type '{}' is from Claude API analysis - using this value", bodyTypeFromInput);
+            dto.setBody_type(bodyTypeFromInput);
+        } else if (bodyTypeFromInput != null && !bodyTypeFromInput.trim().isEmpty()) {
+            logger.info("⚠️ Body type '{}' appears to be manual input - using this value", bodyTypeFromInput);
+            dto.setBody_type(bodyTypeFromInput);
+        } else {
+            logger.info("❌ No body type provided - using default 'Normal'");
+            dto.setBody_type("Normal");
+        }
+        
+        logger.info("Final body type set: '{}'", dto.getBody_type());
+        logger.info("=== END BODY TYPE PROCESSING ===");
+        
         dto.setOccupation(formData.getOccupation());
         dto.setWork_environment(formData.getWork_environment());
-        
-        // Xử lý dữ liệu sức khỏe - copy trực tiếp
-        dto.setHeart_disease(formData.getHeart_disease());
-        dto.setRespiratory_disease(formData.getRespiratory_disease());
-        dto.setRecent_injury(formData.getRecent_injury());
 
         dto.setCustomerId(formData.getCustomerId());
 
@@ -551,9 +689,6 @@ public class TrackDataAiController {
         if (userDataDTO.getBody_type() != null) userData.put("body_type", userDataDTO.getBody_type());
         if (userDataDTO.getOccupation() != null) userData.put("occupation", userDataDTO.getOccupation());
         if (userDataDTO.getWork_environment() != null) userData.put("work_environment", userDataDTO.getWork_environment());
-        if (userDataDTO.getHeart_disease() != null) userData.put("heart_disease", userDataDTO.getHeart_disease());
-        if (userDataDTO.getRespiratory_disease() != null) userData.put("respiratory_disease", userDataDTO.getRespiratory_disease());
-        if (userDataDTO.getRecent_injury() != null) userData.put("recent_injury", userDataDTO.getRecent_injury());
         
         return userData;
     }
@@ -572,10 +707,7 @@ public class TrackDataAiController {
             "chest_circumference",
             "body_type",
             "occupation",
-            "work_environment",
-            "heart_disease",
-            "respiratory_disease",
-            "recent_injury"
+            "work_environment"
         );
     }
 
@@ -891,35 +1023,46 @@ public class TrackDataAiController {
         String base64Image = Base64.getEncoder().encodeToString(imageBytes);
 
         // Tạo nội dung system message
-        String systemPrompt = "Bạn là một huấn luyện viên thể hình chuyên nghiệp, có khả năng phân tích hình thể khách quan dựa trên hình ảnh và các thông số. " + 
-                "Khi đánh giá ảnh cơ thể, bạn CHỈ tập trung vào hình dạng cơ thể, phân bố cơ-mỡ, và cấu trúc cơ bắp. " + 
-                "Đây là một ứng dụng fitness nên bạn cần đưa ra phân tích chuyên nghiệp, chi tiết và hữu ích. " +
-                "Khi nhìn thấy một bức ảnh, tập trung vào các phần cơ thể hiển thị và bỏ qua các phần khác. " +
-                "TRẢ LỜI HOÀN TOÀN BẰNG TIẾNG VIỆT. " +
-                "QUAN TRỌNG: Luôn xưng hô với người dùng là 'bạn' thay vì 'người này' hoặc các đại từ khác để tạo sự thân thiện. " +
-                "Hãy phân tích thật kỹ tỷ lệ mỡ/cơ trong hình ảnh. Đặc biệt chú ý tới phần bụng, hông, ngực và tay để phân loại chính xác. " +
-                "Hãy thật cẩn thận khi phân loại hình thể, đặc biệt là phân biệt giữa 'Normal' và 'Skinny Fat': " +
-                "- Normal: Cơ thể cân đối, ít mỡ bụng, có đường nét cơ bắp khá rõ ràng. " +
-                "- Skinny Fat: Cân nặng có vẻ bình thường nhưng có mỡ bụng, cơ bắp ít và không rõ nét. ";
+        String systemPrompt = "Bạn là chuyên gia phân tích thể hình với 15 năm kinh nghiệm, chuyên phân loại hình thể dựa trên hình ảnh. " +
+                "Nhiệm vụ của bạn là phân tích MỘT CÁCH CHÍNH XÁC hình thể cơ thể dựa trên tỷ lệ cơ-mỡ và đường nét cơ bắp. " +
+                
+                "📋 5 LOẠI HÌNH THỂ CHÍNH XÁC: " +
+                "1. **THIN**: QUÁ ỐM - Rất gầy, xương nổi rõ, thiếu cân nặng nghiêm trọng " +
+                "2. **SKINNY**: ỐM NHƯNG MỠ BỤNG NHIỀU - Gầy nhưng có mỡ tích tụ ở bụng, cơ bắp yếu " +
+                "3. **NORMAL**: BÌNH THƯỜNG, KHÔNG CÓ CƠ BẮP - Cân nặng ổn, không gầy không mập, cơ bắp không nổi bật " +
+                "4. **OVERWEIGHT**: QUÁ MỠ VÀ MẬP - Thừa cân rõ ràng, nhiều mỡ thừa, bụng to " +
+                "5. **FIT**: CƠ BẮP SĂN CHẮC - Có đường cơ rõ nét, sixpack, cơ bắp phát triển tốt " +
+                
+                "🔍 TIÊU CHÍ PHÂN BIỆT QUAN TRỌNG: " +
+                "- THIN vs SKINNY: Thin = hoàn toàn gầy, Skinny = gầy + mỡ bụng " +
+                "- SKINNY vs NORMAL: Skinny có mỡ bụng, Normal cân đối không mỡ bụng " +
+                "- NORMAL vs FIT: Normal không có cơ bắp nổi, Fit có cơ bắp rõ nét " +
+                "- FIT vs OVERWEIGHT: Fit có cơ bắp, Overweight có mỡ thừa " +
+                
+                "TRẢ LỜI BẰNG TIẾNG VIỆT và PHẢI CHÍNH XÁC 100%.";
 
-        // Tạo nội dung user message
-        String prompt = "Hãy phân tích hình thể cơ thể trong ảnh này (bỏ qua khuôn mặt nếu có). " + 
-                "Thông số cơ thể: Cao " + height + "cm, nặng " + weight + "kg, giới tính: " + gender + ". " +
-                "Dựa vào hình ảnh và chỉ số BMI = " + Math.round((weight / Math.pow(height/100, 2)) * 100) / 100.0 + ", hãy phân tích các yếu tố sau:\n\n" +
-                "1. Phân loại hình thể (chọn MỘT loại phù hợp nhất): Thin (gầy), Skinny Fat (gầy có mỡ), Overweight (thừa cân), Normal (bình thường), hoặc Fit (có cơ bắp).\n\n" +
-                "2. Phân tích chi tiết (ít nhất 150 từ):\n" + 
-                "   - Tỷ lệ cơ-mỡ và phân bố\n" + 
-                "   - Đường nét cơ bắp và sự rõ ràng\n" + 
-                "   - Tỷ lệ cơ thể tổng thể\n" + 
-                "   - 2-3 điểm mạnh rõ ràng nhất\n" + 
-                "   - 2-3 điểm yếu cần cải thiện\n\n" +
-                "3. Đề xuất chi tiết (ít nhất 200 từ):\n" + 
-                "   - Kế hoạch tập luyện tổng thể phù hợp nhất\n" + 
-                "   - Tần suất tập luyện lý tưởng (số buổi/tuần, thời gian/buổi)\n" + 
-                "   - Liệt kê ít nhất 5 bài tập cụ thể (tên bài, nhóm cơ, số hiệp/lần lặp lại)\n" + 
-                "   - Hướng dẫn dinh dưỡng phù hợp (lượng protein, carbs, chất béo)\n" + 
-                "   - Đề xuất về cardio và thời gian nghỉ ngơi/phục hồi\n\n" +
-                "Hãy trả về KẾT QUẢ DẠNG JSON với 3 trường: bodyType, analysis, và recommendations.";
+        // Tạo nội dung user message với prompt chi tiết hơn
+        String prompt = "Hãy phân tích CHÍNH XÁC hình thể trong ảnh này (bỏ qua khuôn mặt). " +
+                "Thông số: Cao " + height + "cm, nặng " + weight + "kg, giới tính: " + gender + ". " +
+                "BMI = " + Math.round((weight / Math.pow(height/100, 2)) * 100) / 100.0 + ". " +
+                
+                "🔍 QUAN SÁT: " +
+                "A) Quá ốm/xương nổi? → THIN " +
+                "B) Ốm + mỡ bụng? → SKINNY " +
+                "C) Cân đối, không cơ bắp? → NORMAL " +
+                "D) Cơ bắp rõ nét/sixpack? → FIT " +
+                "E) Quá mỡ/mập? → OVERWEIGHT " +
+                
+                "⚖️ PHÂN LOẠI CHÍNH XÁC (chọn 1 trong 5): " +
+                "📏 THIN: Nếu QUÁ ỐM, xương nổi " +
+                "⚠️ SKINNY: Nếu ỐM + MỠ BỤNG " +
+                "⚖️ NORMAL: Nếu cân đối, KHÔNG cơ bắp " +
+                "🔴 OVERWEIGHT: Nếu QUÁ MỠ, mập " +
+                "🏋️ FIT: Nếu CƠ BẮP SĂN CHẮC " +
+                
+                "Chọn 1 trong 5: Thin, Skinny, Normal, Overweight, Fit. " +
+                "Mô tả lý do chọn và đề xuất tập luyện. " +
+                "JSON: {\"bodyType\": \"...\", \"analysis\": \"...\", \"recommendations\": \"...\"}";
 
         // Create the messages array with proper structure
         List<Map<String, Object>> messages = new ArrayList<>();
@@ -1088,7 +1231,9 @@ public class TrackDataAiController {
 
     /**
      * Phương pháp thay thế để gọi Claude API khi phương pháp chính gặp hạn chế về chính sách
-     * Sử dụng cách tiếp cận khác với prompt không đề cập đến khuôn mặt
+     * Sử dụng cách tiếp cận khác với prompt cải tiến cho 5 loại hình thể:
+     * THIN (quá ốm), SKINNY (ốm nhưng mỡ bụng), NORMAL (bình thường không cơ bắp), 
+     * OVERWEIGHT (quá mỡ mập), FIT (cơ bắp săn chắc)
      */
     private String callClaudeApiAlternative(MultipartFile image, Double height, Double weight, String gender) throws Exception {
         // Rate limiting check
@@ -1119,22 +1264,51 @@ public class TrackDataAiController {
         requestBody.put("max_tokens", 2000);
 
         // Thêm system message như một tham số cấp cao
-        String systemPrompt = "Bạn là một huấn luyện viên thể hình chuyên nghiệp, có chuyên môn phân tích hình thể và đưa ra lời khuyên tập luyện. " +
-                "Hãy phân tích hình thể một cách khách quan và đưa ra đánh giá chuyên môn, không có ý kiến cá nhân. " +
-                "Trả về kết quả dạng JSON với 3 trường: bodyType, analysis, và recommendations.";
+        String systemPrompt = "Bạn là chuyên gia phân tích thể hình với 15 năm kinh nghiệm, chuyên phân loại hình thể dựa trên hình ảnh. " +
+                "Nhiệm vụ của bạn là phân tích MỘT CÁCH CHÍNH XÁC hình thể cơ thể dựa trên tỷ lệ cơ-mỡ và đường nét cơ bắp. " +
+                
+                "📋 5 LOẠI HÌNH THỂ CHÍNH XÁC: " +
+                "1. **THIN**: QUÁ ỐM - Rất gầy, xương nổi rõ, thiếu cân nặng nghiêm trọng " +
+                "2. **SKINNY**: ỐM NHƯNG MỠ BỤNG NHIỀU - Gầy nhưng có mỡ tích tụ ở bụng, cơ bắp yếu " +
+                "3. **NORMAL**: BÌNH THƯỜNG, KHÔNG CÓ CƠ BẮP - Cân nặng ổn, không gầy không mập, cơ bắp không nổi bật " +
+                "4. **OVERWEIGHT**: QUÁ MỠ VÀ MẬP - Thừa cân rõ ràng, nhiều mỡ thừa, bụng to " +
+                "5. **FIT**: CƠ BẮP SĂN CHẮC - Có đường cơ rõ nét, sixpack, cơ bắp phát triển tốt " +
+                
+                "🔍 TIÊU CHÍ PHÂN BIỆT QUAN TRỌNG: " +
+                "- THIN vs SKINNY: Thin = hoàn toàn gầy, Skinny = gầy + mỡ bụng " +
+                "- SKINNY vs NORMAL: Skinny có mỡ bụng, Normal cân đối không mỡ bụng " +
+                "- NORMAL vs FIT: Normal không có cơ bắp nổi, Fit có cơ bắp rõ nét " +
+                "- FIT vs OVERWEIGHT: Fit có cơ bắp, Overweight có mỡ thừa " +
+                
+                "TRẢ LỜI BẰNG TIẾNG VIỆT và PHẢI CHÍNH XÁC 100%.";
         requestBody.put("system", systemPrompt);
 
         List<Map<String, Object>> messages = new ArrayList<>();
         Map<String, Object> userMessage = new HashMap<>();
         userMessage.put("role", "user");
 
-        // Create user message content
-        String prompt = "Tôi là huấn luyện viên fitness. Hãy giúp tôi phân tích thân hình cơ thể trong ảnh này. " +
-                "Thông số cơ thể: Cao " + height + "cm, nặng " + weight + "kg, giới tính: " + gender + ". " +
-                "Bạn có thể phân tích và phân loại hình thể này không? " +
-                "Hãy phân loại hình thể vào một trong các nhóm: Thin (gầy), Skinny Fat (gầy có mỡ), Overweight (thừa cân), Normal (bình thường), hoặc Fit (có cơ bắp). " +
-                "Cũng hãy đánh giá tỷ lệ cơ/mỡ, điểm mạnh và điểm yếu, và đề xuất các bài tập phù hợp. " +
-                "Cho tôi kết quả dạng JSON có bodyType, analysis, và recommendations. Đừng kèm giải thích, chỉ trả kết quả JSON.";
+        // Create user message content với tiêu chí chính xác
+        String prompt = "Hãy phân tích CHÍNH XÁC hình thể trong ảnh này (bỏ qua khuôn mặt). " +
+                "Thông số: Cao " + height + "cm, nặng " + weight + "kg, giới tính: " + gender + ". " +
+                "BMI = " + Math.round((weight / Math.pow(height/100, 2)) * 100) / 100.0 + ". " +
+                
+                "🔍 QUAN SÁT: " +
+                "A) Quá ốm/xương nổi? → THIN " +
+                "B) Ốm + mỡ bụng? → SKINNY " +
+                "C) Cân đối, không cơ bắp? → NORMAL " +
+                "D) Cơ bắp rõ nét/sixpack? → FIT " +
+                "E) Quá mỡ/mập? → OVERWEIGHT " +
+                
+                "⚖️ PHÂN LOẠI CHÍNH XÁC (chọn 1 trong 5): " +
+                "📏 THIN: Nếu QUÁ ỐM, xương nổi " +
+                "⚠️ SKINNY: Nếu ỐM + MỠ BỤNG " +
+                "⚖️ NORMAL: Nếu cân đối, KHÔNG cơ bắp " +
+                "🔴 OVERWEIGHT: Nếu QUÁ MỠ, mập " +
+                "🏋️ FIT: Nếu CƠ BẮP SĂN CHẮC " +
+                
+                "Chọn 1 trong 5: Thin, Skinny, Normal, Overweight, Fit. " +
+                "Mô tả lý do chọn và đề xuất tập luyện. " +
+                "JSON: {\"bodyType\": \"...\", \"analysis\": \"...\", \"recommendations\": \"...\"}";
 
         List<Map<String, Object>> content = new ArrayList<>();
         Map<String, Object> textContent = new HashMap<>();
@@ -1316,9 +1490,6 @@ public class TrackDataAiController {
             userMetrics.put("training_frequency", userDataAi.getTraining_frequency());
             userMetrics.put("occupation", userDataAi.getOccupation());
             userMetrics.put("work_environment", userDataAi.getWork_environment());
-            userMetrics.put("heart_disease", userDataAi.getHeart_disease());
-            userMetrics.put("respiratory_disease", userDataAi.getRespiratory_disease());
-            userMetrics.put("recent_injury", userDataAi.getRecent_injury());
             
             recommendationDetails.put("userMetrics", userMetrics);
             
@@ -1409,21 +1580,7 @@ public class TrackDataAiController {
         
         // Health conditions
         boolean hasHealthIssues = false;
-        if (userDataAi.getHeart_disease() != null && userDataAi.getHeart_disease()) {
-            hasHealthIssues = true;
-            explanation.append("- Khóa học này an toàn cho người có vấn đề về tim mạch.\n");
-        }
-        
-        if (userDataAi.getRespiratory_disease() != null && userDataAi.getRespiratory_disease()) {
-            hasHealthIssues = true;
-            explanation.append("- Khóa học này phù hợp với người có vấn đề hô hấp.\n");
-        }
-        
-        if (userDataAi.getRecent_injury() != null && userDataAi.getRecent_injury()) {
-            hasHealthIssues = true;
-            explanation.append("- Khóa học này đã tính đến yếu tố chấn thương gần đây của bạn.\n");
-        }
-        
+
         if (!hasHealthIssues) {
             explanation.append("- Bạn không có vấn đề sức khỏe đặc biệt, nên khóa học này phù hợp tối ưu cho bạn.\n");
         }
@@ -1517,6 +1674,22 @@ public class TrackDataAiController {
             response.put("customerId", formData.getCustomerId());
             response.put("userDataId", userDataId);
             
+            // *** XÓA DRAFT DATA SAU KHI HOÀN THÀNH ***
+            try {
+                FormWizardDraftDTO removedDraft = draftStorage.remove(formData.getCustomerId());
+                if (removedDraft != null) {
+                    logger.info("Cleared draft data for customer {} after successful confirmation", 
+                        formData.getCustomerId());
+                    response.put("draftCleared", true);
+                } else {
+                    response.put("draftCleared", false);
+                }
+            } catch (Exception e) {
+                logger.warn("Failed to clear draft data for customer {}: {}", 
+                    formData.getCustomerId(), e.getMessage());
+                response.put("draftCleared", false);
+            }
+            
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             logger.error("Error confirming recommendation: " + e.getMessage(), e);
@@ -1542,9 +1715,6 @@ public class TrackDataAiController {
         if (formDataMap.get("work_environment") != null) dto.setWork_environment((String) formDataMap.get("work_environment"));
         if (formDataMap.get("training_history") != null) dto.setTraining_history((String) formDataMap.get("training_history"));
         if (formDataMap.get("training_frequency") != null) dto.setTraining_frequency((String) formDataMap.get("training_frequency"));
-        if (formDataMap.get("heart_disease") != null) dto.setHeart_disease((Boolean) formDataMap.get("heart_disease"));
-        if (formDataMap.get("respiratory_disease") != null) dto.setRespiratory_disease((Boolean) formDataMap.get("respiratory_disease"));
-        if (formDataMap.get("recent_injury") != null) dto.setRecent_injury((Boolean) formDataMap.get("recent_injury"));
         if (formDataMap.get("customerId") != null) dto.setCustomerId((Integer) formDataMap.get("customerId"));
         
         return dto;
@@ -1632,9 +1802,6 @@ public class TrackDataAiController {
             userMetrics.put("training_frequency", formData.getTraining_frequency());
             userMetrics.put("occupation", formData.getOccupation());
             userMetrics.put("work_environment", formData.getWork_environment());
-            userMetrics.put("heart_disease", formData.getHeart_disease());
-            userMetrics.put("respiratory_disease", formData.getRespiratory_disease());
-            userMetrics.put("recent_injury", formData.getRecent_injury());
             
             recommendationDetails.put("userMetrics", userMetrics);
             
@@ -1952,6 +2119,690 @@ public class TrackDataAiController {
             logger.error("Error getting comparison results: " + e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error getting comparison results: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/generate-recommendation-explanation")
+    public ResponseEntity<?> generateRecommendationExplanation(@RequestBody Map<String, Object> requestData) {
+        try {
+            // Parse dữ liệu từ request
+            Map<String, Object> userMetricsMap = (Map<String, Object>) requestData.get("userMetrics");
+            Map<String, Object> courseData = (Map<String, Object>) requestData.get("courseData");
+            
+            if (userMetricsMap == null || courseData == null) {
+                return ResponseEntity.badRequest().body("Missing userMetrics or courseData");
+            }
+            
+            // Lấy thông tin khóa học chi tiết
+            Integer courseId = (Integer) courseData.get("id");
+            Course course = courseService.findCourseById(courseId);
+            
+            if (course == null) {
+                return ResponseEntity.badRequest().body("Course not found");
+            }
+            
+            // Tạo prompt chi tiết cho Claude
+            String claudePrompt = createDetailedRecommendationPrompt(userMetricsMap, course);
+            
+            // Gọi Claude API
+            String explanation = callClaudeForRecommendationExplanation(claudePrompt);
+            
+            // Trả về kết quả
+            Map<String, Object> response = new HashMap<>();
+            response.put("explanation", explanation);
+            response.put("courseId", courseId);
+            response.put("courseName", course.getCourseName());
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("Error generating recommendation explanation: " + e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error generating explanation: " + e.getMessage());
+        }
+    }
+    
+    private String createDetailedRecommendationPrompt(Map<String, Object> userMetrics, Course course) {
+        StringBuilder prompt = new StringBuilder();
+        prompt.append("Bạn là một huấn luyện viên thể hình chuyên nghiệp. Hãy giải thích tại sao khóa học được đề xuất phù hợp với hồ sơ của người dùng.\n\n");
+        
+        // Thông tin người dùng
+        prompt.append("THÔNG TIN NGƯỜI DÙNG:\n");
+        prompt.append("- Độ tuổi: ").append(userMetrics.get("age")).append("\n");
+        prompt.append("- Giới tính: ").append(userMetrics.get("gender")).append("\n");
+        prompt.append("- Chiều cao: ").append(userMetrics.get("height")).append(" cm\n");
+        prompt.append("- Cân nặng: ").append(userMetrics.get("weight")).append(" kg\n");
+        prompt.append("- BMI: ").append(userMetrics.get("bmi")).append("\n");
+        
+        if (userMetrics.get("waist_circumference") != null) {
+            prompt.append("- Vòng eo: ").append(userMetrics.get("waist_circumference")).append(" cm\n");
+        }
+        if (userMetrics.get("chest_circumference") != null) {
+            prompt.append("- Vòng ngực: ").append(userMetrics.get("chest_circumference")).append(" cm\n");
+        }
+        
+        prompt.append("- Loại hình thể: ").append(userMetrics.get("body_type")).append("\n");
+        prompt.append("- Nghề nghiệp: ").append(userMetrics.get("occupation")).append("\n");
+        prompt.append("- Môi trường làm việc: ").append(userMetrics.get("work_environment")).append("\n");
+        prompt.append("- Lịch sử tập luyện: ").append(userMetrics.get("training_history")).append("\n");
+        prompt.append("- Tần suất mong muốn: ").append(userMetrics.get("training_frequency")).append("\n");
+        prompt.append("- Mục tiêu tập luyện: ").append(userMetrics.get("training_goals")).append("\n");
+        
+
+        
+        // Thông tin khóa học
+        prompt.append("\nKHÓA HỌC ĐƯỢC ĐỀ XUẤT:\n");
+        prompt.append("- Tên khóa học: ").append(course.getCourseName()).append("\n");
+        prompt.append("- Mô tả: ").append(course.getDescription() != null ? course.getDescription() : "Khóa học toàn diện").append("\n");
+        prompt.append("- Thời lượng: ").append(course.getDuration() != null ? course.getDuration() : "Không xác định").append("\n");
+        
+        if (course.getCourseType() != null) {
+            prompt.append("- Loại khóa học: ").append(course.getCourseType().getCourseTypeName()).append("\n");
+        }
+        
+        // Yêu cầu cụ thể
+        prompt.append("\nYÊU CẦU:\n");
+        prompt.append("Hãy viết một giải thích chi tiết (200-300 từ) bằng tiếng Việt về:\n");
+        prompt.append("1. Tại sao khóa học này phù hợp với thông số cơ thể của người dùng\n");
+        prompt.append("2. Khóa học sẽ giúp đạt được mục tiêu như thế nào\n");
+        prompt.append("3. Cách khóa học phù hợp với lịch sử tập luyện và tần suất mong muốn\n");
+        prompt.append("4. Lưu ý đặc biệt về sức khỏe (nếu có)\n");
+        prompt.append("5. Kết quả có thể mong đợi sau khi hoàn thành khóa học\n\n");
+        prompt.append("Hãy viết theo tone chuyên nghiệp nhưng thân thiện, dễ hiểu.");
+        
+        return prompt.toString();
+    }
+    
+    private String callClaudeForRecommendationExplanation(String prompt) {
+        try {
+            // Rate limiting check
+            synchronized (claudeApiLock) {
+                long currentTime = System.currentTimeMillis();
+                long timeSinceLastCall = currentTime - lastCallTimestamp;
+                if (timeSinceLastCall < MIN_CALL_INTERVAL_MS) {
+                    Thread.sleep(MIN_CALL_INTERVAL_MS - timeSinceLastCall);
+                }
+                lastCallTimestamp = System.currentTimeMillis();
+            }
+
+            // Thiết lập header
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("x-api-key", claudeApiKey);
+            headers.set("anthropic-version", claudeApiVersion);
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            // Tạo request body
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("model", claudeModel != null ? claudeModel : "claude-3-haiku-20240307");
+            requestBody.put("max_tokens", 1000);
+            requestBody.put("temperature", 0.7);
+
+            // Tạo messages
+            List<Map<String, Object>> messages = new ArrayList<>();
+            Map<String, Object> userMessage = new HashMap<>();
+            userMessage.put("role", "user");
+            userMessage.put("content", prompt);
+            messages.add(userMessage);
+            requestBody.put("messages", messages);
+
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+            logger.info("Calling Claude API for recommendation explanation");
+
+            ResponseEntity<Map> response = restTemplate.exchange(claudeApiUrl, HttpMethod.POST, entity, Map.class);
+            
+            if (response.getStatusCode().is2xxSuccessful()) {
+                Map responseBody = response.getBody();
+                if (responseBody != null && responseBody.containsKey("content")) {
+                    List<Map<String, Object>> contentList = (List<Map<String, Object>>) responseBody.get("content");
+                    if (!contentList.isEmpty()) {
+                        Map<String, Object> firstContent = contentList.get(0);
+                        if (firstContent.containsKey("text")) {
+                            return (String) firstContent.get("text");
+                        }
+                    }
+                }
+            }
+            
+            // Fallback nếu API call thất bại
+            return "Không thể tạo giải thích chi tiết từ AI. Khóa học được đề xuất dựa trên phân tích thông số cơ thể và mục tiêu tập luyện của bạn.";
+            
+        } catch (Exception e) {
+            logger.error("Error calling Claude for recommendation explanation: " + e.getMessage(), e);
+            return "Không thể tạo giải thích chi tiết từ AI. Khóa học được đề xuất dựa trên phân tích thông số cơ thể và mục tiêu tập luyện của bạn.";
+        }
+    }
+    
+    // ==================== DRAFT DATA MANAGEMENT ENDPOINTS ====================
+    
+    /**
+     * Lưu tạm dữ liệu form wizard để user có thể quay lại chỉnh sửa
+     */
+    @PostMapping("/save-draft")
+    public ResponseEntity<?> saveDraft(@RequestBody FormWizardDraftDTO draftData) {
+        try {
+            if (draftData.getCustomerId() == null) {
+                return ResponseEntity.badRequest().body("Customer ID is required");
+            }
+            
+            // Kiểm tra customer tồn tại
+            Customer customer = customerService.findById(draftData.getCustomerId());
+            if (customer == null) {
+                return ResponseEntity.badRequest().body("Customer not found");
+            }
+            
+            // Set timestamps
+            String currentTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
+            if (draftData.getCreatedAt() == null) {
+                draftData.setCreatedAt(currentTime);
+            }
+            draftData.setUpdatedAt(currentTime);
+            
+            // Lưu vào in-memory storage (có thể thay bằng database sau)
+            draftStorage.put(draftData.getCustomerId(), draftData);
+            
+            logger.info("Saved draft data for customer {} at step {}", 
+                draftData.getCustomerId(), draftData.getCurrentStep());
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "success");
+            response.put("message", "Draft data saved successfully");
+            response.put("customerId", draftData.getCustomerId());
+            response.put("currentStep", draftData.getCurrentStep());
+            response.put("savedAt", currentTime);
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("Error saving draft data: " + e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error saving draft data: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Lấy dữ liệu draft đã lưu của customer
+     */
+    @GetMapping("/get-draft/{customerId}")
+    public ResponseEntity<?> getDraft(@PathVariable Integer customerId) {
+        try {
+            // Kiểm tra customer tồn tại
+            Customer customer = customerService.findById(customerId);
+            if (customer == null) {
+                return ResponseEntity.badRequest().body("Customer not found");
+            }
+            
+            FormWizardDraftDTO draftData = draftStorage.get(customerId);
+            
+            if (draftData == null) {
+                // Không có draft data
+                Map<String, Object> response = new HashMap<>();
+                response.put("status", "no_draft");
+                response.put("message", "No draft data found for this customer");
+                response.put("customerId", customerId);
+                response.put("hasData", false);
+                
+                return ResponseEntity.ok(response);
+            }
+            
+            logger.info("Retrieved draft data for customer {} at step {}", 
+                customerId, draftData.getCurrentStep());
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "found");
+            response.put("message", "Draft data retrieved successfully");
+            response.put("hasData", true);
+            response.put("draftData", draftData);
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("Error retrieving draft data: " + e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error retrieving draft data: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Xóa dữ liệu draft khi user hoàn thành form hoặc muốn bắt đầu lại
+     */
+    @DeleteMapping("/clear-draft/{customerId}")
+    public ResponseEntity<?> clearDraft(@PathVariable Integer customerId) {
+        try {
+            FormWizardDraftDTO removedData = draftStorage.remove(customerId);
+            
+            Map<String, Object> response = new HashMap<>();
+            if (removedData != null) {
+                response.put("status", "success");
+                response.put("message", "Draft data cleared successfully");
+                response.put("customerId", customerId);
+                
+                logger.info("Cleared draft data for customer {}", customerId);
+            } else {
+                response.put("status", "no_data");
+                response.put("message", "No draft data found to clear");
+                response.put("customerId", customerId);
+            }
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("Error clearing draft data: " + e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error clearing draft data: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Cập nhật draft data từng bước
+     */
+    @PutMapping("/update-draft-step")
+    public ResponseEntity<?> updateDraftStep(@RequestBody Map<String, Object> updateData) {
+        try {
+            Integer customerId = (Integer) updateData.get("customerId");
+            Integer step = (Integer) updateData.get("step");
+            Map<String, Object> stepData = (Map<String, Object>) updateData.get("stepData");
+            
+            if (customerId == null || step == null || stepData == null) {
+                return ResponseEntity.badRequest()
+                        .body("customerId, step, and stepData are required");
+            }
+            
+            // Lấy draft data hiện tại hoặc tạo mới
+            FormWizardDraftDTO draftData = draftStorage.getOrDefault(customerId, new FormWizardDraftDTO());
+            if (draftData.getCustomerId() == null) {
+                draftData.setCustomerId(customerId);
+                draftData.setCreatedAt(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
+            }
+            
+            // Cập nhật current step
+            draftData.setCurrentStep(step);
+            draftData.setUpdatedAt(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
+            
+            // Cập nhật data theo từng step
+            updateDraftDataByStep(draftData, step, stepData);
+            
+            // Lưu lại
+            draftStorage.put(customerId, draftData);
+            
+            logger.info("Updated draft data for customer {} at step {}", customerId, step);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "success");
+            response.put("message", "Draft step updated successfully");
+            response.put("customerId", customerId);
+            response.put("step", step);
+            response.put("updatedAt", draftData.getUpdatedAt());
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("Error updating draft step: " + e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error updating draft step: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Helper method để cập nhật draft data theo từng step
+     */
+    private void updateDraftDataByStep(FormWizardDraftDTO draftData, Integer step, Map<String, Object> stepData) {
+        switch (step) {
+            case 1:
+                // Step 1: Thông tin cơ bản
+                if (stepData.get("age") != null) draftData.setAge((Integer) stepData.get("age"));
+                if (stepData.get("gender") != null) draftData.setGender((String) stepData.get("gender"));
+                if (stepData.get("height") != null) draftData.setHeight(((Number) stepData.get("height")).doubleValue());
+                if (stepData.get("weight") != null) draftData.setWeight(((Number) stepData.get("weight")).doubleValue());
+                if (stepData.get("bmi") != null) draftData.setBmi(((Number) stepData.get("bmi")).doubleValue());
+                break;
+                
+            case 2:
+                // Step 2: Đo lường cơ thể
+                if (stepData.get("chest_circumference") != null) {
+                    draftData.setChest_circumference(((Number) stepData.get("chest_circumference")).doubleValue());
+                }
+                if (stepData.get("waist_circumference") != null) {
+                    draftData.setWaist_circumference(((Number) stepData.get("waist_circumference")).doubleValue());
+                }
+                break;
+                
+            case 3:
+                // Step 3: Mục tiêu tập luyện
+                if (stepData.get("training_goals") != null) {
+                    draftData.setTraining_goals((String) stepData.get("training_goals"));
+                }
+                break;
+                
+            case 4:
+                // Step 4: Lịch sử tập luyện
+                if (stepData.get("training_history") != null) {
+                    draftData.setTraining_history((String) stepData.get("training_history"));
+                }
+                if (stepData.get("training_frequency") != null) {
+                    draftData.setTraining_frequency((String) stepData.get("training_frequency"));
+                }
+                break;
+                
+            case 5:
+                // Step 5: Thông tin nghề nghiệp và sức khỏe
+                if (stepData.get("occupation") != null) {
+                    draftData.setOccupation((String) stepData.get("occupation"));
+                }
+                if (stepData.get("work_environment") != null) {
+                    draftData.setWork_environment((String) stepData.get("work_environment"));
+                }
+                break;
+                
+            case 6:
+                // Step 6: Phân tích hình ảnh
+                if (stepData.get("body_type") != null) {
+                    draftData.setBody_type((String) stepData.get("body_type"));
+                }
+                if (stepData.get("imageAnalysis") != null) {
+                    draftData.setImageAnalysis((String) stepData.get("imageAnalysis"));
+                }
+                if (stepData.get("imageRecommendations") != null) {
+                    draftData.setImageRecommendations((String) stepData.get("imageRecommendations"));
+                }
+                if (stepData.get("imageBase64") != null) {
+                    draftData.setImageBase64((String) stepData.get("imageBase64"));
+                }
+                break;
+                
+            case 7:
+                // Step 7: Khóa học được đề xuất
+                if (stepData.get("recommendedCourseId") != null) {
+                    draftData.setRecommendedCourseId((Integer) stepData.get("recommendedCourseId"));
+                }
+                if (stepData.get("recommendedCourseName") != null) {
+                    draftData.setRecommendedCourseName((String) stepData.get("recommendedCourseName"));
+                }
+                break;
+                
+            default:
+                logger.warn("Unknown step: {}", step);
+                break;
+        }
+    }
+    
+    /**
+     * Kiểm tra xem customer có draft data không
+     */
+    @GetMapping("/check-draft-status/{customerId}")
+    public ResponseEntity<?> checkDraftStatus(@PathVariable Integer customerId) {
+        try {
+            FormWizardDraftDTO draftData = draftStorage.get(customerId);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("customerId", customerId);
+            
+            if (draftData == null) {
+                response.put("hasDraft", false);
+                response.put("currentStep", 1);
+                response.put("message", "No draft found, starting fresh");
+            } else {
+                response.put("hasDraft", true);
+                response.put("currentStep", draftData.getCurrentStep() != null ? draftData.getCurrentStep() : 1);
+                response.put("lastUpdated", draftData.getUpdatedAt());
+                response.put("message", "Draft found, can resume from step " + draftData.getCurrentStep());
+                
+                // Thống kê các step đã hoàn thành
+                Map<String, Boolean> completedSteps = new HashMap<>();
+                completedSteps.put("step1", draftData.getAge() != null && draftData.getGender() != null);
+                completedSteps.put("step2", draftData.getChest_circumference() != null || draftData.getWaist_circumference() != null);
+                completedSteps.put("step3", draftData.getTraining_goals() != null);
+                completedSteps.put("step4", draftData.getTraining_history() != null || draftData.getTraining_frequency() != null);
+                completedSteps.put("step5", draftData.getOccupation() != null || draftData.getWork_environment() != null);
+                completedSteps.put("step6", draftData.getBody_type() != null || draftData.getImageAnalysis() != null);
+                completedSteps.put("step7", draftData.getRecommendedCourseId() != null);
+                
+                response.put("completedSteps", completedSteps);
+            }
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("Error checking draft status: " + e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error checking draft status: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Chuyển đổi draft data thành UserFormDataDTO để process
+     */
+    @PostMapping("/convert-draft-to-form/{customerId}")
+    public ResponseEntity<?> convertDraftToForm(@PathVariable Integer customerId) {
+        try {
+            FormWizardDraftDTO draftData = draftStorage.get(customerId);
+            
+            if (draftData == null) {
+                return ResponseEntity.badRequest().body("No draft data found for customer");
+            }
+            
+            // Tạo UserFormDataDTO từ draft data
+            UserFormDataDTO formData = new UserFormDataDTO();
+            
+            // Map all fields
+            formData.setCustomerId(customerId);
+            formData.setAge(draftData.getAge());
+            formData.setGender(draftData.getGender());
+            formData.setHeight(draftData.getHeight());
+            formData.setWeight(draftData.getWeight());
+            formData.setBmi(draftData.getBmi());
+            formData.setChest_circumference(draftData.getChest_circumference());
+            formData.setWaist_circumference(draftData.getWaist_circumference());
+            formData.setTraining_goals(draftData.getTraining_goals());
+            formData.setTraining_history(draftData.getTraining_history());
+            formData.setTraining_frequency(draftData.getTraining_frequency());
+            formData.setOccupation(draftData.getOccupation());
+            formData.setWork_environment(draftData.getWork_environment());
+            formData.setBody_type(draftData.getBody_type());
+            
+            // Process form data như bình thường
+            ResponseEntity<RecommendationDTO> processResult = processFormData(formData);
+            
+            logger.info("Converted draft data to form and processed for customer {}", customerId);
+            
+            // Trả về kết quả process cùng với thông tin draft
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "success");
+            response.put("message", "Draft converted and processed successfully");
+            response.put("processResult", processResult.getBody());
+            response.put("draftData", draftData); // Để frontend có thể hiển thị lại Step 6 analysis nếu cần
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("Error converting draft to form: " + e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error converting draft to form: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * ENDPOINT TỔNG HỢP: Auto-save và load draft data cho frontend
+     * Frontend chỉ cần call endpoint này khi user chuyển step
+     */
+    @PostMapping("/auto-save-and-get-step/{customerId}/{step}")
+    public ResponseEntity<?> autoSaveAndGetStep(@PathVariable Integer customerId, 
+                                                @PathVariable Integer step,
+                                                @RequestBody(required = false) Map<String, Object> currentStepData) {
+        try {
+            // Step 1: Save current step data (nếu có)
+            if (currentStepData != null && !currentStepData.isEmpty()) {
+                FormWizardDraftDTO draftData = draftStorage.getOrDefault(customerId, new FormWizardDraftDTO());
+                if (draftData.getCustomerId() == null) {
+                    draftData.setCustomerId(customerId);
+                    draftData.setCreatedAt(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
+                }
+                
+                // Lưu data của step hiện tại
+                Integer currentStep = (Integer) currentStepData.get("fromStep");
+                if (currentStep != null) {
+                    updateDraftDataByStep(draftData, currentStep, currentStepData);
+                    draftData.setCurrentStep(step); // Update to target step
+                    draftData.setUpdatedAt(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
+                    draftStorage.put(customerId, draftData);
+                    
+                    logger.info("Auto-saved step {} data for customer {}", currentStep, customerId);
+                }
+            }
+            
+            // Step 2: Load draft data cho step đích
+            FormWizardDraftDTO draftData = draftStorage.get(customerId);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("customerId", customerId);
+            response.put("targetStep", step);
+            response.put("status", "success");
+            
+            if (draftData == null) {
+                // Không có draft data
+                response.put("hasData", false);
+                response.put("stepData", new HashMap<>());
+                response.put("message", "No draft data, starting fresh");
+            } else {
+                // Có draft data - trả về data của step đích
+                response.put("hasData", true);
+                response.put("stepData", getStepDataFromDraft(draftData, step));
+                response.put("currentStep", draftData.getCurrentStep());
+                response.put("lastUpdated", draftData.getUpdatedAt());
+                response.put("message", "Draft data loaded successfully");
+                
+                // Thống kê progress
+                Map<String, Boolean> completedSteps = new HashMap<>();
+                completedSteps.put("step1", draftData.getAge() != null && draftData.getGender() != null);
+                completedSteps.put("step2", draftData.getChest_circumference() != null || draftData.getWaist_circumference() != null);
+                completedSteps.put("step3", draftData.getTraining_goals() != null);
+                completedSteps.put("step4", draftData.getTraining_history() != null || draftData.getTraining_frequency() != null);
+                completedSteps.put("step5", draftData.getOccupation() != null || draftData.getWork_environment() != null);
+                completedSteps.put("step6", draftData.getBody_type() != null || draftData.getImageAnalysis() != null);
+                completedSteps.put("step7", draftData.getRecommendedCourseId() != null);
+                
+                response.put("completedSteps", completedSteps);
+            }
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("Error in auto-save-and-get-step: " + e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error in auto-save-and-get-step: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Helper method để lấy data của step cụ thể từ draft
+     */
+    private Map<String, Object> getStepDataFromDraft(FormWizardDraftDTO draftData, Integer step) {
+        Map<String, Object> stepData = new HashMap<>();
+        
+        switch (step) {
+            case 1:
+                // Step 1: Thông tin cơ bản
+                if (draftData.getAge() != null) stepData.put("age", draftData.getAge());
+                if (draftData.getGender() != null) stepData.put("gender", draftData.getGender());
+                if (draftData.getHeight() != null) stepData.put("height", draftData.getHeight());
+                if (draftData.getWeight() != null) stepData.put("weight", draftData.getWeight());
+                if (draftData.getBmi() != null) stepData.put("bmi", draftData.getBmi());
+                break;
+                
+            case 2:
+                // Step 2: Đo lường cơ thể
+                if (draftData.getChest_circumference() != null) {
+                    stepData.put("chest_circumference", draftData.getChest_circumference());
+                }
+                if (draftData.getWaist_circumference() != null) {
+                    stepData.put("waist_circumference", draftData.getWaist_circumference());
+                }
+                break;
+                
+            case 3:
+                // Step 3: Mục tiêu tập luyện
+                if (draftData.getTraining_goals() != null) {
+                    stepData.put("training_goals", draftData.getTraining_goals());
+                }
+                break;
+                
+            case 4:
+                // Step 4: Lịch sử tập luyện
+                if (draftData.getTraining_history() != null) {
+                    stepData.put("training_history", draftData.getTraining_history());
+                }
+                if (draftData.getTraining_frequency() != null) {
+                    stepData.put("training_frequency", draftData.getTraining_frequency());
+                }
+                break;
+                
+            case 5:
+                // Step 5: Thông tin nghề nghiệp và sức khỏe
+                if (draftData.getOccupation() != null) {
+                    stepData.put("occupation", draftData.getOccupation());
+                }
+                if (draftData.getWork_environment() != null) {
+                    stepData.put("work_environment", draftData.getWork_environment());
+                }
+                break;
+                
+            case 6:
+                // Step 6: Phân tích hình ảnh
+                if (draftData.getBody_type() != null) {
+                    stepData.put("body_type", draftData.getBody_type());
+                }
+                if (draftData.getImageAnalysis() != null) {
+                    stepData.put("imageAnalysis", draftData.getImageAnalysis());
+                }
+                if (draftData.getImageRecommendations() != null) {
+                    stepData.put("imageRecommendations", draftData.getImageRecommendations());
+                }
+                if (draftData.getImageBase64() != null) {
+                    stepData.put("imageBase64", draftData.getImageBase64());
+                }
+                break;
+                
+            case 7:
+                // Step 7: Khóa học được đề xuất
+                if (draftData.getRecommendedCourseId() != null) {
+                    stepData.put("recommendedCourseId", draftData.getRecommendedCourseId());
+                }
+                if (draftData.getRecommendedCourseName() != null) {
+                    stepData.put("recommendedCourseName", draftData.getRecommendedCourseName());
+                }
+                break;
+                
+            default:
+                logger.warn("Unknown step: {}", step);
+                break;
+        }
+        
+        return stepData;
+    }
+    
+    /**
+     * ENDPOINT ĐƠN GIẢN: Chỉ load data cho step cụ thể (dùng khi component mount)
+     */
+    @GetMapping("/load-step-data/{customerId}/{step}")
+    public ResponseEntity<?> loadStepData(@PathVariable Integer customerId, @PathVariable Integer step) {
+        try {
+            FormWizardDraftDTO draftData = draftStorage.get(customerId);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("customerId", customerId);
+            response.put("step", step);
+            response.put("status", "success");
+            
+            if (draftData == null) {
+                response.put("hasData", false);
+                response.put("stepData", new HashMap<>());
+                response.put("message", "No saved data for this step");
+            } else {
+                Map<String, Object> stepData = getStepDataFromDraft(draftData, step);
+                response.put("hasData", !stepData.isEmpty());
+                response.put("stepData", stepData);
+                response.put("message", stepData.isEmpty() ? "No data for this step" : "Step data loaded successfully");
+                response.put("lastUpdated", draftData.getUpdatedAt());
+            }
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("Error loading step data: " + e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error loading step data: " + e.getMessage());
         }
     }
 }

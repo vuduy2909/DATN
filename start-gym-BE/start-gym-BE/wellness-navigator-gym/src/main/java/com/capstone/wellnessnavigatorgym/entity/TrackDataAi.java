@@ -75,12 +75,6 @@ public class TrackDataAi {
                 return getEffective();
             case "body_type":
                 return null; // Not stored in TrackDataAi but needed for compatibility
-            case "heart_disease":
-                return false; // Default value as it's not stored directly in this entity
-            case "respiratory_disease":
-                return false; // Default value as it's not stored directly in this entity
-            case "recent_injury":
-                return false; // Default value as it's not stored directly in this entity
             default:
                 System.out.println("Invalid attribute: " + attributeName);
                 return null;
@@ -104,9 +98,6 @@ public class TrackDataAi {
             case "course_id":
             case "effective":
             case "body_type":  // Support for compatibility
-            case "heart_disease":
-            case "respiratory_disease":
-            case "recent_injury":
                 return true;
             default:
                 return false;

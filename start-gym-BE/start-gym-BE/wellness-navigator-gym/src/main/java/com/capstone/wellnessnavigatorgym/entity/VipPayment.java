@@ -1,5 +1,6 @@
 package com.capstone.wellnessnavigatorgym.entity;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -63,17 +64,20 @@ public class VipPayment {
     @Column(name = "payment_method", length = 50)
     private String paymentMethod = "VNPAY";
     
-    @Column(name = "payment_gateway_response", columnDefinition = "JSON")
+    @Column(name = "payment_gateway_response", columnDefinition = "LONGTEXT")
     private String paymentGatewayResponse;
     
     // Timestamps
     @Column(name = "created_date", nullable = false)
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdDate = LocalDateTime.now();
     
     @Column(name = "updated_date")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updatedDate = LocalDateTime.now();
     
     @Column(name = "completed_date")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime completedDate;
     
     public enum PaymentStatus {

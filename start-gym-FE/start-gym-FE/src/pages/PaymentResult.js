@@ -13,7 +13,6 @@ import {
 } from '@mui/material';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheckCircle, faTimesCircle, faSpinner } from '@fortawesome/free-solid-svg-icons';
-import { request } from '../utils/axiosInstance';
 
 const PaymentResult = () => {
     const location = useLocation();
@@ -43,15 +42,58 @@ const PaymentResult = () => {
         try {
             setLoading(true);
             
-            // Call backend to process VNPay return
-            const response = await request.get('/api/v1/payment/vnpay-return', {
-                params: vnpParams
+            console.log('=== PaymentResult Debug ===');
+            console.log('VNPay params:', vnpParams);
+            
+            // Build query string manually
+            const queryString = new URLSearchParams(vnpParams).toString();
+            const url = `http://localhost:8080/api/v1/payment/vnpay-return?${queryString}`;
+            
+            console.log('Calling URL:', url);
+            
+            // Use fetch instead of axios to avoid interceptor issues
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
             });
+            
+            console.log('Response status:', response.status);
+            console.log('Response ok:', response.ok);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            console.log('Backend response data:', data);
+            console.log('Response status field:', data?.status);
+            console.log('Response message field:', data?.message);
 
-            setPaymentResult(response.data);
+            // Handle response correctly
+            if (data) {
+                setPaymentResult(data);
+                
+                // If payment is successful, set flag for Collections page to refresh
+                if (data.status === 'SUCCESS') {
+                    localStorage.setItem('vipPaymentSuccess', 'true');
+                    console.log('Set vipPaymentSuccess flag in localStorage');
+                }
+            } else {
+                throw new Error('No data in response');
+            }
         } catch (error) {
             console.error('Error processing payment result:', error);
-            setError('Lỗi khi xử lý kết quả thanh toán: ' + (error.response?.data?.message || error.message));
+            
+            // Try to extract error message from response
+            let errorMessage = 'Lỗi khi xử lý kết quả thanh toán';
+            if (error.message) {
+                errorMessage += ': ' + error.message;
+            }
+            
+            setError(errorMessage);
         } finally {
             setLoading(false);
         }
@@ -65,6 +107,8 @@ const PaymentResult = () => {
                 return <FontAwesomeIcon icon={faCheckCircle} style={{ fontSize: '64px', color: '#4CAF50' }} />;
             case 'FAILED':
                 return <FontAwesomeIcon icon={faTimesCircle} style={{ fontSize: '64px', color: '#F44336' }} />;
+            case 'ERROR':
+                return <FontAwesomeIcon icon={faTimesCircle} style={{ fontSize: '64px', color: '#FF5722' }} />;
             default:
                 return <FontAwesomeIcon icon={faSpinner} style={{ fontSize: '64px', color: '#FF9800' }} />;
         }
@@ -78,6 +122,8 @@ const PaymentResult = () => {
                 return 'success';
             case 'FAILED':
                 return 'error';
+            case 'ERROR':
+                return 'error';
             default:
                 return 'warning';
         }
@@ -85,9 +131,9 @@ const PaymentResult = () => {
 
     const handleBackToCourses = () => {
         if (paymentResult?.status === 'SUCCESS') {
-            navigate('/user'); // Go to user dashboard to see enrolled courses
+            navigate('/collections'); // Go to collections page to see enrolled courses
         } else {
-            navigate('/vip-courses'); // Go back to VIP courses page
+            navigate('/collections'); // Go back to collections page
         }
     };
 
@@ -125,6 +171,7 @@ const PaymentResult = () => {
                         <Typography variant="h4" component="h1" gutterBottom sx={{ mt: 2 }}>
                             {paymentResult?.status === 'SUCCESS' ? 'Thanh toán thành công!' : 
                              paymentResult?.status === 'FAILED' ? 'Thanh toán thất bại!' : 
+                             paymentResult?.status === 'ERROR' ? 'Lỗi xử lý thanh toán!' :
                              'Trạng thái thanh toán không xác định'}
                         </Typography>
                     </Box>
@@ -164,7 +211,7 @@ const PaymentResult = () => {
                                             Mã giao dịch:
                                         </Typography>
                                         <Typography variant="body2" fontWeight="bold">
-                                            {paymentResult.transactionRef}
+                                            {paymentResult.transactionRef || 'N/A'}
                                         </Typography>
                                     </div>
                                     
@@ -173,7 +220,7 @@ const PaymentResult = () => {
                                             Mã phản hồi:
                                         </Typography>
                                         <Typography variant="body2" fontWeight="bold">
-                                            {paymentResult.responseCode}
+                                            {paymentResult.responseCode || 'N/A'}
                                         </Typography>
                                     </div>
                                     
@@ -186,9 +233,29 @@ const PaymentResult = () => {
                                             fontWeight="bold"
                                             color={paymentResult.status === 'SUCCESS' ? 'success.main' : 'error.main'}
                                         >
-                                            {paymentResult.status === 'SUCCESS' ? 'Thành công' : 'Thất bại'}
+                                            {paymentResult.status === 'SUCCESS' ? 'Thành công' : 
+                                             paymentResult.status === 'FAILED' ? 'Thất bại' :
+                                             paymentResult.status === 'ERROR' ? 'Lỗi' : 'Không xác định'}
                                         </Typography>
                                     </div>
+                                    
+                                    {/* Hiển thị thông tin enrollment nếu có */}
+                                    {paymentResult.courseEnrollment && (
+                                        <div style={{ borderBottom: 'none' }}>
+                                            <Typography variant="body2" color="text.secondary">
+                                                Đăng ký khóa học:
+                                            </Typography>
+                                            <Typography 
+                                                variant="body2" 
+                                                fontWeight="bold"
+                                                color={paymentResult.courseEnrollment === 'SUCCESS' ? 'success.main' : 'warning.main'}
+                                            >
+                                                {paymentResult.courseEnrollment === 'SUCCESS' ? 'Thành công' :
+                                                 paymentResult.courseEnrollment === 'ALREADY_ENROLLED' ? 'Đã đăng ký' :
+                                                 paymentResult.courseEnrollment === 'FAILED' ? 'Thất bại' : 'Không tìm thấy'}
+                                            </Typography>
+                                        </div>
+                                    )}
                                 </Box>
                             </Box>
 
@@ -196,7 +263,17 @@ const PaymentResult = () => {
                                 <Alert severity="success" sx={{ mb: 3 }}>
                                     <Typography variant="body2">
                                         🎉 Chúc mừng! Bạn đã thành công đăng ký khóa học VIP. 
-                                        Khóa học sẽ được thêm vào tài khoản của bạn trong vài phút.
+                                        {paymentResult.courseEnrollment === 'SUCCESS' 
+                                            ? ' Khóa học đã được thêm vào tài khoản của bạn.'
+                                            : ' Khóa học sẽ được thêm vào tài khoản của bạn trong vài phút.'}
+                                    </Typography>
+                                </Alert>
+                            )}
+                            
+                            {paymentResult.courseEnrollmentError && (
+                                <Alert severity="warning" sx={{ mb: 3 }}>
+                                    <Typography variant="body2">
+                                        Thanh toán thành công nhưng có lỗi khi thêm khóa học: {paymentResult.courseEnrollmentError}
                                     </Typography>
                                 </Alert>
                             )}

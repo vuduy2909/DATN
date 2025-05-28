@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Snackbar, Alert } from '@mui/material';
 import { collectionService } from '../../service/collectionService';
 import Step1 from '../Steps/Step1';
 import Step2 from '../Steps/Step2';
@@ -19,7 +20,29 @@ const Question = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
-    const navigate = useNavigate()
+    // Snackbar state for notifications
+    const [snackbar, setSnackbar] = useState({
+        open: false,
+        message: '',
+        severity: 'info' // 'error', 'warning', 'info', 'success'
+    });
+
+    const navigate = useNavigate();
+
+    const showSnackbar = (message, severity = 'info') => {
+        setSnackbar({
+            open: true,
+            message,
+            severity
+        });
+    };
+
+    const handleSnackbarClose = (event, reason) => {
+        if (reason === 'clickaway') {
+            return;
+        }
+        setSnackbar({ ...snackbar, open: false });
+    };
 
     useEffect(() => {
         const fetchUserData = async () => {
@@ -44,9 +67,6 @@ const Question = () => {
         training_history: '',
         occupation: '',
         work_environment: '',
-        heart_condition: '',
-        respiratory_condition: '',
-        injury: '',
         customerId: undefined
     });
 
@@ -145,7 +165,7 @@ const Question = () => {
         
         if (missingFields.length > 0) {
             console.error("Missing required fields:", missingFields);
-            alert(`Vui lòng điền đầy đủ thông tin: ${missingFields.join(', ')}`);
+            showSnackbar(`Vui lòng điền đầy đủ thông tin: ${missingFields.join(', ')}`, 'warning');
             return;
         }
         
@@ -226,6 +246,23 @@ const Question = () => {
     return (
         <div>
             {renderStep()}
+            
+            {/* Snackbar for notifications */}
+            <Snackbar 
+                open={snackbar.open} 
+                autoHideDuration={4000} 
+                onClose={handleSnackbarClose}
+                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            >
+                <Alert 
+                    onClose={handleSnackbarClose} 
+                    severity={snackbar.severity} 
+                    sx={{ width: '100%' }}
+                    variant="filled"
+                >
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </div>
     );
 };

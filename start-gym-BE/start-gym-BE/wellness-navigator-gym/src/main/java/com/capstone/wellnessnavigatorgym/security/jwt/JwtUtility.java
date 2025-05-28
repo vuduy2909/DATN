@@ -32,7 +32,9 @@ public class JwtUtility implements Serializable {
 
     public boolean validateJwtToken(String authToken) {
         try {
+            logger.debug("Validating JWT token...");
             Jwts.parser().setSigningKey(jwtSecret).parseClaimsJws(authToken);
+            logger.debug("JWT token validation successful");
             return true;
         } catch (SignatureException e) {
             logger.error("Invalid JWT signature: {}", e.getMessage());
@@ -40,6 +42,7 @@ public class JwtUtility implements Serializable {
             logger.error("Invalid JWT token: {}", e.getMessage());
         } catch (ExpiredJwtException e) {
             logger.error("JWT token is expired: {}", e.getMessage());
+            logger.error("Expired token details: {}", e.getClaims());
         } catch (UnsupportedJwtException e) {
             logger.error("JWT token is unsupported: {}", e.getMessage());
         } catch (IllegalArgumentException e) {

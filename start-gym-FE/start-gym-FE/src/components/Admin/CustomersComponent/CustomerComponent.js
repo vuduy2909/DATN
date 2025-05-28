@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, IconButton, Avatar } from '@mui/material';
+import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, IconButton, Avatar, Snackbar, Alert } from '@mui/material';
 import { Delete as DeleteIcon, Edit as EditIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../AuthContext';
@@ -13,6 +13,28 @@ const CustomerComponent = () => {
   const { user } = useAuth();
   const [userData, setUserData] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Snackbar state for notifications
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'info'
+  });
+
+  const showSnackbar = (message, severity = 'info') => {
+    setSnackbar({
+      open: true,
+      message,
+      severity
+    });
+  };
+
+  const handleSnackbarClose = (event, reason) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+    setSnackbar({ ...snackbar, open: false });
+  };
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -69,9 +91,10 @@ const CustomerComponent = () => {
       } else {
         setUserData([]);
       }
+      showSnackbar('Customer deleted successfully! 🗑️', 'success');
     } catch (error) {
       console.error('Error deleting user:', error);
-      alert('Failed to delete user');
+      showSnackbar('Failed to delete customer', 'error');
     }
   };
 
@@ -131,6 +154,23 @@ const CustomerComponent = () => {
           ))}
         </TableBody>
       </Table>
+
+      {/* Snackbar for notifications */}
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={4000} 
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={handleSnackbarClose} 
+          severity={snackbar.severity} 
+          sx={{ width: '100%' }}
+          variant="filled"
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </TableContainer>
   );
 };

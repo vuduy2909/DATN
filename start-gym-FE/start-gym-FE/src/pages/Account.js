@@ -12,12 +12,13 @@ import {
     TextField, 
     Avatar,
     Box,
-    Alert,
     CircularProgress,
     MenuItem,
     Select,
     FormControl,
-    InputLabel
+    InputLabel,
+    Snackbar,
+    Alert
 } from '@mui/material';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCamera, faKey, faUser } from '@fortawesome/free-solid-svg-icons';
@@ -28,7 +29,28 @@ const Account = () => {
     const { user } = useAuth();
     const [userData, setUserData] = useState({});
     const [loading, setLoading] = useState(false);
-    const [message, setMessage] = useState({ type: '', text: '' });
+    
+    // Snackbar state for notifications
+    const [snackbar, setSnackbar] = useState({
+        open: false,
+        message: '',
+        severity: 'info'
+    });
+
+    const showSnackbar = (message, severity = 'info') => {
+        setSnackbar({
+            open: true,
+            message,
+            severity
+        });
+    };
+
+    const handleSnackbarClose = (event, reason) => {
+        if (reason === 'clickaway') {
+            return;
+        }
+        setSnackbar({ ...snackbar, open: false });
+    };
     
     // Password states
     const [passwordData, setPasswordData] = useState({
@@ -59,11 +81,11 @@ const Account = () => {
                 
                 // Set profile data for editing
                 setProfileData({
-                    customerEmail: res.customerEmail || '',
+                    customerEmail: res.accountEmail || '',
                     customerPhone: res.customerPhone || '',
                     customerAddress: res.customerAddress || '',
-                    customerGender: res.customerGender || '',
-                    customerDateOfBirth: res.customerDateOfBirth || ''
+                    customerGender: res.customerGender === true ? 'Male' : res.customerGender === false ? 'Female' : res.customerGender || '',
+                    customerDateOfBirth: res.dateOfBirth ? res.dateOfBirth.split(' ')[0] : ''
                 });
             } catch (error) {
                 console.log("Error fetching user information", error);
@@ -78,7 +100,6 @@ const Account = () => {
     // Handle profile data change
     const handleProfileChange = (field, value) => {
         setProfileData(prev => ({ ...prev, [field]: value }));
-        setMessage({ type: '', text: '' });
     };
 
     // Handle profile update
@@ -88,13 +109,13 @@ const Account = () => {
         // Validate email
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(profileData.customerEmail)) {
-            setMessage({ type: 'error', text: 'Please enter a valid email address' });
+            showSnackbar('Please enter a valid email address', 'error');
             return;
         }
         
         // Validate phone
         if (!/^\d{10,11}$/.test(profileData.customerPhone)) {
-            setMessage({ type: 'error', text: 'Phone number must be 10-11 digits' });
+            showSnackbar('Phone number must be 10-11 digits', 'error');
             return;
         }
         
@@ -110,7 +131,7 @@ const Account = () => {
             }
             
             if (age < 16) {
-                setMessage({ type: 'error', text: 'You must be at least 16 years old' });
+                showSnackbar('You must be at least 16 years old', 'error');
                 return;
             }
         }
@@ -119,10 +140,10 @@ const Account = () => {
         try {
             await request.put('/customer/update-profile', profileData);
             
-            setMessage({ type: 'success', text: 'Profile updated successfully!' });
+            showSnackbar('Profile updated successfully! 🎉', 'success');
             setUserData(prev => ({ ...prev, ...profileData }));
         } catch (error) {
-            setMessage({ type: 'error', text: 'Failed to update profile. Please try again.' });
+            showSnackbar('Failed to update profile. Please try again.', 'error');
             console.log("Error updating profile", error);
         } finally {
             setLoading(false);
@@ -134,24 +155,23 @@ const Account = () => {
         const file = event.target.files[0];
         if (file) {
             if (file.size > 5 * 1024 * 1024) { // 5MB limit
-                setMessage({ type: 'error', text: 'File size must be less than 5MB' });
+                showSnackbar('File size must be less than 5MB', 'error');
                 return;
             }
             
             if (!file.type.startsWith('image/')) {
-                setMessage({ type: 'error', text: 'Please select an image file' });
+                showSnackbar('Please select an image file', 'error');
                 return;
             }
             
             setSelectedFile(file);
             setPreviewUrl(URL.createObjectURL(file));
-            setMessage({ type: '', text: '' });
         }
     };
 
     const handleAvatarUpload = async () => {
         if (!selectedFile) {
-            setMessage({ type: 'error', text: 'Please select an image first' });
+            showSnackbar('Please select an image first', 'error');
             return;
         }
 
@@ -166,11 +186,11 @@ const Account = () => {
                 },
             });
             
-            setMessage({ type: 'success', text: 'Avatar updated successfully!' });
+            showSnackbar('Avatar updated successfully! 🎉', 'success');
             setUserData(prev => ({ ...prev, customerImg: response.data.avatarUrl }));
             setSelectedFile(null);
         } catch (error) {
-            setMessage({ type: 'error', text: 'Failed to upload avatar. Please try again.' });
+            showSnackbar('Failed to upload avatar. Please try again.', 'error');
             console.log("Error uploading avatar", error);
         } finally {
             setLoading(false);
@@ -180,19 +200,18 @@ const Account = () => {
     // Handle password change
     const handlePasswordChange = (field, value) => {
         setPasswordData(prev => ({ ...prev, [field]: value }));
-        setMessage({ type: '', text: '' });
     };
 
     const handlePasswordSubmit = async (e) => {
         e.preventDefault();
         
         if (passwordData.newPassword !== passwordData.confirmPassword) {
-            setMessage({ type: 'error', text: 'New passwords do not match' });
+            showSnackbar('New passwords do not match', 'error');
             return;
         }
         
         if (passwordData.newPassword.length < 6) {
-            setMessage({ type: 'error', text: 'New password must be at least 6 characters' });
+            showSnackbar('New password must be at least 6 characters', 'error');
             return;
         }
 
@@ -203,10 +222,10 @@ const Account = () => {
                 newPassword: passwordData.newPassword
             });
             
-            setMessage({ type: 'success', text: 'Password changed successfully!' });
+            showSnackbar('Password changed successfully! 🎉', 'success');
             setPasswordData({ oldPassword: '', newPassword: '', confirmPassword: '' });
         } catch (error) {
-            setMessage({ type: 'error', text: 'Failed to change password. Please check your current password.' });
+            showSnackbar('Failed to change password. Please check your current password.', 'error');
             console.log("Error changing password", error);
         } finally {
             setLoading(false);
@@ -221,12 +240,6 @@ const Account = () => {
                     <Typography variant="h4" component="h1" gutterBottom style={{ textAlign: 'center', marginBottom: '30px' }}>
                         Account Settings
                     </Typography>
-                    
-                    {message.text && (
-                        <Alert severity={message.type} style={{ marginBottom: '20px' }}>
-                            {message.text}
-                        </Alert>
-                    )}
                     
                     <Grid container spacing={3}>
                         {/* Avatar Section */}
@@ -413,6 +426,23 @@ const Account = () => {
                             </Card>
                         </Grid>
                     </Grid>
+
+                    {/* Snackbar for notifications */}
+                    <Snackbar 
+                        open={snackbar.open} 
+                        autoHideDuration={4000} 
+                        onClose={handleSnackbarClose}
+                        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+                    >
+                        <Alert 
+                            onClose={handleSnackbarClose} 
+                            severity={snackbar.severity} 
+                            sx={{ width: '100%' }}
+                            variant="filled"
+                        >
+                            {snackbar.message}
+                        </Alert>
+                    </Snackbar>
                 </Container>
             </div>
             <Footer />

@@ -7,23 +7,35 @@ import BodyImageAnalyzer from '../BodyImageAnalyzer';
 import UserFormService from '../../services/UserFormService';
 
 const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
-    const [bodyImage, setBodyImage] = useState(null);
     const [submitting, setSubmitting] = useState(false);
     
     // Xử lý khi phân tích ảnh hoàn tất hoặc khi các trường đo lường được cập nhật
     const handleAnalysisComplete = (bodyType, measurementChange = null) => {
-        // Update body type
-        handleChange({
-            target: {
-                name: 'bodyType',
-                value: bodyType,
-            },
-        });
+        console.log('=== STEP6: BODY TYPE UPDATE ===');
+        console.log('Body type received from Claude API:', bodyType);
+        console.log('Current formData.bodyType:', formData.bodyType);
+        
+        // Update body type - ưu tiên kết quả từ Claude API
+        if (bodyType && bodyType !== 'Unknown') {
+            console.log('✅ Updating body type from Claude API:', bodyType);
+            handleChange({
+                target: {
+                    name: 'bodyType',
+                    value: bodyType,
+                },
+            });
+            console.log('Body type updated to:', bodyType);
+        } else {
+            console.log('❌ No valid body type from Claude API, keeping existing value:', formData.bodyType);
+        }
         
         // If we have measurement changes, update those too
         if (measurementChange) {
+            console.log('📏 Updating measurements:', measurementChange);
             handleChange(measurementChange);
         }
+        
+        console.log('=== END STEP6: BODY TYPE UPDATE ===');
     };
 
     const handleSubmit = async () => {
@@ -33,16 +45,6 @@ const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
         setSubmitting(true);
         console.log('Step6: handleSubmit called');
         
-        // If bodyImage exists, include it
-        if (bodyImage) {
-            handleChange({
-                target: {
-                    name: 'bodyImage',
-                    value: bodyImage,
-                },
-            });
-        }
-        
         console.log('Submitting form with body analysis data:', {
             bodyType: formData.bodyType,
             waist_circumference: formData.waistSize,
@@ -50,15 +52,6 @@ const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
         });
         
         try {
-            // Helper to map training frequencies to exact enum values required by database
-            const EXACT_ENUM_VALUES = {
-                TRAINING_FREQUENCY: ['Never', 'Occasionally', 'Moderate', 'Regularly', 'Advanced'],
-                OCCUPATION: ['Student', 'Office worker', 'Delivery staff', 'Lecturer', 'Service staff', 'Other'],
-                WORK_ENVIRONMENT: ['Office', 'Shift work', 'Standing-intensive', 'Walking-intensive', 'Driving-intensive', 'Manual labor'],
-                TRAINING_GOALS: ['1, Strength Training', '2, Cardiovascular Training', '3, Flexibility and Balance',
-                    '4, Train strength and endurance', '5, Mind-Body Wellness', '6, Functional Training', '7, Weight Loss']
-            };
-            
             // Simplified and more reliable mapping function
             const mapTrainingFrequency = (value) => {
                 if (!value) return 'Moderate'; // Default to exact enum value
@@ -136,6 +129,7 @@ const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
                 height: formData.height,
                 weight: formData.weight,
                 bmi: Math.round((formData.weight / Math.pow(formData.height/100, 2)) * 100) / 100, // Tính BMI và làm tròn 2 chữ số thập phân
+                body_type: formData.bodyType || 'Normal',
                 training_goals: (trainingGoalMap[formData.trainingGoal] || '7, Weight Loss').trim(),
                 occupation: (occupationMap[formData.occupation] || 'Student').trim(),
                 work_environment: (workEnvironmentMap[formData.workEnvironment] || 'Office').trim(),
@@ -144,6 +138,9 @@ const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
                 customerId: formData.customerId
             };
             
+            console.log('=== STEP6: API DATA PREPARATION ===');
+            console.log('FormData.bodyType from form:', formData.bodyType);
+            console.log('Body type in API data:', apiFormData.body_type);
             console.log('Calling API directly from Step6 with data:', apiFormData);
             console.log('Original training history:', formData.trainingFrequency);
             console.log('Mapped training history:', apiFormData.training_history);

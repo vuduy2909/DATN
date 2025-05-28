@@ -16,6 +16,7 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -87,6 +88,8 @@ public class SecurityController {
         );
     }
 
+
+
     @PostMapping("/oauth/google")
     @Transactional
     public ResponseEntity<?> loginGoogle(@RequestBody SocialResponse jwtResponseSocial) {
@@ -133,7 +136,9 @@ public class SecurityController {
                 
                 customerService.save(newCustomer);
             }
-            String jwt = jwtTokenProvider.generateToken(payload.getEmail());
+            // Create authentication for JWT generation
+            Authentication auth = new UsernamePasswordAuthenticationToken(payload.getEmail(), null, Collections.emptyList());
+            String jwt = jwtUtility.generateJwtToken(auth);
             return ResponseEntity.ok(new JwtResponse(jwt, payload.getEmail()));
         } catch (Exception e) {
             e.printStackTrace();
@@ -172,7 +177,7 @@ public class SecurityController {
                 return new ResponseEntity<>(new MessageResponse("The email already exists! Please try again!"), HttpStatus.BAD_REQUEST);
             }
 
-            // Create Account
+            // Create and save Account first
             Account account = new Account();
             account.setUserName(signupRequest.getUsername());
             account.setEncryptPassword(passwordEncoder.encode(signupRequest.getPassword()));
@@ -185,10 +190,10 @@ public class SecurityController {
             roles.add(role);
             account.setRoles(roles);
             
-            // Save account first
-            account = accountService.save(account);
+            // Save account first and get the saved instance
+            Account savedAccount = accountService.save(account);
             
-            if (account == null || account.getAccountId() == null) {
+            if (savedAccount == null || savedAccount.getAccountId() == null) {
                 throw new RuntimeException("Failed to create account");
             }
 
@@ -207,7 +212,7 @@ public class SecurityController {
             
             System.out.println("Generated customer code: " + customerCode); // Debug log
 
-            // Create Customer record automatically
+            // Create Customer record with the saved account
             Customer customer = new Customer();
             customer.setCustomerCode(customerCode);
             customer.setCustomerName(signupRequest.getName());
@@ -217,13 +222,14 @@ public class SecurityController {
             customer.setDateOfBirth(signupRequest.getDateOfBirth());
             customer.setCustomerAddress(signupRequest.getAddress());
             customer.setIsEnable(true);
-            customer.setAccount(account);
+            customer.setAccount(savedAccount); // Use the saved account instance
             customer.setCustomerType(defaultType);
             
             // Save customer
             customerService.save(customer);
             
             System.out.println("Customer saved successfully with ID: " + customer.getCustomerId()); // Debug log
+            System.out.println("Account ID linked: " + savedAccount.getAccountId()); // Debug log
 
             return new ResponseEntity<>(new MessageResponse("Account registration successful!"), HttpStatus.OK);
             

@@ -21,4 +21,7 @@ public interface ICustomerCourseService {
     boolean isCustomerEnrolledInCourse(Integer customerId, Integer courseId);
     
     void addCourseForCustomer(Integer courseId, Integer customerId);
+    
+    // Method to delete course from customer
+    void deleteCourseFromCustomer(Integer courseId, Integer customerId);
 }

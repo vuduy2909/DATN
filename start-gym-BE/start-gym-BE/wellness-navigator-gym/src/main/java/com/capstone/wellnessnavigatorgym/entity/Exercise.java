@@ -1,5 +1,6 @@
 package com.capstone.wellnessnavigatorgym.entity;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
@@ -27,6 +28,7 @@ public class Exercise {
     private String instructions;
     private Boolean isEnable;
     private Double duration;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime uploadDate;
     private Integer views;
 

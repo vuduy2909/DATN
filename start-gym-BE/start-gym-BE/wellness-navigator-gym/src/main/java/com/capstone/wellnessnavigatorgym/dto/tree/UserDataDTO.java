@@ -26,9 +26,6 @@ public class UserDataDTO {
     private String training_goals;
     private String training_history;
     private String training_frequency;
-    private Boolean heart_disease;
-    private Boolean respiratory_disease;
-    private Boolean recent_injury;
     private String occupation; // Nghề nghiệp
     private String work_environment; // Môi trường làm việc
     private Integer customerId;
@@ -51,9 +48,6 @@ public class UserDataDTO {
                 ", training_goals='" + training_goals + '\'' +
                 ", training_history='" + training_history + '\'' +
                 ", training_frequency='" + training_frequency + '\'' +
-                ", heart_disease=" + heart_disease +
-                ", respiratory_disease=" + respiratory_disease +
-                ", recent_injury=" + recent_injury +
                 ", occupation='" + occupation + '\'' +
                 ", work_environment='" + work_environment + '\'' +
                 ", customerId=" + customerId +

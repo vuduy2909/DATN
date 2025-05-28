@@ -30,14 +30,9 @@ public class UserFormDataDTO {
     // Step 4: Tần suất tập luyện mong muốn
     private String training_frequency; // "2 buổi/tuần", "3 buổi/tuần", "4 buổi/tuần", "5 buổi/tuần"
     
-    // Step 5: Thông tin nghề nghiệp và sức khỏe
+    // Step 5: Thông tin nghề nghiệp
     private String occupation;      // "Sinh viên", "Nhân viên văn phòng", ...
     private String work_environment; // "Văn phòng", "Đứng nhiều", ...
-    
-    // Các trường sức khỏe - dùng tên trường giống cơ sở dữ liệu
-    private Boolean heart_disease;      // Mắc bệnh tim
-    private Boolean respiratory_disease; // Mắc bệnh hô hấp
-    private Boolean recent_injury;      // Có chấn thương gần đây
     
     // Step 6: Số đo cơ thể
     private Double chest_circumference;  // Vòng ngực (cm)
@@ -62,9 +57,6 @@ public class UserFormDataDTO {
                 ", training_frequency='" + training_frequency + '\'' +
                 ", occupation='" + occupation + '\'' +
                 ", work_environment='" + work_environment + '\'' +
-                ", heart_disease=" + heart_disease +
-                ", respiratory_disease=" + respiratory_disease +
-                ", recent_injury=" + recent_injury +
                 ", chest_circumference=" + chest_circumference +
                 ", waist_circumference=" + waist_circumference +
                 ", customerId=" + customerId +

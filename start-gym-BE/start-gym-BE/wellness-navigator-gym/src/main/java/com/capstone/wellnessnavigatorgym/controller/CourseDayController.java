@@ -1,6 +1,7 @@
 package com.capstone.wellnessnavigatorgym.controller;
 
 import com.capstone.wellnessnavigatorgym.dto.course.CourseDayDetailDto;
+import com.capstone.wellnessnavigatorgym.dto.course.CourseWithCompletionDto;
 import com.capstone.wellnessnavigatorgym.entity.CourseDays;
 import com.capstone.wellnessnavigatorgym.service.ICourseDayService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,6 +48,14 @@ public class CourseDayController {
         }
 
         return new ResponseEntity<>(courseWithDays, HttpStatus.OK);
+    }
+
+    @GetMapping("/courses/{courseId}/with-completion")
+    public ResponseEntity<CourseWithCompletionDto> getCourseWithDaysAndCompletion(
+            @PathVariable Integer courseId,
+            @RequestParam(required = false) Integer customerId) {
+        CourseWithCompletionDto courseWithCompletion = courseDayService.findCourseByIdWithCompletion(courseId, customerId);
+        return new ResponseEntity<>(courseWithCompletion, HttpStatus.OK);
     }
 
     @GetMapping("/{courseId}/days/{dayId}")

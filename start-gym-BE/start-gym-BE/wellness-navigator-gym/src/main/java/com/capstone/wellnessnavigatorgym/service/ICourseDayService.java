@@ -1,6 +1,7 @@
 package com.capstone.wellnessnavigatorgym.service;
 
 import com.capstone.wellnessnavigatorgym.dto.course.CourseDayDetailDto;
+import com.capstone.wellnessnavigatorgym.dto.course.CourseWithCompletionDto;
 import com.capstone.wellnessnavigatorgym.dto.day.DayDetailDto;
 import com.capstone.wellnessnavigatorgym.entity.CourseDays;
 
@@ -13,6 +14,8 @@ public interface ICourseDayService {
     List<CourseDayDetailDto> findAllCoursesWithDays();
 
     CourseDayDetailDto findCourseById(Integer courseId);
+
+    CourseWithCompletionDto findCourseByIdWithCompletion(Integer courseId, Integer customerId);
 
     DayDetailDto getDayDetails(Integer courseId, Integer dayId);
 

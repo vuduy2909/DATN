@@ -3,12 +3,15 @@ package com.capstone.wellnessnavigatorgym.service.impl;
 import com.capstone.wellnessnavigatorgym.dto.course.CourseDayDetailDto;
 import com.capstone.wellnessnavigatorgym.dto.course.CourseDetailsOfExerciseDto;
 import com.capstone.wellnessnavigatorgym.dto.course.CourseTypeDto;
+import com.capstone.wellnessnavigatorgym.dto.course.CourseWithCompletionDto;
+import com.capstone.wellnessnavigatorgym.dto.day.DayCompletionDto;
 import com.capstone.wellnessnavigatorgym.dto.day.DayDto;
 import com.capstone.wellnessnavigatorgym.dto.day.DayDetailDto;
 import com.capstone.wellnessnavigatorgym.dto.exercise.ExerciseDto;
 import com.capstone.wellnessnavigatorgym.entity.*;
 import com.capstone.wellnessnavigatorgym.repository.ICourseDayRepository;
 import com.capstone.wellnessnavigatorgym.repository.ICourseRepository;
+import com.capstone.wellnessnavigatorgym.repository.ICustomerDayCompletionRepository;
 import com.capstone.wellnessnavigatorgym.service.ICourseDayService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,6 +37,9 @@ public class CourseDayServiceImpl implements ICourseDayService {
 
     @Autowired
     private ICourseRepository courseRepository;
+
+    @Autowired
+    private ICustomerDayCompletionRepository customerDayCompletionRepository;
 
     @Override
     public List<CourseDays> findAll() {
@@ -123,6 +129,90 @@ public class CourseDayServiceImpl implements ICourseDayService {
         );
         
         return convertCourseToDTO(course, courseDays);
+    }
+
+    @Override
+    public CourseWithCompletionDto findCourseByIdWithCompletion(Integer courseId, Integer customerId) {
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found"));
+        
+        List<CourseDays> courseDays = courseDayRepository.findByCourseIdOrderByDayId(courseId);
+        if (courseDays.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No days found for this course");
+        }
+        
+        // Lấy completion records của customer cho course này
+        final List<CustomerDayCompletion> completions;
+        if (customerId != null) {
+            completions = customerDayCompletionRepository.findByCustomerAndCourse(customerId, courseId);
+        } else {
+            completions = Collections.emptyList();
+        }
+        
+        // Convert sang DTO với thông tin completion
+        CourseWithCompletionDto dto = new CourseWithCompletionDto();
+        dto.setCourseId(course.getCourseId());
+        dto.setCourseName(course.getCourseName());
+        dto.setDescription(course.getDescription());
+        dto.setDuration(course.getDuration());
+        dto.setImage(course.getImage());
+        dto.setStatus(course.getStatus());
+        dto.setCourseType(convertCourseTypeToDTO(course.getCourseType()));
+        
+        // Convert days với completion status
+        List<DayCompletionDto> dayCompletionDtos = courseDays.stream()
+                .sorted(Comparator.comparing(CourseDays::getDayId))
+                .map(courseDay -> {
+                    DayCompletionDto dayDto = new DayCompletionDto();
+                    Day day = courseDay.getDay();
+                    if (day != null) {
+                        dayDto.setDayId(day.getDayId());
+                        dayDto.setDayName(day.getDayName());
+                    } else {
+                        dayDto.setDayId(courseDay.getDayId());
+                        dayDto.setDayName("Day " + courseDay.getDayId());
+                    }
+                    dayDto.setStatus(courseDay.getStatus());
+                    
+                    // Tìm completion record cho day này
+                    CustomerDayCompletion completion = completions.stream()
+                            .filter(c -> c.getDay().getDayId().equals(courseDay.getDayId()))
+                            .findFirst()
+                            .orElse(null);
+                    
+                    if (completion != null) {
+                        dayDto.setIsCompleted(completion.getIsCompleted());
+                        dayDto.setCompletionDate(completion.getCompletionDate() != null ? 
+                                completion.getCompletionDate().toString() : null);
+                    } else {
+                        dayDto.setIsCompleted(false);
+                        dayDto.setCompletionDate(null);
+                    }
+                    
+                    return dayDto;
+                })
+                .collect(Collectors.toList());
+        
+        dto.setDays(dayCompletionDtos);
+        dto.setTotalDays(dayCompletionDtos.size());
+        
+        // Tính completion statistics
+        if (customerId != null) {
+            long completedCount = dayCompletionDtos.stream()
+                    .mapToLong(day -> day.getIsCompleted() ? 1 : 0)
+                    .sum();
+            dto.setCompletedDays((int) completedCount);
+            dto.setCompletionPercentage(dayCompletionDtos.size() > 0 ? 
+                    (double) completedCount / dayCompletionDtos.size() * 100 : 0.0);
+        } else {
+            dto.setCompletedDays(0);
+            dto.setCompletionPercentage(0.0);
+        }
+        
+        logger.debug("Found {} days for course {} with {} completed", 
+                dayCompletionDtos.size(), courseId, dto.getCompletedDays());
+        
+        return dto;
     }
 
     @Override

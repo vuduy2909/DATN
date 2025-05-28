@@ -2,23 +2,14 @@ import React, { useState } from 'react';
 import styles from './Step5.module.css';
 
 import FormControl from '@mui/material/FormControl';
-import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Radio from '@mui/material/Radio';
-import RadioGroup from '@mui/material/RadioGroup';
-import FormLabel from '@mui/material/FormLabel';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import InputLabel from '@mui/material/InputLabel';
-import Checkbox from '@mui/material/Checkbox';
-import FormGroup from '@mui/material/FormGroup';
 
 const Step5 = ({ formData, handleChange, handleNext, handlePrevious }) => {
     const [occupation, setOccupation] = useState('');
     const [workEnvironment, setWorkEnvironment] = useState('');
-    const [healthIssues, setHealthIssues] = useState([]);
-
     const occupationOptions = [
         'Sinh viên', 
         'Nhân viên văn phòng', 
@@ -36,22 +27,6 @@ const Step5 = ({ formData, handleChange, handleNext, handlePrevious }) => {
         'Lao động chân tay'
     ];
 
-    const healthIssueOptions = [
-        { value: 'heart', label: 'Bệnh tim mạch' },
-        { value: 'respiratory', label: 'Vấn đề về hô hấp' },
-        { value: 'injury', label: 'Chấn thương xương khớp' }
-    ];
-
-    const handleHealthIssueChange = (event) => {
-        const { value, checked } = event.target;
-        
-        if (checked) {
-            setHealthIssues([...healthIssues, value]);
-        } else {
-            setHealthIssues(healthIssues.filter(issue => issue !== value));
-        }
-    };
-
     const handleSubmit = () => {
         handleChange({
             target: { name: 'occupation', value: occupation }
@@ -59,10 +34,6 @@ const Step5 = ({ formData, handleChange, handleNext, handlePrevious }) => {
         
         handleChange({
             target: { name: 'workEnvironment', value: workEnvironment }
-        });
-        
-        handleChange({
-            target: { name: 'healthIssues', value: healthIssues }
         });
         
         handleNext();
@@ -123,7 +94,7 @@ const Step5 = ({ formData, handleChange, handleNext, handlePrevious }) => {
                 </div>
 
                 <div className={styles.line}></div>
-                <h4>5. Thông tin về nghề nghiệp và sức khỏe</h4>
+                <h4>5. Thông tin về nghề nghiệp</h4>
 
                 <div className={styles.formContainer}>
                     <FormControl fullWidth sx={{ mb: 3 }}>
@@ -158,28 +129,6 @@ const Step5 = ({ formData, handleChange, handleNext, handlePrevious }) => {
                                 </MenuItem>
                             ))}
                         </Select>
-                    </FormControl>
-                    
-                    <FormControl component="fieldset" sx={{ mb: 3, width: '100%' }}>
-                        <FormLabel component="legend" sx={{ color: '#CF4044' }}>
-                            Tiền sử bệnh lý (Có thể chọn nhiều)
-                        </FormLabel>
-                        <FormGroup>
-                            {healthIssueOptions.map((option) => (
-                                <FormControlLabel
-                                    key={option.value}
-                                    control={
-                                        <Checkbox 
-                                            checked={healthIssues.includes(option.value)}
-                                            onChange={handleHealthIssueChange}
-                                            value={option.value}
-                                            color="error"
-                                        />
-                                    }
-                                    label={option.label}
-                                />
-                            ))}
-                        </FormGroup>
                     </FormControl>
                 </div>
 

@@ -149,11 +149,19 @@
 .popupContent {
     position: relative;
     overflow: auto;
-    width: 274px;
+    width: 350px;
+    max-height: 500px;
     display: flex;
     flex-direction: column;
     padding: 12px;
     align-items: center;
+}
+
+.progressInfo {
+    color: #666;
+    font-size: 0.9rem;
+    margin-top: 5px;
+    text-align: center;
 }
 
 .popoverPaper {
@@ -173,29 +181,112 @@
 }
 
 .popupDays {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
-    justify-content: center;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
     margin-top: 10px;
+    width: 100%;
+    padding: 0 10px;
+}
+
+.dayContainer {
+    position: relative;
+    width: 100%;
 }
 
 .popupDay {
-    margin: 5px;
-    padding: 10px 20px;
+    display: block;
+    padding: 8px 12px;
     background-color: #e74c3c;
     color: #fff;
     text-decoration: none;
     border-radius: 5px;
     font-weight: bold;
     text-align: center;
-    min-width: 80px;
+    font-size: 14px;
+    width: 100%;
+    box-sizing: border-box;
     transition: all 0.3s ease;
 }
 
 .popupDay:hover {
     background-color: #c0392b;
     transform: scale(1.05);
+}
+
+.completedDay {
+    background-color: #27ae60 !important; /* Màu xanh lá cho ngày đã hoàn thành */
+}
+
+.completedDay:hover {
+    background-color: #229954 !important;
+}
+
+.incompleteDay {
+    background-color: #e74c3c; /* Màu đỏ cho ngày chưa hoàn thành */
+}
+
+.incompleteDay:hover {
+    background-color: #c0392b;
+}
+
+.completionButton {
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    font-size: 10px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    z-index: 10;
+}
+
+.loadingButton {
+    opacity: 0.7;
+    cursor: not-allowed;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        opacity: 0.7;
+    }
+    50% {
+        transform: scale(1.1);
+        opacity: 0.5;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 0.7;
+    }
+}
+
+.completedButton {
+    background-color: #27ae60;
+    color: #fff;
+}
+
+.completedButton:hover {
+    background-color: #229954;
+    transform: scale(1.1);
+}
+
+.incompleteButton {
+    background-color: #e74c3c;
+    color: #fff;
+}
+
+.incompleteButton:hover {
+    background-color: #c0392b;
+    transform: scale(1.1);
 }
 
 .disabledCard {

@@ -16,6 +16,20 @@ export const getDays = async (days) => {
     }
 };
 
+// GET COURSE WITH COMPLETION STATUS FOR USER
+export const getDaysWithCompletion = async (courseId, customerId = null) => {
+    try {
+        const url = customerId 
+            ? `/course-day/courses/${courseId}/with-completion?customerId=${customerId}`
+            : `/course-day/courses/${courseId}/with-completion`;
+        const res = await request.get(url);
+        return res;
+    } catch (error) {
+        console.error('Error fetching days with completion:', error);
+        throw error;
+    }
+};
+
 // GET FULL EXERCISES
 export const getExercise = async () => {
     try {
@@ -49,13 +63,13 @@ export const getComment = async (courseId, dayId) => {
     }
 }
 
-// GET COMMENT OF EXERCISES IN A DAY
+// POST COMMENT OF EXERCISES IN A DAY
 export const postComment = async (data) => {
     try {
         const res = await request.post(`/comment/create`, data);
         return res;
     } catch (error) {
-        console.log('Error fetching comments', error);
+        console.log('Error posting comments', error);
         throw error;
     }
 }
@@ -80,7 +94,7 @@ export const putDoneExercise = async (day, exercise) => {
         const res = await request.put(`/exercise-day/updateStatusForDay/day/${day}/exercise/${exercise}?status=true`);
         return res;
     } catch (error) {
-        console.log('Error fetching recommend course', error);
+        console.log('Error updating exercise status', error);
     }
 }
 
@@ -89,7 +103,29 @@ export const putReviewCourse = async (courseId, data) => {
         const res = await request.put(`/track-data-ai/update-effectiveness/${courseId}`, data);
         return res;
     } catch (error) {
-        console.log('Error fetching recommend course', error);
+        console.log('Error updating course review', error);
+    }
+}
+
+// TOGGLE DAY COMPLETION STATUS
+export const toggleDayCompletion = async (customerId, courseId, dayId) => {
+    try {
+        const res = await request.put(`/customer-progress/toggle?customerId=${customerId}&courseId=${courseId}&dayId=${dayId}`);
+        return res;
+    } catch (error) {
+        console.error('Error toggling day completion:', error);
+        throw error;
+    }
+}
+
+// DELETE USER COURSE FROM customer_course TABLE
+export const deleteUserCourse = async (courseId) => {
+    try {
+        const res = await request.remove(`/customer-course/${courseId}`);
+        return res;
+    } catch (error) {
+        console.error('Error deleting user course:', error);
+        throw error;
     }
 }
 

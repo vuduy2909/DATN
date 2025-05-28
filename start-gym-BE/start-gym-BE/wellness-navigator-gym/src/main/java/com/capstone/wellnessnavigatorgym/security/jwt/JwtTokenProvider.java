@@ -24,4 +24,17 @@ public class JwtTokenProvider implements Serializable {
                 .signWith(SignatureAlgorithm.HS512, JWT_SECRET)
                 .compact();
     }
+    
+    public boolean validateToken(String token) {
+        try {
+            Jwts.parser().setSigningKey(JWT_SECRET).parseClaimsJws(token);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+    
+    public String getUsernameFromToken(String token) {
+        return Jwts.parser().setSigningKey(JWT_SECRET).parseClaimsJws(token).getBody().getSubject();
+    }
 }

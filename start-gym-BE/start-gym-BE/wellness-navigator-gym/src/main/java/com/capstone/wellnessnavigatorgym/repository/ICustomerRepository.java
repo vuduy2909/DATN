@@ -124,10 +124,39 @@ public interface ICustomerRepository extends JpaRepository<Customer, Integer> {
     @Query(value = "SELECT a.customer_id, a.customer_name, a.customer_phone, a.customer_gender, a.customer_date_of_birth, " +
             "a.customer_address, a.customer_card_id, a.is_delete, a.is_enable, u.user_id, a.create_time, " +
             "a.email, u.user_data_id, u.age, u.bmi, u.gender, u.training_goals, u.training_history, " +
-            "u.heart_disease, u.respiratory_disease, u.recent_injury, u.training_frequency, " +
+            "u.training_frequency, " +
             "u.occupation, u.work_environment " +
             "FROM customer a LEFT JOIN user_data_ai u " +
             "ON a.customer_id = u.customer_id " +
             "ORDER BY a.create_time DESC", nativeQuery = true)
     List<Tuple> getAllCustomerInfo();
+
+    // Dashboard-specific queries
+    @Query(value = "SELECT COUNT(*) FROM customer c " +
+            "JOIN account a ON c.account_id = a.account_id " +
+            "WHERE c.is_enable = true AND a.is_enable = true", nativeQuery = true)
+    Long countAllActiveCustomers();
+
+    @Query(value = "SELECT COUNT(*) FROM customer c " +
+            "WHERE c.is_enable = true AND c.customer_type_id = :customerTypeId", nativeQuery = true)
+    Long countCustomersByType(@Param("customerTypeId") Integer customerTypeId);
+
+    @Query(value = "SELECT COUNT(*) FROM customer c " +
+            "JOIN account a ON c.account_id = a.account_id " +
+            "WHERE c.is_enable = true AND a.is_enable = true " +
+            "AND DATE(a.create_date) = CURDATE()", nativeQuery = true)
+    Long countCustomersRegisteredToday();
+
+    @Query(value = "SELECT COUNT(*) FROM customer c " +
+            "JOIN account a ON c.account_id = a.account_id " +
+            "WHERE c.is_enable = true AND a.is_enable = true " +
+            "AND YEARWEEK(a.create_date, 1) = YEARWEEK(CURDATE(), 1)", nativeQuery = true)
+    Long countCustomersRegisteredThisWeek();
+
+    @Query(value = "SELECT COUNT(*) FROM customer c " +
+            "JOIN account a ON c.account_id = a.account_id " +
+            "WHERE c.is_enable = true AND a.is_enable = true " +
+            "AND YEAR(a.create_date) = YEAR(CURDATE()) " +
+            "AND MONTH(a.create_date) = MONTH(CURDATE())", nativeQuery = true)
+    Long countCustomersRegisteredThisMonth();
 }

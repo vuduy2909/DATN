@@ -1,5 +1,6 @@
 package com.capstone.wellnessnavigatorgym.entity;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
@@ -34,9 +35,11 @@ public class UserDataAi {
     
     // Thêm trường để track thời gian
     @Column(name = "created_date")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime created_date;
     
     @Column(name = "updated_date")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updated_date;
     
     // These are VARCHAR fields in user_data_ai table, not enums
@@ -49,10 +52,6 @@ public class UserDataAi {
     @Column(name = "training_goals")
     @Convert(converter = TrainingGoalsConverter.class)
     private TrainingGoals training_goals;
-    
-    private Boolean heart_disease;
-    private Boolean respiratory_disease;
-    private Boolean recent_injury;
     
     // Use standard TrainingFrequency enum (now synchronized with database)
     @Enumerated(EnumType.STRING)

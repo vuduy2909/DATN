@@ -9,7 +9,6 @@ import { useAuth } from '../../AuthContext'
 import Badge from '@mui/material/Badge';
 import { useParams } from 'react-router-dom';
 import { collectionService } from '../../service/collectionService';
-import List_Day from "../List_Day/List_Day";
 import ListVideo from "../ListVideo/ListVideo";
 import Chip from '@mui/material/Chip';
 
@@ -26,17 +25,25 @@ const VideoPlayer = ({ exercise, meals, videos, onVideoSelect }) => {
         console.log('Thời lượng video:', duration);
     };
 
-    // PUT DONE EXERCISE
+    // GET USER INFO
+    const { user } = useAuth();
+    const [userData, setUserData] = useState([]);
+    
+    // PUT DONE EXERCISE - chỉ gọi khi user đã đăng nhập
     const [isRequestSent, setIsRequestSent] = useState(false);
 
     const handleEnded = async () => {
-        if (!isRequestSent) {
+        // Chỉ gọi API khi user đã đăng nhập và có username
+        if (!isRequestSent && user && user.username) {
             try {
-                const sendRequestDone = await collectionService.putDoneExercise(dayId, exercise.exerciseId);
+                await collectionService.putDoneExercise(dayId, exercise.exerciseId);
                 setIsRequestSent(true);
+                console.log('Exercise marked as completed');
             } catch (error) {
                 console.error('Lỗi khi gửi request PUT', error);
             }
+        } else if (!user || !user.username) {
+            console.log('User not logged in, skipping exercise completion tracking');
         }
     };
 
@@ -44,20 +51,19 @@ const VideoPlayer = ({ exercise, meals, videos, onVideoSelect }) => {
         setIsRequestSent(false);
     }, [exercise.videoUrl]);
 
-    // GET USER INFO
-    const { user } = useAuth();
-    const [userData, setUserData] = useState([]);
     useEffect(() => {
         const fetchUserData = async () => {
             try {
                 const res = await request.get('/customer/detail')
                 setUserData(res)
+                console.log('User data fetched successfully');
             } catch (error) {
                 console.log("Error fetching user information", error);
             }
         }
 
-        if (user) {
+        // Chỉ gọi API khi user đã đăng nhập và có username
+        if (user && user.username) {
             fetchUserData();
         }
     }, [user])
@@ -80,16 +86,21 @@ const VideoPlayer = ({ exercise, meals, videos, onVideoSelect }) => {
                     : [];
 
                 setListComment(filteredComment);
-
-                // Update lengthComment separately when listComment changes
                 setLengthComment(filteredComment?.length || 0);
+                console.log('Comments loaded successfully');
             } catch (error) {
-                console.log(error);
+                console.log('Error fetching comments:', error);
+                // Nếu lỗi, set empty array để tránh crash
+                setListComment([]);
+                setLengthComment(0);
             }
         };
 
-        getCommentOfExercise();
-    }, [courseId, dayId, exercise.exerciseId]);
+        // Luôn gọi API comment vì đây là API công khai
+        if (courseId && dayId && exercise.exerciseId && exercise.courseId && exercise.dayId) {
+            getCommentOfExercise();
+        }
+    }, [courseId, dayId, exercise.exerciseId, exercise.courseId, exercise.dayId]);
 
     return (
         <div className={styles.container}>

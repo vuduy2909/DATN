@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import styles from './Register.module.css'
-import { TextField, FormControl, InputLabel, Select, MenuItem, Button } from '@mui/material';
+import { TextField, FormControl, InputLabel, Select, MenuItem, Button, Snackbar, Alert } from '@mui/material';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
@@ -36,7 +36,29 @@ const Register = () => {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [confirmPasswordError, setConfirmPasswordError] = useState('');
 
+    // Snackbar state for notifications
+    const [snackbar, setSnackbar] = useState({
+        open: false,
+        message: '',
+        severity: 'info' // 'error', 'warning', 'info', 'success'
+    });
+
     const navigate = useNavigate();
+
+    const showSnackbar = (message, severity = 'info') => {
+        setSnackbar({
+            open: true,
+            message,
+            severity
+        });
+    };
+
+    const handleSnackbarClose = (event, reason) => {
+        if (reason === 'clickaway') {
+            return;
+        }
+        setSnackbar({ ...snackbar, open: false });
+    };
 
     const handleLogin = async () => {
         navigate('/login')
@@ -159,12 +181,12 @@ const Register = () => {
         try {
             // Validate form trước khi submit
             if (!name || !username || !gender || !phone || !dateOfBirth || !address || !email || !password || !confirmPassword) {
-                alert('Vui lòng điền đầy đủ thông tin');
+                showSnackbar('Vui lòng điền đầy đủ thông tin', 'warning');
                 return;
             }
 
             if (nameError || usernameError || phoneError || dateOfBirthError || addressError || emailError || passwordError || confirmPasswordError) {
-                alert('Vui lòng sửa các lỗi trong form');
+                showSnackbar('Vui lòng sửa các lỗi trong form', 'warning');
                 return;
             }
 
@@ -174,7 +196,7 @@ const Register = () => {
             const age = today.diff(birthDate, 'year');
             
             if (age < 16) {
-                alert('Bạn phải từ 16 tuổi trở lên để đăng ký');
+                showSnackbar('Bạn phải từ 16 tuổi trở lên để đăng ký', 'warning');
                 return;
             }
 
@@ -195,18 +217,18 @@ const Register = () => {
             const response = await axios.post('http://localhost:8080/api/v1/public/signup', userData);
 
             if (response.status === 200) {
-                alert('Đăng ký thành công!');
-                navigate('/login');
+                showSnackbar('Đăng ký thành công! 🎉', 'success');
+                setTimeout(() => navigate('/login'), 1500); // Delay để user thấy thông báo
             } else {
                 console.error('Đăng ký không thành công');
-                alert('Đăng ký không thành công. Vui lòng thử lại.');
+                showSnackbar('Đăng ký không thành công. Vui lòng thử lại.', 'error');
             }
         } catch (error) {
             console.error('Đã xảy ra lỗi:', error);
             if (error.response && error.response.data) {
-                alert('Lỗi: ' + error.response.data.message || 'Đăng ký thất bại');
+                showSnackbar('Lỗi: ' + (error.response.data.message || 'Đăng ký thất bại'), 'error');
             } else {
-                alert('Đã xảy ra lỗi. Vui lòng thử lại.');
+                showSnackbar('Đã xảy ra lỗi. Vui lòng thử lại.', 'error');
             }
         }
     };
@@ -400,6 +422,23 @@ const Register = () => {
                     </form>
                 </div>
             </div>
+
+            {/* Snackbar for notifications */}
+            <Snackbar 
+                open={snackbar.open} 
+                autoHideDuration={4000} 
+                onClose={handleSnackbarClose}
+                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            >
+                <Alert 
+                    onClose={handleSnackbarClose} 
+                    severity={snackbar.severity} 
+                    sx={{ width: '100%' }}
+                    variant="filled"
+                >
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </div>
     );
 };

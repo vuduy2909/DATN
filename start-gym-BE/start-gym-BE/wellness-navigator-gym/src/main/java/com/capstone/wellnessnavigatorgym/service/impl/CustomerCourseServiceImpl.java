@@ -113,4 +113,23 @@ public class CustomerCourseServiceImpl implements ICustomerCourseService {
         
         customerCourseRepository.save(customerCourse);
     }
+    
+    @Override
+    public void deleteCourseFromCustomer(Integer courseId, Integer customerId) {
+        // Validate customer exists
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new IllegalArgumentException("Customer not found with ID: " + customerId));
+        
+        // Validate course exists
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new IllegalArgumentException("Course not found with ID: " + courseId));
+        
+        // Check if customer is enrolled in this course
+        if (!isCustomerEnrolledInCourse(customerId, courseId)) {
+            throw new IllegalArgumentException("Customer is not enrolled in this course");
+        }
+        
+        // Delete the customer course record
+        customerCourseRepository.deleteByCustomerIdAndCourseId(customerId, courseId);
+    }
 }

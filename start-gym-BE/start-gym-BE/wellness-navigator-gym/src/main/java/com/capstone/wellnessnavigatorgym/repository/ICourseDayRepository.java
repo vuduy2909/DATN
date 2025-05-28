@@ -20,7 +20,7 @@ public interface ICourseDayRepository extends JpaRepository<CourseDays, Integer>
     @Query("SELECT cd FROM CourseDays cd " +
            "LEFT JOIN FETCH cd.course c " +
            "LEFT JOIN FETCH cd.day d " +
-           "WHERE cd.courseId = :courseId " +
+           "WHERE cd.courseId = :courseId AND cd.status = true " +
            "ORDER BY cd.dayId")
     List<CourseDays> findByCourseIdOrderByDayId(@Param("courseId") Integer courseId);
 

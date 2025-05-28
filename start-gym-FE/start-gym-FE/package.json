@@ -44,6 +44,7 @@
     "react-scripts": "^5.0.1",
     "react-scroll-parallax": "^3.4.5",
     "react-youtube": "^10.1.0",
+    "recharts": "^2.15.3",
     "web-vitals": "^2.1.4",
     "yarn": "^1.22.21"
   },

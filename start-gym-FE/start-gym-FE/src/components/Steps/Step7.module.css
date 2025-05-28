@@ -3,13 +3,14 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  padding-top: 0;
 }
 
 .stepIndicator {
   width: 100%;
   display: flex;
   justify-content: center;
-  margin-bottom: 20px;
+  margin-bottom: 10px;
 }
 
 .stepLabel {
@@ -256,12 +257,19 @@
 }
 
 .highlightedLogItem {
-  background-color: rgba(207, 64, 68, 0.05);
-  border-left: 3px solid #CF4044;
-  font-weight: bold;
+  background-color: #fff3cd;
+  border-left: 4px solid #CF4044;
+  padding: 8px 12px;
+  margin: 4px 0;
+  border-radius: 4px;
+}
+
+.highlightedLogItem .logLabel {
+  font-weight: 600;
+  color: #CF4044;
 }
 
 .highlightedLogItem .logValue {
-  font-size: 110%;
-  font-weight: 700;
+  font-weight: 600;
+  color: #cf4044;
 } 

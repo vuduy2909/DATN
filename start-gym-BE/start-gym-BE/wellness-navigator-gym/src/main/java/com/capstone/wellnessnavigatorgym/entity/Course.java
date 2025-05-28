@@ -1,5 +1,6 @@
 package com.capstone.wellnessnavigatorgym.entity;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
@@ -39,9 +40,11 @@ public class Course {
     private Boolean isVip = false;
     
     @Column(name = "created_date")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdDate = LocalDateTime.now();
     
     @Column(name = "updated_date")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updatedDate = LocalDateTime.now();
 
     @ManyToOne(cascade = CascadeType.ALL)

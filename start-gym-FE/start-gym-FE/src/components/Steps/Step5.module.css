@@ -3,7 +3,7 @@
     flex-direction: column;
     align-items: center;
     background-color: var(--color-yellow-white);
-    padding: 83px;
+    padding: 20px;
 }
 
 .loadSteps {
@@ -49,7 +49,7 @@
     letter-spacing: -0.0183197em;
     line-height: 30px;
     color: var(--neutral-600, #6F6C90);
-    margin: 40px 0px;
+    margin: 20px 0px;
 }
 
 .line {

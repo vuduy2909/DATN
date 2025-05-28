@@ -70,12 +70,23 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
                         "/api/v1/payment/**",
                         "/api/v1/customer/list",
                         "/api/v1/cart/**",
+                        "/api/v1/customer-course/debug-customer/**",
+                        "/api/v1/customer-course/fix-vanba-account",
                         "/uploads/**")
                 .permitAll()
-                .antMatchers("/api/v1/customer/**",
+                // Các API cần authentication để thêm khóa học hoặc thao tác cá nhân
+                .antMatchers("/api/v1/customer/detail",
+                        "/api/v1/customer/register-course/**",
+                        "/api/v1/customer/profile/**",
+                        "/api/v1/customer/update/**",
+                        "/api/v1/exercise-day/updateStatusForDay/**",
                         "/api/v1/customer-type/**",
-                        "/api/v1/exercise/**",
-                        "/api/v1/exercise-day/**").hasAnyRole("USER", "ADMIN")
+                        "/api/v1/customer-course/**",
+                        "/api/v1/users/info").hasAnyRole("USER", "ADMIN")
+                // Admin only endpoints
+                .antMatchers("/api/v1/customer/admin/**",
+                        "/api/v1/admin/**",
+                        "/api/v1/exercise/**").hasRole("ADMIN")
                 .anyRequest()
                 .authenticated()
                 .and()

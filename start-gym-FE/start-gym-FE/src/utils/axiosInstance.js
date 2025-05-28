@@ -44,9 +44,9 @@ export const patch = async (url, data, options = {}) => {
     }
 };
 
-export const remove = async (url, data, options = {}) => {
+export const remove = async (url, options = {}) => {
     try {
-        const response = await axiosInstance.delete(url, data, options);
+        const response = await axiosInstance.delete(url, options);
         return response.data;
     } catch (err) {
         console.error(`DELETE request failed for ${url}:`, err);
@@ -56,10 +56,13 @@ export const remove = async (url, data, options = {}) => {
 
 // Mỗi request đều setting sẵn r - bỏ 1 lần ở đây và không dùng axios => dùng request để gọi api
 axiosInstance.interceptors.request.use((config) => {
-    const token = 'Bearer ' + localStorage.getItem('token');
+    const token = localStorage.getItem('token');
 
-    if (token && token !== 'Bearer null' && token !== 'Bearer undefined') {
-        config.headers.authorization = token;
+    if (token && token !== 'null' && token !== 'undefined') {
+        config.headers.Authorization = `Bearer ${token}`;
+        console.log('Setting Authorization header:', `Bearer ${token.substring(0, 20)}...`);
+    } else {
+        console.log('No valid token found for request');
     }
     return config;
 });
@@ -69,26 +72,58 @@ axiosInstance.interceptors.response.use(
         if (response.data && response.data.message === 'Error -> Not authenticated') {
             console.log('Phát hiện lỗi xác thực, chuyển hướng về trang đăng nhập');
             localStorage.removeItem('token');
+            localStorage.removeItem('isAdmin');
             window.location.href = '/login';
             return null;
         }
         return response;
     },
     (error) => {
-        console.log('API Error:', error);
+        // Chỉ log chi tiết khi cần debug
+        if (process.env.NODE_ENV === 'development') {
+            console.log('API Error:', error);
+            console.log('Current URL:', window.location.pathname);
+            console.log('Error status:', error?.response?.status);
+            console.log('Error response data:', error?.response?.data);
+        }
         
         // Xử lý lỗi xác thực
         if (error?.response?.status === 401) {
             console.log('Mã lỗi 401: Chưa xác thực');
-            localStorage.removeItem('token');
             
-            if (!window.location.href.includes('login') && !window.location.href.includes('register')) {
+            const currentPath = window.location.pathname;
+            
+            // Kiểm tra xem có phải trang công khai không
+            const isPublicPage = 
+                currentPath === '/' ||
+                currentPath === '/login' ||
+                currentPath === '/register' ||
+                currentPath === '/about' ||
+                currentPath === '/recipe' ||
+                currentPath === '/blog' ||
+                currentPath.startsWith('/collections') ||  // Tất cả trang collections
+                currentPath.match(/^\/collections\/\d+\/days\/\d+$/);  // Trang workout cụ thể
+            
+            // Kiểm tra xem có phải API call từ AuthContext hoặc AdminRoute không
+            const isAuthCheck = error.config?.url?.includes('/users/info');
+            
+            // Chỉ xóa token và redirect nếu không phải trang công khai và không phải auth check
+            if (!isPublicPage && !isAuthCheck) {
+                console.log('Redirecting to login from protected page:', currentPath);
+                localStorage.removeItem('token');
+                localStorage.removeItem('isAdmin');
                 window.location.href = '/login';
+            } else {
+                console.log('Staying on current page - either public page or auth check');
+                // Nếu là auth check và token không hợp lệ, chỉ log không redirect
+                if (isAuthCheck) {
+                    console.log('Auth check failed - token may be expired');
+                }
             }
-            return null;
+            return Promise.reject(error);  // Trả về error để component có thể handle
         }
         
-        // Các lỗi khác - báo lỗi nhưng không tự động chuyển hướng
+        // Các lỗi khác - chỉ log khi cần
         if (error?.response?.status === 400 || error?.response?.status === 404) {
             console.log(`Lỗi ${error.response.status}: ${error.response.data?.message || 'Unknown error'}`);
         }

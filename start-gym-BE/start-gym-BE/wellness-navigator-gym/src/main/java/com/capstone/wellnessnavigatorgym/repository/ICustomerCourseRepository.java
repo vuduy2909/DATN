@@ -2,6 +2,7 @@ package com.capstone.wellnessnavigatorgym.repository;
 
 import com.capstone.wellnessnavigatorgym.entity.CustomerCourse;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -16,4 +17,8 @@ public interface ICustomerCourseRepository extends JpaRepository<CustomerCourse,
     
     @Query("SELECT cc FROM CustomerCourse cc WHERE cc.customer.customerId = :customerId AND cc.recommendedStatus = true")
     List<CustomerCourse> findByCustomer_CustomerIdAndRecommendedStatusIsTrue(@Param("customerId") Integer customerId);
+    
+    @Modifying
+    @Query("DELETE FROM CustomerCourse cc WHERE cc.customer.customerId = :customerId AND cc.course.courseId = :courseId")
+    void deleteByCustomerIdAndCourseId(@Param("customerId") Integer customerId, @Param("courseId") Integer courseId);
 }

@@ -131,19 +131,38 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
       
       setAnalysisResult(result);
       
+      console.log('=== BODY IMAGE ANALYZER: CLAUDE RESULT ===');
+      console.log('Received analysis result:', result);
+      console.log('Body type from Claude:', result?.bodyType);
+      console.log('Current formData.bodyType:', formData.bodyType);
+      
       // Cập nhật body type trong form dựa trên kết quả phân tích
       if (result && result.bodyType && result.bodyType !== 'Unknown' && onAnalysisComplete) {
+        console.log('✅ Claude API returned valid body type:', result.bodyType);
+        console.log('Calling onAnalysisComplete with body type:', result.bodyType);
+        
         onAnalysisComplete(result.bodyType);
         
         // Update the measurements as well
         if (waistCircumference) {
+          console.log('📏 Also updating waist circumference:', waistCircumference);
           handleChange('waist_circumference', waistCircumference);
         }
         
         if (chestCircumference) {
+          console.log('📏 Also updating chest circumference:', chestCircumference);
           handleChange('chest_circumference', chestCircumference);
         }
+        
+        console.log('Body type update completed successfully');
+      } else {
+        console.log('❌ No valid body type from Claude API or onAnalysisComplete not available');
+        console.log('Result:', result);
+        console.log('Body type:', result?.bodyType);
+        console.log('onAnalysisComplete:', !!onAnalysisComplete);
       }
+      
+      console.log('=== END BODY IMAGE ANALYZER: CLAUDE RESULT ===');
     } catch (err) {
       console.error('Failed to analyze image:', err);
       

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import styles from './Step7.module.css'; // Use dedicated CSS for Step7
 import Button from '@mui/material/Button';
-import { Paper, Typography, Box, Divider, Chip, Alert, CircularProgress } from '@mui/material';
-import { request } from '../../utils/axiosInstance';
+import { Paper, Typography, Divider, Chip, Alert, CircularProgress } from '@mui/material';
+
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendationResult, loading, error }) => {
@@ -17,11 +17,15 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
     const [confirmError, setConfirmError] = useState('');
     const [confirmed, setConfirmed] = useState(false);
     
-    // Add a state to track if we have a valid recommendation 
-    const [hasValidRecommendation, setHasValidRecommendation] = useState(false);
+
     
     // Add state to track local recommendation data
     const [localRecommendation, setLocalRecommendation] = useState(null);
+    
+    // Function to generate explanation using Claude API (temporarily disabled)
+    // const generateClaudeExplanation = async (recommendation) => {
+    //     // Implementation disabled due to unused variables
+    // };
 
     useEffect(() => {
         console.log('Step7 useEffect triggered with recommendationResult:', recommendationResult);
@@ -35,11 +39,14 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
                     console.log('Loaded recommendation data from localStorage:', parsed);
                     setLocalRecommendation(parsed);
 
-                    // Verify if we have the necessary data
-                    const hasValidData = parsed.recommendedCourse || 
-                                        (parsed.userMetrics && Object.keys(parsed.userMetrics).length > 0);
+
                     
-                    setHasValidRecommendation(hasValidData);
+                    // Generate Claude explanation if we have valid data - TEMPORARY DISABLED
+                    /*
+                    if (hasValidData) {
+                        generateClaudeExplanation(parsed);
+                    }
+                    */
                 }
             } catch (e) {
                 console.error('Error parsing localStorage recommendation data:', e);
@@ -60,15 +67,15 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
                 console.error('Error saving to localStorage:', e);
             }
             
-            // Verify if we have the necessary data from the API
-            const hasValidData = recommendationResult.recommendedCourse || 
-                                (recommendationResult.userMetrics && Object.keys(recommendationResult.userMetrics).length > 0);
+
             
-            setHasValidRecommendation(hasValidData);
-            
-            if (!hasValidData) {
-                console.warn('Recommendation result does not contain expected data');
+            // Generate Claude explanation if we have valid data - TEMPORARY DISABLED
+            /*
+            if (hasValidData) {
+                generateClaudeExplanation(recommendationResult);
             }
+            */
+
         }
     }, [recommendationResult]);
 
@@ -156,8 +163,7 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
     // Get the recommendation from the API result
     const recommendedCourse = activeRecommendation?.recommendedCourse;
     
-    // Get the explanation from the API
-    const explanationText = activeRecommendation?.explanation || '';
+
     
     // Check if we have API recommendations
     const hasApiRecommendations = !!recommendedCourse;
@@ -167,6 +173,14 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
 
     // Format backend log data for display
     const formatLogData = () => {
+        // Debug để kiểm tra dữ liệu
+        console.log('Step7 Debug - userMetrics:', userMetrics);
+        console.log('Step7 Debug - formData:', formData);
+        console.log('Step7 Debug - waist from userMetrics:', userMetrics.waist_circumference);
+        console.log('Step7 Debug - waist from formData:', formData.waistSize);
+        console.log('Step7 Debug - chest from userMetrics:', userMetrics.chest_circumference);
+        console.log('Step7 Debug - chest from formData:', formData.chestSize);
+        
         // Helper function to map database enum values to user-friendly display text
         const mapTrainingFrequency = (value) => {
             if (!value) return "Not specified";
@@ -253,47 +267,46 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
             { label: "Chiều cao", value: `${userMetrics.height || formData.height} cm` },
             { label: "Cân nặng", value: `${userMetrics.weight || formData.weight} kg` },
             { label: "BMI", value: userMetrics.bmi ? Number(userMetrics.bmi).toFixed(2) : (formData.weight / Math.pow(formData.height/100, 2)).toFixed(2) },
-            { label: "Loại hình thể", value: userMetrics.body_type || formData.bodyType || "Normal" },
-            { label: "Nghề nghiệp", value: mapOccupation(userMetrics.occupation) || mapOccupation(formData.occupation) || "Sinh viên" },
-            { label: "Môi trường làm việc", value: mapWorkEnvironment(userMetrics.work_environment) || mapWorkEnvironment(formData.workEnvironment) || "Văn phòng" },
-            { label: "Lịch sử tập luyện", value: mapTrainingFrequency(userMetrics.training_history) || mapTrainingFrequency(formData.trainingFrequency) || "Never" },
-            { label: "Tần suất mong muốn", value: mapTrainingFrequency(userMetrics.training_frequency) || mapTrainingFrequency(formData.desiredFrequency) || "2 sessions/week" },
-            { label: "Mục tiêu tập luyện", value: mapTrainingGoal(userMetrics.training_goals) || mapTrainingGoal(formData.trainingGoal) || "Giảm cân tổng thể" },
+            { 
+                label: "Loại hình thể", 
+                value: userMetrics.body_type || formData.bodyType || "Normal",
+                isHighlighted: true // Highlight body type để dễ nhận biết
+            },
+            { label: "Nghề nghiệp", value: mapOccupation(userMetrics.occupation || formData.occupation) },
+            { label: "Môi trường làm việc", value: mapWorkEnvironment(userMetrics.work_environment || formData.workEnvironment) },
+            { label: "Lịch sử tập luyện", value: mapTrainingFrequency(userMetrics.training_history || formData.trainingFrequency) },
+            { label: "Tần suất mong muốn", value: mapTrainingFrequency(userMetrics.training_frequency || formData.desiredFrequency) },
+            { label: "Mục tiêu tập luyện", value: mapTrainingGoal(userMetrics.training_goals || formData.trainingGoal) },
         ];
 
-        // Add measurements with more prominence
-        if (userMetrics.waist_circumference || formData.waistSize) {
+        // Add measurements with more prominence - kiểm tra tất cả tên field có thể
+        const waistValue = userMetrics.waist_circumference || formData.waistSize || formData.waist_circumference;
+        const chestValue = userMetrics.chest_circumference || formData.chestSize || formData.chest_circumference;
+        
+        console.log('Step7 Debug - Final waist value:', waistValue);
+        console.log('Step7 Debug - Final chest value:', chestValue);
+        
+        if (waistValue) {
             data.push({ 
                 label: "Vòng eo", 
-                value: `${userMetrics.waist_circumference || formData.waistSize} cm`,
+                value: `${waistValue} cm`,
                 isHighlighted: true
             });
         } else {
             data.push({ label: "Vòng eo", value: "Không có" });
         }
 
-        if (userMetrics.chest_circumference || formData.chestSize) {
+        if (chestValue) {
             data.push({ 
                 label: "Vòng ngực", 
-                value: `${userMetrics.chest_circumference || formData.chestSize} cm`,
+                value: `${chestValue} cm`,
                 isHighlighted: true
             });
         } else {
             data.push({ label: "Vòng ngực", value: "Không có" });
         }
 
-        // Add health information
-        if (userMetrics.heart_disease === true || userMetrics.heart_disease === "true") {
-            data.push({ label: "Vấn đề tim mạch", value: "Có" });
-        }
-        
-        if (userMetrics.respiratory_disease === true || userMetrics.respiratory_disease === "true") {
-            data.push({ label: "Vấn đề hô hấp", value: "Có" });
-        }
-
-        if (userMetrics.recent_injury === true || userMetrics.recent_injury === "true") {
-            data.push({ label: "Chấn thương gần đây", value: "Có" });
-        }
+        console.log('Step7 Debug - Final body type value:', userMetrics.body_type || formData.bodyType || "Normal");
 
         return data;
     };
@@ -366,17 +379,24 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
                                 </div>
                             </Paper>
                             
-                            {/* Hiển thị giải thích từ API */}
-                            {explanationText && (
-                                <Paper elevation={1} className={styles.section}>
-                                    <Typography variant="h6" color="error" gutterBottom>
-                                        Giải thích đề xuất
-                                    </Typography>
+                            {/* Hiển thị giải thích từ API - TEMPORARY DISABLED */}
+                            {/*
+                            <Paper elevation={1} className={styles.section}>
+                                <Typography variant="h6" color="error" gutterBottom>
+                                    Giải thích đề xuất từ AI
+                                </Typography>
+                                {explanationLoading ? (
+                                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', py: 3 }}>
+                                        <CircularProgress size={24} color="error" sx={{ mr: 2 }} />
+                                        <Typography variant="body2">Đang tạo giải thích chi tiết...</Typography>
+                                    </Box>
+                                ) : (
                                     <Typography paragraph style={{ whiteSpace: 'pre-line' }}>
-                                        {explanationText}
+                                        {claudeExplanation || explanationText || 'Đang tạo giải thích từ AI...'}
                                     </Typography>
-                                </Paper>
-                            )}
+                                )}
+                            </Paper>
+                            */}
                             
                             {/* Hiển thị thông tin khóa học đề xuất */}
                             <Typography variant="h6" color="error" gutterBottom className={styles.sectionTitle}>

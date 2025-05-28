@@ -11,36 +11,27 @@ import Footer from "../components/Footer/Footer";
 import { Parallax } from "react-scroll-parallax";
 import imgIcon from '../images/Dumbell_02.png'
 import imgIconBell from '../images/Kettlebell_03.png'
+import { useLocation } from 'react-router-dom';
 
 const Homepage = () => {
+    const location = useLocation();
+    
     useEffect(() => {
-        // Kiểm tra xem có cờ forceAdminRedirect không
-        const forceAdminRedirect = localStorage.getItem('forceAdminRedirect');
-        if (forceAdminRedirect === 'true') {
-            console.log('Phát hiện cờ forceAdminRedirect, chuyển hướng đến /admin...');
-            localStorage.removeItem('forceAdminRedirect');
-            window.location.replace('/admin');
-            return;
-        }
-
-        // Kiểm tra xem có redirect từ trang admin không 
+        // Kiểm tra xem có redirect từ trang admin không (từ state hoặc sessionStorage)
         const navigatingFromAdmin = sessionStorage.getItem('navigatingFromAdmin');
-        if (navigatingFromAdmin === 'true') {
+        const fromAdminState = location.state?.fromAdmin;
+        
+        if (navigatingFromAdmin === 'true' || fromAdminState) {
             console.log('Phát hiện chuyển hướng từ trang admin, cập nhật trạng thái...');
             // Xóa flag sau khi đã xử lý
             sessionStorage.removeItem('navigatingFromAdmin');
-
-            // COMMENT tạm thời đoạn code này - không tắt trạng thái admin nữa
-            /*
-            // Nếu đang để admin=true, tạm thời tắt nó đi khi ở trang Home
-            if (localStorage.getItem('isAdmin') === 'true') {
-                // Lưu trạng thái admin để có thể khôi phục sau này
-                sessionStorage.setItem('adminState', 'true');
-                localStorage.setItem('isAdmin', 'false');
+            
+            // Xóa state để tránh ảnh hưởng lần sau
+            if (location.state?.fromAdmin) {
+                window.history.replaceState({}, document.title);
             }
-            */
         }
-    }, []);
+    }, [location]);
 
     return (
         <div>

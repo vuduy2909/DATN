@@ -14,10 +14,15 @@ import User from './pages/User';
 import Profile from './pages/Profile';
 import Account from './pages/Account';
 import Recommend from './pages/Recommend';
+import PaymentResult from './pages/PaymentResult';
 import AdminPage from './pages/Admin/AdminPage'
 import NewExercise from './pages/Admin/NewExercise';
 import EditExercise from './pages/Admin/EditExercise';
 import EditCustomer from './pages/Admin/EditCustomer';
+import NewCustomerType from './pages/Admin/NewCustomerType';
+import EditCustomerType from './pages/Admin/EditCustomerType';
+import AdminRoute from './components/AdminRoute';
+import NotFound from './pages/NotFound';
 
 function App() {
 
@@ -36,10 +41,18 @@ function App() {
       <Route path="/collections/:courseId" element={<CollectionsDetail />} />
       <Route path="/collections/:courseId/days/:dayId" element={<Workout />} />
       <Route path='/recommend' element={<Recommend />} />
-      <Route path='/newexercise' element={<NewExercise />} />
-      <Route path='/editexercise/:id' element={<EditExercise />} />
-      <Route path='/editcustomer/:id' element={<EditCustomer />} />
-      <Route path='/admin' element={<AdminPage />} />
+      <Route path='/payment/result' element={<PaymentResult />} />
+      
+      {/* Protected Admin Routes */}
+      <Route path='/admin' element={<AdminRoute><AdminPage /></AdminRoute>} />
+      <Route path='/newexercise' element={<AdminRoute><NewExercise /></AdminRoute>} />
+      <Route path='/editexercise/:id' element={<AdminRoute><EditExercise /></AdminRoute>} />
+      <Route path='/editcustomer/:id' element={<AdminRoute><EditCustomer /></AdminRoute>} />
+      <Route path='/admin/customer-types/new' element={<AdminRoute><NewCustomerType /></AdminRoute>} />
+      <Route path='/admin/customer-types/edit/:id' element={<AdminRoute><EditCustomerType /></AdminRoute>} />
+      
+      {/* 404 Not Found - Must be last route */}
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }

@@ -1,4 +1,4 @@
-import { Button, Form, Input, Select } from 'antd';
+import { Button, Form, Input, Select, message } from 'antd';
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../AuthContext';
@@ -30,7 +30,7 @@ const EditCustomer = () => {
         setCustomer(res);
       } catch (error) {
         console.log('Error fetching customer information', error);
-        alert('Failed to load customer information: ' + (error.message || 'Unknown error'));
+        message.error('Failed to load customer information: ' + (error.message || 'Unknown error'));
       } finally {
         setLoading(false);
       }
@@ -68,12 +68,12 @@ const EditCustomer = () => {
         console.log('Submitting data:', customerInfo);
         
         await request.put('/customer/edit/' + id, customerInfo);
-        alert('Customer information updated successfully!');
-        navigate('/admin');
+        message.success('Customer information updated successfully! 🎉');
+        setTimeout(() => navigate('/admin'), 1500); // Delay để user thấy thông báo
       }
     } catch (error) {
       console.log('Error editing customer', error);
-      alert('Error updating customer information: ' + (error.message || 'Unknown error'));
+      message.error('Error updating customer information: ' + (error.message || 'Unknown error'));
     }
   };
 
