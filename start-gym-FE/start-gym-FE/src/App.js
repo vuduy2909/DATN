@@ -23,11 +23,15 @@ import NewCustomerType from './pages/Admin/NewCustomerType';
 import EditCustomerType from './pages/Admin/EditCustomerType';
 import AdminRoute from './components/AdminRoute';
 import NotFound from './pages/NotFound';
+import ScrollToTop from './components/ScrollToTop';
 
 function App() {
 
   return (
     <Routes>
+      {/* ScrollToTop component to automatically scroll to top on route change */}
+      <Route path="*" element={<ScrollToTop />} />
+      
       <Route path="/" element={<Homepage />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />

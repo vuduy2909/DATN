@@ -5,54 +5,39 @@ const UserFormService = {
   // Gửi dữ liệu form 7 bước và nhận đề xuất khóa học
   submitFormData: async (formData) => {
     try {
-      console.log('UserFormService: Preparing to submit form data:', formData);
+      console.log('UserFormService: Submitting form data:', formData);
       
-      // Kiểm tra các trường bắt buộc
-      const requiredFields = ['age', 'gender', 'customerId'];
-      const missingFields = requiredFields.filter(field => !formData[field]);
+      // Lấy token từ localStorage
+      const token = localStorage.getItem('token');
+      const headers = {};
       
-      if (missingFields.length > 0) {
-        console.error('UserFormService: Missing required fields:', missingFields);
-        throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
       }
       
-      // Override window.alert before API call to silence any alerts
+      // Temporarily replace alert with console.log to suppress popup
       const originalAlert = window.alert;
-      window.alert = function(message) {
-        console.log('Alert suppressed:', message);
-        return;
-      };
       
       try {
-        // Lấy token từ localStorage (hoặc vị trí lưu trữ khác)
-        const token = localStorage.getItem('token');
-        const headers = {};
+        window.alert = () => {
+          console.log('UserFormService: Suppressed an alert dialog');
+        };
         
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-          console.log('UserFormService: Token found and included in headers');
-        } else {
-          console.warn('UserFormService: No token found in localStorage');
-        }
-        
-        // Thêm custom header để bỏ qua thông báo từ server
-        headers['X-Skip-Alert'] = 'true';
-        
-        // Sửa endpoint API để match với backend controller
-        console.log('UserFormService: Sending POST request to /track-data-ai/process-form-data');
-        const response = await request.post('/track-data-ai/process-form-data', formData, { headers });
-        console.log('UserFormService: Received response:', JSON.stringify(response));
+        // Call the correct AI recommendation endpoint
+        const response = await request.post('/track-data-ai/recommend-course', formData, { headers });
         
         // Restore original alert
         window.alert = originalAlert;
         
-        // Xóa bất kỳ popup nào có thể đã xuất hiện
-        const closeButtons = document.querySelectorAll('button.MuiButtonBase-root');
-        closeButtons.forEach(button => {
-          if (button.textContent === 'OK' || button.textContent === 'Close') {
+        console.log('UserFormService: Received recommendation response:', response);
+        
+        // Try to click any close buttons from unexpected dialogs
+        setTimeout(() => {
+          const closeButtons = document.querySelectorAll('button[aria-label="close"], .close-button, [onclick*="close"]');
+          closeButtons.forEach(button => {
             button.click();
             console.log('UserFormService: Found and clicked a close button');
-          }
+          });
         });
         
         return response;

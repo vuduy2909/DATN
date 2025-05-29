@@ -24,7 +24,7 @@ public class CourseServiceImpl implements ICourseService {
 
     @Override
     public List<Course> findAll() {
-        return courseRepository.findAll();
+        return courseRepository.findAllWithCourseType();
     }
 
     @SneakyThrows

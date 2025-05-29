@@ -1,38 +1,105 @@
-import React, { useState } from 'react';
-import styles from './Step6.module.css';
+import React, { useState, useEffect } from 'react';
 
-import Button from '@mui/material/Button';
-import { Divider } from '@mui/material';
+import {
+    Box,
+    Container,
+    Paper,
+    Typography,
+    Button,
+    Stepper,
+    Step,
+    StepLabel,
+    Chip,
+    Avatar,
+    Card,
+    CardContent,
+    Divider,
+    CircularProgress
+} from '@mui/material';
+import {
+    CameraAlt,
+    ArrowBack,
+    CheckCircle,
+    SmartToy
+} from '@mui/icons-material';
+
 import BodyImageAnalyzer from '../BodyImageAnalyzer';
 import UserFormService from '../../services/UserFormService';
 
 const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
     const [submitting, setSubmitting] = useState(false);
+    const [analysisTimestamp, setAnalysisTimestamp] = useState(Date.now()); // Force re-render when analysis updates
+
+    const steps = [
+        'Thông tin tập luyện',
+        'Thông tin cơ bản', 
+        'Mục tiêu tập luyện',
+        'Tần suất mong muốn',
+        'Thông tin nghề nghiệp',
+        'Số đo cơ thể',
+        'Kết quả phân tích'
+    ];
     
+    // Load saved bodyType from analysis when component mounts
+    useEffect(() => {
+        try {
+            const savedAnalysisData = localStorage.getItem('bodyImageAnalysisData');
+            if (savedAnalysisData) {
+                const parsedData = JSON.parse(savedAnalysisData);
+                if (parsedData.analysisResult && parsedData.analysisResult.bodyType) {
+                    const savedBodyType = parsedData.analysisResult.bodyType;
+                    
+                    // Only update if current bodyType is different and saved one is valid
+                    if (savedBodyType !== formData.bodyType && savedBodyType !== 'Unknown') {
+                        console.log('🔄 Restoring bodyType from saved analysis:', savedBodyType);
+                        handleChange({
+                            target: {
+                                name: 'bodyType',
+                                value: savedBodyType.trim(),
+                            },
+                        });
+                        setAnalysisTimestamp(Date.now());
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error loading saved bodyType:', error);
+        }
+    }, []); // Only run on mount
+
     // Xử lý khi phân tích ảnh hoàn tất hoặc khi các trường đo lường được cập nhật
     const handleAnalysisComplete = (bodyType, measurementChange = null) => {
         console.log('=== STEP6: BODY TYPE UPDATE ===');
         console.log('Body type received from Claude API:', bodyType);
         console.log('Current formData.bodyType:', formData.bodyType);
+        console.log('Measurement change:', measurementChange);
         
         // Update body type - ưu tiên kết quả từ Claude API
-        if (bodyType && bodyType !== 'Unknown') {
+        if (bodyType && bodyType !== 'Unknown' && typeof bodyType === 'string') {
             console.log('✅ Updating body type from Claude API:', bodyType);
+            
+            // Ensure the bodyType is properly updated in formData
             handleChange({
                 target: {
                     name: 'bodyType',
-                    value: bodyType,
+                    value: bodyType.trim(), // Remove any whitespace
                 },
             });
-            console.log('Body type updated to:', bodyType);
+            
+            console.log('Body type updated to:', bodyType.trim());
+            
+            // Force re-render of current data display
+            setAnalysisTimestamp(Date.now());
         } else {
             console.log('❌ No valid body type from Claude API, keeping existing value:', formData.bodyType);
         }
         
         // If we have measurement changes, update those too
-        if (measurementChange) {
+        if (measurementChange && measurementChange.target) {
             console.log('📏 Updating measurements:', measurementChange);
             handleChange(measurementChange);
+            // Also force re-render for measurement updates
+            setAnalysisTimestamp(Date.now());
         }
         
         console.log('=== END STEP6: BODY TYPE UPDATE ===');
@@ -88,8 +155,8 @@ const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
             // ENUM('Student','Office worker','Delivery staff','Lecturer','Service staff','Other')
             const occupationMap = {
                 'Sinh viên': 'Student',
-                'Văn phòng': 'Office worker',
-                'Giao hàng': 'Delivery staff',
+                'Nhân viên văn phòng': 'Office worker',
+                'Nhân viên giao hàng': 'Delivery staff',
                 'Giảng viên': 'Lecturer',
                 'Nhân viên dịch vụ': 'Service staff',
                 'Khác': 'Other'
@@ -101,22 +168,22 @@ const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
                 'Văn phòng': 'Office',
                 'Làm theo ca': 'Shift work',
                 'Đứng nhiều': 'Standing-intensive',
-                'Đi bộ nhiều': 'Walking-intensive',
-                'Lái xe': 'Driving-intensive',
-                'Lao động tay chân': 'Manual labor'
+                'Đi lại nhiều': 'Walking-intensive',
+                'Lái xe nhiều': 'Driving-intensive',
+                'Lao động chân tay': 'Manual labor'
             };
             
             // Map training goals values to database ENUM values
             // ENUM('1, Strength Training','2, Cardiovascular Training','3, Flexibility and Balance',
             //      '4, Train strength and endurance','5, Mind-Body Wellness','6, Functional Training','7, Weight Loss')
             const trainingGoalMap = {
-                'Tăng cơ': '1, Strength Training',
-                'Tăng sức bền tim mạch': '2, Cardiovascular Training',
-                'Dẻo dai và thăng bằng': '3, Flexibility and Balance',
-                'Tăng sức mạnh và sức bền': '4, Train strength and endurance',
-                'Sức khỏe tinh thần': '5, Mind-Body Wellness',
-                'Huấn luyện chức năng': '6, Functional Training',
-                'Giảm cân tổng thể': '7, Weight Loss'
+                'Giảm cân tổng thể': '7, Weight Loss',
+                'Giảm mỡ, giữ cơ': '7, Weight Loss',
+                'Tăng cơ bắp': '1, Strength Training',
+                'Tăng sức mạnh': '1, Strength Training',
+                'Cải thiện sức chịu đựng': '2, Cardiovascular Training',
+                'Tăng tính linh hoạt': '3, Flexibility and Balance',
+                'Duy trì vóc dáng': '6, Functional Training'
             };
 
             // Prepare API data format
@@ -183,112 +250,227 @@ const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
     };
 
     return (
-        <div className={styles.groupCard}>
-            <div className={styles.wrapCard}>
-                <div className={styles.loadSteps}>
-                    <div className={styles.stepCircle}>
-                        <p className={styles.stepNumber}>1</p>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="35" height="35" viewBox="0 0 35 35" fill="none">
-                            <circle cx="17.2012" cy="17.3235" r="17" fill="#CF4044" />
-                        </svg>
-                    </div>
-                    <div className={styles.lineStepFull}></div>
-                    <div className={styles.stepCircle}>
-                        <p className={styles.stepNumber}>2</p>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="35" height="35" viewBox="0 0 35 35" fill="none">
-                            <circle cx="17.2012" cy="17.3235" r="17" fill="#CF4044" />
-                        </svg>
-                    </div>
-                    <div className={styles.lineStepFull}></div>
-                    <div className={styles.stepCircle}>
-                        <p className={styles.stepNumber}>3</p>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="35" height="35" viewBox="0 0 35 35" fill="none">
-                            <circle cx="17.2012" cy="17.3235" r="17" fill="#CF4044" />
-                        </svg>
-                    </div>
-                    <div className={styles.lineStepFull}></div>
-                    <div className={styles.stepCircle}>
-                        <p className={styles.stepNumber}>4</p>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="35" height="35" viewBox="0 0 35 35" fill="none">
-                            <circle cx="17.2012" cy="17.3235" r="17" fill="#CF4044" />
-                        </svg>
-                    </div>
-                    <div className={styles.lineStepFull}></div>
-                    <div className={styles.stepCircle}>
-                        <p className={styles.stepNumber}>5</p>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="35" height="35" viewBox="0 0 35 35" fill="none">
-                            <circle cx="17.3809" cy="17.3235" r="17" fill="#CF4044" />
-                        </svg>
-                    </div>
-                    <div className={styles.lineStepFull}></div>
-                    <div className={styles.stepCircle}>
-                        <p className={styles.stepNumber}>6</p>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="35" height="35" viewBox="0 0 35 35" fill="none">
-                            <circle cx="17.3809" cy="17.3235" r="17" fill="#CF4044" />
-                        </svg>
-                    </div>
-                    <div className={styles.lineStepNon}></div>
-                    <div className={styles.stepCircle}>
-                        <p className={styles.stepNumberNon}>7</p>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="35" height="35" viewBox="0 0 35 35" fill="none">
-                            <circle cx="17.3809" cy="17.3235" r="17" fill="#EFF0F7" />
-                        </svg>
-                    </div>
-                </div>
-                <div className={styles.line}></div>
-                <h4>6. AI Phân tích cơ thể</h4>
-                <div className={styles.formContainer}>
-                    <Divider sx={{ my: 3 }} />
-                    
-                    {/* Component phân tích ảnh */}
-                    <BodyImageAnalyzer 
-                        formData={formData} 
-                        onAnalysisComplete={handleAnalysisComplete}
-                    />
-                </div>
-                <div className={styles.btnGroup}>
-                    <Button
-                        variant="outlined"
-                        onClick={handlePrevious}
-                        sx={{ marginTop: 10, borderRadius: 55, color: '#CF4044', border: '1px solid #CF4044' }}
-                        color="error"
-                        disabled={submitting}
-                    >
-                        Bước trước
-                    </Button>
-                    <Button
-                        variant="contained"
-                        onClick={handleSubmit}
-                        sx={{ 
-                            marginTop: 10, 
-                            borderRadius: 55, 
-                            color: '#fff', 
-                            backgroundColor: submitting ? '#999' : '#CF4044',
-                            position: 'relative',
-                            minWidth: '180px'
-                        }}
-                        color="error"
-                        disabled={submitting}
-                    >
-                        {submitting ? (
-                            <>
-                                <span style={{ marginRight: '10px' }}>Đang xử lý...</span>
-                                <div className={styles.spinner} style={{
-                                    width: '20px',
-                                    height: '20px',
-                                    border: '2px solid rgba(255,255,255,0.2)',
-                                    borderTop: '2px solid #fff',
-                                    borderRadius: '50%',
-                                    animation: 'spin 1s linear infinite',
-                                    position: 'absolute',
-                                    right: '20px'
-                                }}></div>
-                            </>
-                        ) : 'Hoàn thành'}
-                    </Button>
-                </div>
-            </div>
-        </div>
+        <Box sx={{ 
+            backgroundColor: '#ffffff', 
+            minHeight: '100vh',
+            py: 2,
+            background: 'linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)'
+        }}>
+            <Container maxWidth="md" sx={{ py: 4 }}>
+                {/* Material UI Stepper */}
+                <Paper elevation={2} sx={{ p: 3, mb: 4, borderRadius: 3 }}>
+                    <Stepper activeStep={5} alternativeLabel>
+                        {steps.map((label, index) => (
+                            <Step key={label}>
+                                <StepLabel>
+                                    <Typography variant="caption" sx={{ fontSize: '0.75rem' }}>
+                                        {label}
+                                    </Typography>
+                                </StepLabel>
+                            </Step>
+                        ))}
+                    </Stepper>
+                </Paper>
+
+                {/* Main Content */}
+                <Paper elevation={4} sx={{ p: 4, borderRadius: 4, background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)' }}>
+                    {/* Header */}
+                    <Box sx={{ textAlign: 'center', mb: 4 }}>
+                        <Avatar sx={{ 
+                            bgcolor: '#CF4044', 
+                            width: 80, 
+                            height: 80, 
+                            mx: 'auto', 
+                            mb: 2,
+                            boxShadow: '0 8px 24px rgba(207, 64, 68, 0.3)'
+                        }}>
+                            <SmartToy sx={{ fontSize: 40 }} />
+                        </Avatar>
+                        
+                        <Typography variant="h4" sx={{ 
+                            fontWeight: 'bold', 
+                            color: '#2c3e50', 
+                            mb: 1,
+                            background: 'linear-gradient(45deg, #CF4044 30%, #e74c3c 90%)',
+                            backgroundClip: 'text',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                        }}>
+                            AI Phân tích cơ thể
+                        </Typography>
+                        
+                        <Typography variant="h6" sx={{ color: '#7f8c8d', fontWeight: 400 }}>
+                            Sử dụng AI để phân tích thông số cơ thể và tạo chương trình tối ưu
+                        </Typography>
+                        
+                        <Chip 
+                            label="Bước 6/7" 
+                            color="primary" 
+                            sx={{ 
+                                mt: 2, 
+                                bgcolor: '#CF4044',
+                                fontWeight: 'bold'
+                            }} 
+                        />
+                    </Box>
+
+                    {/* AI Analysis Section */}
+                    <Card elevation={3} sx={{ mb: 4, borderRadius: 3, border: '2px solid #e3f2fd' }}>
+                        <CardContent sx={{ p: 3 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                                <Avatar sx={{ bgcolor: '#2196f3', mr: 2, width: 50, height: 50 }}>
+                                    <CameraAlt />
+                                </Avatar>
+                                <Box>
+                                    <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#2c3e50' }}>
+                                        Phân tích hình ảnh thông minh
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ color: '#7f8c8d' }}>
+                                        Upload ảnh để AI phân tích dáng người và đưa ra khuyến nghị
+                                    </Typography>
+                                </Box>
+                            </Box>
+
+                            <Divider sx={{ my: 3 }} />
+                            
+                            {/* Component phân tích ảnh */}
+                            <BodyImageAnalyzer 
+                                formData={formData} 
+                                onAnalysisComplete={handleAnalysisComplete}
+                            />
+                        </CardContent>
+                    </Card>
+
+                    {/* Current Data Summary */}
+                    {(formData.bodyType || formData.chestSize || formData.waistSize) && (
+                        <Card 
+                            key={`current-data-${analysisTimestamp}`} // Force re-render when analysis updates
+                            elevation={2} 
+                            sx={{ mb: 4, borderRadius: 3, bgcolor: '#f8f9fa' }}
+                        >
+                            <CardContent sx={{ p: 3 }}>
+                                <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#2c3e50', mb: 2, textAlign: 'center' }}>
+                                    📊 Dữ liệu hiện tại
+                                </Typography>
+                                
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center' }}>
+                                    {formData.bodyType && (
+                                        <Chip 
+                                            label={`Dáng người: ${formData.bodyType}`}
+                                            color="primary"
+                                            sx={{ 
+                                                bgcolor: '#e8f5e8',
+                                                color: '#2e7d32',
+                                                fontWeight: 'bold',
+                                                animation: formData.bodyType && analysisTimestamp > Date.now() - 3000 ? 'pulse 2s ease-in-out 3' : 'none',
+                                                '@keyframes pulse': {
+                                                    '0%': { transform: 'scale(1)' },
+                                                    '50%': { transform: 'scale(1.05)' },
+                                                    '100%': { transform: 'scale(1)' }
+                                                }
+                                            }}
+                                        />
+                                    )}
+                                    {formData.chestSize && (
+                                        <Chip 
+                                            label={`Vòng ngực: ${formData.chestSize}cm`}
+                                            color="secondary"
+                                            sx={{ 
+                                                bgcolor: '#fff3e0',
+                                                color: '#f57c00',
+                                                fontWeight: 'bold'
+                                            }}
+                                        />
+                                    )}
+                                    {formData.waistSize && (
+                                        <Chip 
+                                            label={`Vòng eo: ${formData.waistSize}cm`}
+                                            color="info"
+                                            sx={{ 
+                                                bgcolor: '#e3f2fd',
+                                                color: '#1565c0',
+                                                fontWeight: 'bold'
+                                            }}
+                                        />
+                                    )}
+                                </Box>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {/* Navigation Buttons */}
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
+                        <Button
+                            variant="outlined"
+                            onClick={handlePrevious}
+                            startIcon={<ArrowBack />}
+                            disabled={submitting}
+                            size="large"
+                            sx={{ 
+                                borderRadius: 6,
+                                color: '#CF4044', 
+                                borderColor: '#CF4044',
+                                padding: '12px 32px',
+                                fontSize: '16px',
+                                fontWeight: 'bold',
+                                textTransform: 'none',
+                                '&:hover': {
+                                    borderColor: '#B8363C',
+                                    backgroundColor: 'rgba(207, 64, 68, 0.04)',
+                                    transform: 'translateY(-2px)'
+                                },
+                                '&:disabled': {
+                                    borderColor: '#cccccc',
+                                    color: '#666666'
+                                },
+                                transition: 'all 0.3s ease-in-out'
+                            }}
+                        >
+                            Bước trước
+                        </Button>
+                        
+                        <Button
+                            variant="contained"
+                            onClick={handleSubmit}
+                            disabled={submitting}
+                            endIcon={submitting ? <CircularProgress size={20} color="inherit" /> : <CheckCircle />}
+                            size="large"
+                            sx={{ 
+                                borderRadius: 6,
+                                background: submitting 
+                                    ? '#999999' 
+                                    : 'linear-gradient(45deg, #CF4044 30%, #e74c3c 90%)',
+                                color: 'white',
+                                padding: '12px 32px',
+                                fontSize: '16px',
+                                fontWeight: 'bold',
+                                textTransform: 'none',
+                                minWidth: '180px',
+                                boxShadow: submitting 
+                                    ? 'none' 
+                                    : '0 8px 20px rgba(207, 64, 68, 0.4)',
+                                '&:hover': {
+                                    background: submitting 
+                                        ? '#999999'
+                                        : 'linear-gradient(45deg, #B8363C 30%, #c0392b 90%)',
+                                    boxShadow: submitting 
+                                        ? 'none' 
+                                        : '0 12px 28px rgba(207, 64, 68, 0.5)',
+                                    transform: submitting ? 'none' : 'translateY(-2px)'
+                                },
+                                '&:disabled': {
+                                    background: '#999999',
+                                    color: 'white'
+                                },
+                                transition: 'all 0.3s ease-in-out'
+                            }}
+                        >
+                            {submitting ? 'Đang xử lý...' : 'Hoàn thành'}
+                        </Button>
+                    </Box>
+                </Paper>
+            </Container>
+        </Box>
     );
 };
 

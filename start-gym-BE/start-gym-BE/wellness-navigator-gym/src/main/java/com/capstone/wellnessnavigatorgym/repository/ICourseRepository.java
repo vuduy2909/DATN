@@ -15,8 +15,11 @@ import java.util.Optional;
 @Repository
 @Transactional
 public interface ICourseRepository extends JpaRepository<Course, Integer> {
-    @Query(value = "SELECT * FROM course WHERE course_id = :id", nativeQuery = true)
+    @Query("SELECT c FROM Course c LEFT JOIN FETCH c.courseType WHERE c.courseId = :id")
     Optional<Course> findCourseById(@Param("id") Integer id);
+
+    @Query("SELECT c FROM Course c LEFT JOIN FETCH c.courseType")
+    List<Course> findAllWithCourseType();
 
     @Query(value = "select c.course_id, c.course_name, c.description, c.duration, c.image, d.day_id, d.day_name, " +
             "e.exercise_id, e.body_part, e.equipment, e.exercise_description, e.exercise_name, e.instructions, e.target, " +

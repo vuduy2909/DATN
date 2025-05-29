@@ -1,9 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import styles from './Step7.module.css'; // Use dedicated CSS for Step7
-import Button from '@mui/material/Button';
-import { Paper, Typography, Divider, Chip, Alert, CircularProgress } from '@mui/material';
-
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import {
+    Box,
+    Container,
+    Paper,
+    Typography,
+    Button,
+    Stepper,
+    Step,
+    StepLabel,
+    Chip,
+    Avatar,
+    Card,
+    CardContent,
+    Alert,
+    CircularProgress,
+    Grid,
+    Divider
+} from '@mui/material';
+import {
+    CheckCircle,
+    ArrowBack,
+    Psychology,
+    FitnessCenter,
+    Star,
+    TrendingUp,
+    Assignment
+} from '@mui/icons-material';
 
 const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendationResult, loading, error }) => {
     console.log('Step7 rendering with props:', { 
@@ -16,16 +38,17 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
     const [confirmLoading, setConfirmLoading] = useState(false);
     const [confirmError, setConfirmError] = useState('');
     const [confirmed, setConfirmed] = useState(false);
-    
-
-    
-    // Add state to track local recommendation data
     const [localRecommendation, setLocalRecommendation] = useState(null);
-    
-    // Function to generate explanation using Claude API (temporarily disabled)
-    // const generateClaudeExplanation = async (recommendation) => {
-    //     // Implementation disabled due to unused variables
-    // };
+
+    const steps = [
+        'Thông tin tập luyện',
+        'Thông tin cơ bản', 
+        'Mục tiêu tập luyện',
+        'Tần suất mong muốn',
+        'Thông tin nghề nghiệp',
+        'Số đo cơ thể',
+        'Kết quả phân tích'
+    ];
 
     useEffect(() => {
         console.log('Step7 useEffect triggered with recommendationResult:', recommendationResult);
@@ -38,15 +61,6 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
                     const parsed = JSON.parse(savedData);
                     console.log('Loaded recommendation data from localStorage:', parsed);
                     setLocalRecommendation(parsed);
-
-
-                    
-                    // Generate Claude explanation if we have valid data - TEMPORARY DISABLED
-                    /*
-                    if (hasValidData) {
-                        generateClaudeExplanation(parsed);
-                    }
-                    */
                 }
             } catch (e) {
                 console.error('Error parsing localStorage recommendation data:', e);
@@ -66,16 +80,6 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
             } catch (e) {
                 console.error('Error saving to localStorage:', e);
             }
-            
-
-            
-            // Generate Claude explanation if we have valid data - TEMPORARY DISABLED
-            /*
-            if (hasValidData) {
-                generateClaudeExplanation(recommendationResult);
-            }
-            */
-
         }
     }, [recommendationResult]);
 
@@ -162,334 +166,377 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
 
     // Get the recommendation from the API result
     const recommendedCourse = activeRecommendation?.recommendedCourse;
-    
-
-    
-    // Check if we have API recommendations
     const hasApiRecommendations = !!recommendedCourse;
-    
-    // Extract user metrics used by the decision tree
     const userMetrics = activeRecommendation?.userMetrics || {};
 
-    // Format backend log data for display
-    const formatLogData = () => {
-        // Debug để kiểm tra dữ liệu
-        console.log('Step7 Debug - userMetrics:', userMetrics);
-        console.log('Step7 Debug - formData:', formData);
-        console.log('Step7 Debug - waist from userMetrics:', userMetrics.waist_circumference);
-        console.log('Step7 Debug - waist from formData:', formData.waistSize);
-        console.log('Step7 Debug - chest from userMetrics:', userMetrics.chest_circumference);
-        console.log('Step7 Debug - chest from formData:', formData.chestSize);
-        
-        // Helper function to map database enum values to user-friendly display text
-        const mapTrainingFrequency = (value) => {
-            if (!value) return "Not specified";
-            
-            // Return the value directly if it's one of the enum values
-            const enumValues = ["Never", "Occasionally", "Moderate", "Regularly", "Advanced"];
-            if (enumValues.includes(value)) {
-                // For user display, we can add descriptions for clarity
-                switch(value) {
-                    case "Never": return "Never (First time)";
-                    case "Occasionally": return "Occasionally (1 session/week)";
-                    case "Moderate": return "Moderate (2-3 sessions/week)";
-                    case "Regularly": return "Regularly (3-4 sessions/week)";
-                    case "Advanced": return "Advanced (5+ sessions/week)";
-                    default: return value;
-                }
-            }
-            
-            // For any non-standard value, try to map it
-            const valueStr = String(value).toUpperCase();
-            if (valueStr.includes("REGULAR")) return "Regularly (3-4 sessions/week)";
-            if (valueStr.includes("NEVER")) return "Never (First time)";
-            if (valueStr.includes("OCCASION")) return "Occasionally (1 session/week)";
-            if (valueStr.includes("MODERATE")) return "Moderate (2-3 sessions/week)";
-            if (valueStr.includes("ADVANCED")) return "Advanced (5+ sessions/week)";
-            
-            return value; // Return as-is if no mapping found
-        };
-        
-        // Map occupation from database enum to user-friendly display
-        const mapOccupation = (value) => {
-            const displayMap = {
-                'Student': 'Sinh viên',
-                'Office worker': 'Văn phòng',
-                'Delivery staff': 'Giao hàng',
-                'Lecturer': 'Giảng viên',
-                'Service staff': 'Nhân viên dịch vụ',
-                'Other': 'Khác'
-            };
-            
-            return displayMap[value] || value;
-        };
-        
-        // Map work environment from database enum to user-friendly display
-        const mapWorkEnvironment = (value) => {
-            const displayMap = {
-                'Office': 'Văn phòng',
-                'Shift work': 'Làm theo ca',
-                'Standing-intensive': 'Đứng nhiều',
-                'Walking-intensive': 'Đi bộ nhiều',
-                'Driving-intensive': 'Lái xe',
-                'Manual labor': 'Lao động tay chân'
-            };
-            
-            return displayMap[value] || value;
-        };
-        
-        // Map training goals from database enum to user-friendly display
-        const mapTrainingGoal = (value) => {
-            // Extract the name part from the enum value (e.g. "7, Weight Loss" -> "Weight Loss")
-            if (value && value.includes(', ')) {
-                const namePart = value.split(', ')[1];
-                
-                // Map English names to Vietnamese if needed
-                const displayMap = {
-                    'Strength Training': 'Tăng cơ',
-                    'Cardiovascular Training': 'Tăng sức bền tim mạch',
-                    'Flexibility and Balance': 'Dẻo dai và thăng bằng',
-                    'Train strength and endurance': 'Tăng sức mạnh và sức bền',
-                    'Mind-Body Wellness': 'Sức khỏe tinh thần',
-                    'Functional Training': 'Huấn luyện chức năng',
-                    'Weight Loss': 'Giảm cân tổng thể'
-                };
-                
-                return displayMap[namePart] || namePart;
-            }
-            
-            return value;
-        };
-        
-        const data = [
-            { label: "Độ tuổi", value: userMetrics.age || formData.age },
-            { label: "Giới tính", value: userMetrics.gender || formData.gender },
-            { label: "Chiều cao", value: `${userMetrics.height || formData.height} cm` },
-            { label: "Cân nặng", value: `${userMetrics.weight || formData.weight} kg` },
-            { label: "BMI", value: userMetrics.bmi ? Number(userMetrics.bmi).toFixed(2) : (formData.weight / Math.pow(formData.height/100, 2)).toFixed(2) },
-            { 
-                label: "Loại hình thể", 
-                value: userMetrics.body_type || formData.bodyType || "Normal",
-                isHighlighted: true // Highlight body type để dễ nhận biết
-            },
-            { label: "Nghề nghiệp", value: mapOccupation(userMetrics.occupation || formData.occupation) },
-            { label: "Môi trường làm việc", value: mapWorkEnvironment(userMetrics.work_environment || formData.workEnvironment) },
-            { label: "Lịch sử tập luyện", value: mapTrainingFrequency(userMetrics.training_history || formData.trainingFrequency) },
-            { label: "Tần suất mong muốn", value: mapTrainingFrequency(userMetrics.training_frequency || formData.desiredFrequency) },
-            { label: "Mục tiêu tập luyện", value: mapTrainingGoal(userMetrics.training_goals || formData.trainingGoal) },
-        ];
-
-        // Add measurements with more prominence - kiểm tra tất cả tên field có thể
-        const waistValue = userMetrics.waist_circumference || formData.waistSize || formData.waist_circumference;
-        const chestValue = userMetrics.chest_circumference || formData.chestSize || formData.chest_circumference;
-        
-        console.log('Step7 Debug - Final waist value:', waistValue);
-        console.log('Step7 Debug - Final chest value:', chestValue);
-        
-        if (waistValue) {
-            data.push({ 
-                label: "Vòng eo", 
-                value: `${waistValue} cm`,
-                isHighlighted: true
-            });
-        } else {
-            data.push({ label: "Vòng eo", value: "Không có" });
+    // Helper functions to map data
+    const mapTrainingFrequency = (value) => {
+        if (!value) return "Không xác định";
+        switch(value) {
+            case "Never": return "Chưa từng tập";
+            case "Occasionally": return "2 buổi/tuần";
+            case "Moderate": return "3 buổi/tuần";
+            case "Regularly": return "4 buổi/tuần";
+            case "Advanced": return "5+ buổi/tuần";
+            default: return value;
         }
-
-        if (chestValue) {
-            data.push({ 
-                label: "Vòng ngực", 
-                value: `${chestValue} cm`,
-                isHighlighted: true
-            });
-        } else {
-            data.push({ label: "Vòng ngực", value: "Không có" });
-        }
-
-        console.log('Step7 Debug - Final body type value:', userMetrics.body_type || formData.bodyType || "Normal");
-
-        return data;
     };
 
-    const logData = formatLogData();
+    const mapTrainingGoal = (value) => {
+        if (!value) return "Không xác định";
+        if (value.includes("Weight Loss")) return "Giảm cân";
+        if (value.includes("Strength Training")) return "Tăng cơ bắp";
+        if (value.includes("Cardiovascular")) return "Tăng sức bền";
+        if (value.includes("Flexibility")) return "Tăng độ dẻo";
+        if (value.includes("Functional")) return "Duy trì vóc dáng";
+        return value;
+    };
+
+    if (loading) {
+        return (
+            <Container maxWidth="md" sx={{ py: 4, textAlign: 'center' }}>
+                <CircularProgress size={80} sx={{ color: '#CF4044', mb: 3 }} />
+                <Typography variant="h5" sx={{ color: '#7f8c8d' }}>
+                    Đang phân tích và tạo đề xuất cho bạn...
+                </Typography>
+            </Container>
+        );
+    }
+
+    if (error) {
+        return (
+            <Container maxWidth="md" sx={{ py: 4 }}>
+                <Alert severity="error" sx={{ mb: 3 }}>
+                    {error}
+                </Alert>
+                <Button variant="outlined" onClick={handlePrevious}>
+                    Quay lại
+                </Button>
+            </Container>
+        );
+    }
 
     return (
-        <div className={styles.container}>
-            <div className={styles.stepIndicator}>
-                <div className={styles.stepLabel}>Bước 7/7: Xác nhận đề xuất khóa học</div>
-            </div>
-            
-            <div className={styles.content}>
-                <div className={styles.card}>
-                    <div className={styles.cardHeader}>
-                        <h2>Thông tin của bạn đã được ghi nhận</h2>
-                    </div>
-                    
-                    {loading && (
-                        <div className={styles.loadingContainer}>
-                            <CircularProgress color="error" />
-                        </div>
-                    )}
-                    
-                    {error && (
-                        <Alert severity="error" className={styles.alert}>
-                            {error}
+        <Box sx={{ 
+            backgroundColor: '#ffffff', 
+            minHeight: '100vh',
+            py: 2,
+            background: 'linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)'
+        }}>
+            <Container maxWidth="md" sx={{ py: 4 }}>
+                {/* Material UI Stepper */}
+                <Paper elevation={2} sx={{ p: 3, mb: 4, borderRadius: 3 }}>
+                    <Stepper activeStep={6} alternativeLabel>
+                        {steps.map((label, index) => (
+                            <Step key={label}>
+                                <StepLabel>
+                                    <Typography variant="caption" sx={{ fontSize: '0.75rem' }}>
+                                        {label}
+                                    </Typography>
+                                </StepLabel>
+                            </Step>
+                        ))}
+                    </Stepper>
+                </Paper>
+
+                {/* Main Content */}
+                <Paper elevation={4} sx={{ p: 4, borderRadius: 4, background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)' }}>
+                    {/* Header */}
+                    <Box sx={{ textAlign: 'center', mb: 4 }}>
+                        <Avatar sx={{ 
+                            bgcolor: '#4CAF50', 
+                            width: 80, 
+                            height: 80, 
+                            mx: 'auto', 
+                            mb: 2,
+                            boxShadow: '0 8px 24px rgba(76, 175, 80, 0.3)'
+                        }}>
+                            <Psychology sx={{ fontSize: 40 }} />
+                        </Avatar>
+                        
+                        <Typography variant="h4" sx={{ 
+                            fontWeight: 'bold', 
+                            color: '#2c3e50', 
+                            mb: 1,
+                            background: 'linear-gradient(45deg, #4CAF50 30%, #66BB6A 90%)',
+                            backgroundClip: 'text',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                        }}>
+                            Kết quả phân tích
+                        </Typography>
+                        
+                        <Typography variant="h6" sx={{ color: '#7f8c8d', fontWeight: 400 }}>
+                            Dựa trên thông tin của bạn, chúng tôi đã tạo ra chương trình tối ưu
+                        </Typography>
+                        
+                        <Chip 
+                            label="Hoàn thành" 
+                            color="success" 
+                            sx={{ 
+                                mt: 2, 
+                                bgcolor: '#4CAF50',
+                                fontWeight: 'bold'
+                            }} 
+                        />
+                    </Box>
+
+                    {/* Recommendation Results */}
+                    {hasApiRecommendations ? (
+                        <Grid container spacing={3} sx={{ mb: 4 }}>
+                            {/* Recommended Course */}
+                            <Grid item xs={12}>
+                                <Card elevation={3} sx={{ borderRadius: 3, border: '2px solid #4CAF50' }}>
+                                    <CardContent sx={{ p: 3 }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                            <Avatar sx={{ bgcolor: '#4CAF50', mr: 2 }}>
+                                                <Star />
+                                            </Avatar>
+                                            <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#2c3e50' }}>
+                                                Khóa học được đề xuất
+                                            </Typography>
+                                        </Box>
+                                        
+                                        <Box sx={{ bgcolor: '#f0f8ff', p: 3, borderRadius: 2, mb: 2 }}>
+                                            <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#1565c0', mb: 1 }}>
+                                                {recommendedCourse.title || recommendedCourse.course_name || 'Khóa học chưa xác định'}
+                                            </Typography>
+                                            <Typography variant="body1" sx={{ color: '#7f8c8d', mb: 2 }}>
+                                                {recommendedCourse.description || recommendedCourse.course_description || 'Mô tả khóa học chưa có'}
+                                            </Typography>
+                                            
+                                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                                <Chip 
+                                                    label={`Cấp độ: ${recommendedCourse.level || recommendedCourse.course_level || 'Chưa xác định'}`} 
+                                                    color="primary" 
+                                                    size="small" 
+                                                />
+                                                <Chip 
+                                                    label={`Thời lượng: ${recommendedCourse.duration || recommendedCourse.course_duration || 'N/A'} phút`} 
+                                                    color="secondary" 
+                                                    size="small" 
+                                                />
+                                                <Chip 
+                                                    label={`Loại: ${recommendedCourse.category || recommendedCourse.course_category || recommendedCourse.course_type || 'Chưa phân loại'}`} 
+                                                    color="info" 
+                                                    size="small" 
+                                                />
+                                                {recommendedCourse.instructor && (
+                                                    <Chip 
+                                                        label={`HLV: ${recommendedCourse.instructor}`} 
+                                                        color="warning" 
+                                                        size="small" 
+                                                    />
+                                                )}
+                                            </Box>
+                                        </Box>
+                                    </CardContent>
+                                </Card>
+                            </Grid>
+
+                            {/* User Physical Information */}
+                            <Grid item xs={12} md={6}>
+                                <Card elevation={2} sx={{ height: '100%', borderRadius: 3 }}>
+                                    <CardContent sx={{ p: 3 }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                            <Avatar sx={{ bgcolor: '#f39c12', mr: 2 }}>
+                                                <Assignment />
+                                            </Avatar>
+                                            <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#2c3e50' }}>
+                                                Thông tin cơ thể
+                                            </Typography>
+                                        </Box>
+
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                            <Typography variant="body2">
+                                                <strong>Tuổi:</strong> {userMetrics.age || formData.age} tuổi
+                                            </Typography>
+                                            <Typography variant="body2">
+                                                <strong>Giới tính:</strong> {userMetrics.gender === 'Male' ? 'Nam' : userMetrics.gender === 'Female' ? 'Nữ' : 'Không xác định'}
+                                            </Typography>
+                                            <Typography variant="body2">
+                                                <strong>Chiều cao:</strong> {userMetrics.height || formData.height} cm
+                                            </Typography>
+                                            <Typography variant="body2">
+                                                <strong>Cân nặng:</strong> {userMetrics.weight || formData.weight} kg
+                                            </Typography>
+                                            <Typography variant="body2">
+                                                <strong>BMI:</strong> {userMetrics.bmi?.toFixed(1) || (formData.bmi ? formData.bmi.toFixed(1) : 'N/A')}
+                                            </Typography>
+                                            <Typography variant="body2">
+                                                <strong>Dáng người:</strong> {userMetrics.body_type || formData.bodyType || 'Không xác định'}
+                                            </Typography>
+                                        </Box>
+                                    </CardContent>
+                                </Card>
+                            </Grid>
+
+                            {/* Body Measurements */}
+                            <Grid item xs={12} md={6}>
+                                <Card elevation={2} sx={{ height: '100%', borderRadius: 3 }}>
+                                    <CardContent sx={{ p: 3 }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                            <Avatar sx={{ bgcolor: '#e91e63', mr: 2 }}>
+                                                <FitnessCenter />
+                                            </Avatar>
+                                            <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#2c3e50' }}>
+                                                Số đo cơ thể
+                                            </Typography>
+                                        </Box>
+
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                            <Typography variant="body2">
+                                                <strong>Vòng ngực:</strong> {userMetrics.chest_circumference || formData.chestSize || 'Chưa đo'} cm
+                                            </Typography>
+                                            <Typography variant="body2">
+                                                <strong>Vòng eo:</strong> {userMetrics.waist_circumference || formData.waistSize || 'Chưa đo'} cm
+                                            </Typography>
+                                            <Typography variant="body2">
+                                                <strong>Nghề nghiệp:</strong> {userMetrics.occupation || formData.occupation || 'Không xác định'}
+                                            </Typography>
+                                            <Typography variant="body2">
+                                                <strong>Môi trường làm việc:</strong> {userMetrics.work_environment || formData.workEnvironment || 'Không xác định'}
+                                            </Typography>
+                                        </Box>
+                                    </CardContent>
+                                </Card>
+                            </Grid>
+
+                            {/* Training Analysis */}
+                            <Grid item xs={12}>
+                                <Card elevation={2} sx={{ borderRadius: 3 }}>
+                                    <CardContent sx={{ p: 3 }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                            <Avatar sx={{ bgcolor: '#9c27b0', mr: 2 }}>
+                                                <TrendingUp />
+                                            </Avatar>
+                                            <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#2c3e50' }}>
+                                                Phân tích tập luyện
+                                            </Typography>
+                                        </Box>
+
+                                        <Grid container spacing={2}>
+                                            <Grid item xs={12} sm={6} md={3}>
+                                                <Typography variant="body2">
+                                                    <strong>Kinh nghiệm:</strong><br/>
+                                                    {mapTrainingFrequency(userMetrics.training_history)}
+                                                </Typography>
+                                            </Grid>
+                                            <Grid item xs={12} sm={6} md={3}>
+                                                <Typography variant="body2">
+                                                    <strong>Tần suất mong muốn:</strong><br/>
+                                                    {mapTrainingFrequency(userMetrics.training_frequency)}
+                                                </Typography>
+                                            </Grid>
+                                            <Grid item xs={12} sm={6} md={3}>
+                                                <Typography variant="body2">
+                                                    <strong>Mục tiêu:</strong><br/>
+                                                    {mapTrainingGoal(userMetrics.training_goals)}
+                                                </Typography>
+                                            </Grid>
+                                            <Grid item xs={12} sm={6} md={3}>
+                                                <Typography variant="body2">
+                                                    <strong>Đánh giá:</strong><br/>
+                                                    Phù hợp với khóa học
+                                                </Typography>
+                                            </Grid>
+                                        </Grid>
+                                    </CardContent>
+                                </Card>
+                            </Grid>
+                        </Grid>
+                    ) : (
+                        <Alert severity="info" sx={{ mb: 4 }}>
+                            Không có dữ liệu đề xuất. Vui lòng thử lại hoặc liên hệ hỗ trợ.
                         </Alert>
                     )}
-                    
+
+                    {/* Status Messages */}
                     {confirmError && (
-                        <Alert severity="error" className={styles.alert}>
+                        <Alert severity="error" sx={{ mb: 3 }}>
                             {confirmError}
                         </Alert>
                     )}
-                    
+
                     {confirmed && (
-                        <Alert severity="success" className={styles.alert} icon={<CheckCircleIcon fontSize="inherit" />}>
-                            <strong>Đề xuất khóa học đã được xác nhận thành công!</strong>
-                            <p>Đang chuyển hướng đến trang khóa học đề xuất...</p>
+                        <Alert severity="success" sx={{ mb: 3 }}>
+                            ✅ Đề xuất đã được xác nhận thành công! Đang chuyển hướng...
                         </Alert>
                     )}
-            
-                    {loading ? (
-                        <div className={styles.loadingContainer}>
-                            <Typography variant="h6">Đang tạo đề xuất từ dữ liệu của bạn...</Typography>
-                            <div className={styles.spinner}></div>
-                        </div>
-                    ) : (
-                        <div className={styles.analysisResults}>
-                            {hasApiRecommendations && (
-                                <Alert severity="success" className={styles.alert}>
-                                    <strong>Hoàn tất phân tích!</strong> Đã tìm được khóa học phù hợp với thông tin của bạn.
-                                </Alert>
-                            )}
-                            
-                            {/* Hiển thị dữ liệu log từ backend */}
-                            <Paper elevation={1} className={styles.section}>
-                                <Typography variant="h6" color="error" gutterBottom>
-                                    Thông số được sử dụng để đưa ra đề xuất
-                                </Typography>
-                                
-                                <div className={styles.logDataContainer}>
-                                    {logData.map((item, index) => (
-                                        <div key={index} className={`${styles.logItem} ${item.isHighlighted ? styles.highlightedLogItem : ''}`}>
-                                            <span className={styles.logLabel}>{item.label}:</span>
-                                            <span className={styles.logValue}>{item.value}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </Paper>
-                            
-                            {/* Hiển thị giải thích từ API - TEMPORARY DISABLED */}
-                            {/*
-                            <Paper elevation={1} className={styles.section}>
-                                <Typography variant="h6" color="error" gutterBottom>
-                                    Giải thích đề xuất từ AI
-                                </Typography>
-                                {explanationLoading ? (
-                                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', py: 3 }}>
-                                        <CircularProgress size={24} color="error" sx={{ mr: 2 }} />
-                                        <Typography variant="body2">Đang tạo giải thích chi tiết...</Typography>
-                                    </Box>
-                                ) : (
-                                    <Typography paragraph style={{ whiteSpace: 'pre-line' }}>
-                                        {claudeExplanation || explanationText || 'Đang tạo giải thích từ AI...'}
-                                    </Typography>
-                                )}
-                            </Paper>
-                            */}
-                            
-                            {/* Hiển thị thông tin khóa học đề xuất */}
-                            <Typography variant="h6" color="error" gutterBottom className={styles.sectionTitle}>
-                                Khóa học đề xuất
-                            </Typography>
-                            
-                            <div className={styles.courseContainer}>
-                                {recommendedCourse ? (
-                                    <Paper 
-                                        elevation={2}
-                                        className={styles.courseCard}
-                                    >
-                                        <div className={styles.courseHeader}>
-                                            <Typography variant="subtitle1" color="error" fontWeight="bold">
-                                                {recommendedCourse.name || "Khóa học được đề xuất"}
-                                            </Typography>
-                                            <Chip 
-                                                label={recommendedCourse.courseType?.name || "General"}
-                                                size="small"
-                                                color="error"
-                                                variant="outlined"
-                                            />
-                                        </div>
-                                        <Divider className={styles.divider} />
-                                        <Typography variant="body2" paragraph>
-                                            {recommendedCourse.description || "Khóa học được cá nhân hóa dựa trên thông tin của bạn"}
-                                        </Typography>
-                                        <div className={styles.courseFooter}>
-                                            <Typography variant="body2">
-                                                <strong>Thời gian:</strong> {recommendedCourse.duration || "N/A"}
-                                            </Typography>
-                                            <Typography variant="body2" color="error">
-                                                Được đề xuất cho hồ sơ của bạn
-                                            </Typography>
-                                        </div>
-                                    </Paper>
-                                ) : (
-                                    <Alert severity="info" className={styles.alert}>
-                                        <strong>Không tìm thấy thông tin khóa học đề xuất.</strong> 
-                                        <p>Có thể có lỗi khi lưu dữ liệu hoặc tạo đề xuất. Các lý do có thể bao gồm:</p>
-                                        <ul>
-                                            <li>Dữ liệu không phù hợp với định dạng yêu cầu</li>
-                                            <li>Lỗi kết nối với máy chủ</li>
-                                            <li>Không có khóa học phù hợp với tiêu chí của bạn</li>
-                                        </ul>
-                                        <p>Bạn vẫn có thể xem danh sách khóa học đề xuất bằng cách nhấn nút bên dưới.</p>
-                                    </Alert>
-                                )}
-                            </div>
-                            
-                            {/* Phần xác nhận */}
-                            <div className={styles.confirmationBox}>
-                                <Typography variant="body1" gutterBottom>
-                                    <strong>{recommendedCourse ? 'Xác nhận lưu thông tin và đăng ký khóa học này?' : 'Xác nhận lưu thông tin và xem danh sách khóa học?'}</strong>
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary" gutterBottom>
-                                    {recommendedCourse ? 'Khi xác nhận, thông tin của bạn sẽ được lưu vào cơ sở dữ liệu và khóa học sẽ được thêm vào danh sách của bạn' : 'Xác nhận để lưu thông tin vào cơ sở dữ liệu và chuyển đến trang danh sách khóa học'}
-                                </Typography>
-                                
-                                <div className={styles.buttonGroup}>
-                                    <Button
-                                        variant="outlined"
-                                        onClick={handlePrevious}
-                                        className={styles.backButton}
-                                        disabled={confirmLoading || confirmed}
-                                    >
-                                        Quay lại
-                                    </Button>
-                                    
-                                    <Button
-                                        variant="contained"
-                                        className={styles.confirmButton}
-                                        onClick={handleConfirmRecommendation}
-                                        disabled={confirmLoading || confirmed}
-                                    >
-                                        {confirmLoading ? (
-                                            <CircularProgress size={24} color="inherit" />
-                                        ) : (
-                                            <>
-                                                {recommendedCourse ? 
-                                                    'Xác nhận & đăng ký khóa học' : 
-                                                    'Xác nhận & lưu thông tin'
-                                                }
-                                            </>
-                                        )}
-                                    </Button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
+
+                    {/* Action Buttons */}
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
+                        <Button
+                            variant="outlined"
+                            onClick={handlePrevious}
+                            startIcon={<ArrowBack />}
+                            disabled={confirmLoading || confirmed}
+                            size="large"
+                            sx={{ 
+                                borderRadius: 6,
+                                color: '#CF4044', 
+                                borderColor: '#CF4044',
+                                padding: '12px 32px',
+                                fontSize: '16px',
+                                fontWeight: 'bold',
+                                textTransform: 'none',
+                                '&:hover': {
+                                    borderColor: '#B8363C',
+                                    backgroundColor: 'rgba(207, 64, 68, 0.04)',
+                                    transform: 'translateY(-2px)'
+                                },
+                                '&:disabled': {
+                                    borderColor: '#cccccc',
+                                    color: '#666666'
+                                },
+                                transition: 'all 0.3s ease-in-out'
+                            }}
+                        >
+                            Quay lại
+                        </Button>
+                        
+                        <Button
+                            variant="contained"
+                            onClick={handleConfirmRecommendation}
+                            disabled={confirmLoading || confirmed}
+                            endIcon={confirmLoading ? <CircularProgress size={20} color="inherit" /> : <FitnessCenter />}
+                            size="large"
+                            sx={{ 
+                                borderRadius: 6,
+                                background: (confirmLoading || confirmed) 
+                                    ? '#4CAF50' 
+                                    : 'linear-gradient(45deg, #4CAF50 30%, #66BB6A 90%)',
+                                color: 'white',
+                                padding: '12px 32px',
+                                fontSize: '16px',
+                                fontWeight: 'bold',
+                                textTransform: 'none',
+                                minWidth: '200px',
+                                boxShadow: (confirmLoading || confirmed) 
+                                    ? 'none' 
+                                    : '0 8px 20px rgba(76, 175, 80, 0.4)',
+                                '&:hover': {
+                                    background: (confirmLoading || confirmed) 
+                                        ? '#4CAF50'
+                                        : 'linear-gradient(45deg, #388E3C 30%, #4CAF50 90%)',
+                                    boxShadow: (confirmLoading || confirmed) 
+                                        ? 'none' 
+                                        : '0 12px 28px rgba(76, 175, 80, 0.5)',
+                                    transform: (confirmLoading || confirmed) ? 'none' : 'translateY(-2px)'
+                                },
+                                '&:disabled': {
+                                    background: '#4CAF50',
+                                    color: 'white'
+                                },
+                                transition: 'all 0.3s ease-in-out'
+                            }}
+                        >
+                            {confirmed ? 'Đã xác nhận!' : confirmLoading ? 'Đang xử lý...' : 'Xác nhận & Bắt đầu'}
+                        </Button>
+                    </Box>
+                </Paper>
+            </Container>
+        </Box>
     );
 };
 

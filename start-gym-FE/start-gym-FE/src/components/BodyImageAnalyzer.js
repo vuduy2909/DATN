@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Box, 
   Button, 
@@ -21,8 +21,79 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
   const [loading, setLoading] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [error, setError] = useState('');
-  const [waistCircumference, setWaistCircumference] = useState('');
-  const [chestCircumference, setChestCircumference] = useState('');
+  const [waistCircumference, setWaistCircumference] = useState(formData.waistSize || '');
+  const [chestCircumference, setChestCircumference] = useState(formData.chestSize || '');
+
+  // Initialize measurements from formData when component mounts or formData changes
+  useEffect(() => {
+    if (formData.waistSize && waistCircumference !== formData.waistSize) {
+      setWaistCircumference(formData.waistSize);
+    }
+    if (formData.chestSize && chestCircumference !== formData.chestSize) {
+      setChestCircumference(formData.chestSize);
+    }
+  }, [formData.waistSize, formData.chestSize]);
+
+  // Load saved analysis data when component mounts
+  useEffect(() => {
+    try {
+      const savedAnalysisData = localStorage.getItem('bodyImageAnalysisData');
+      if (savedAnalysisData) {
+        const parsedData = JSON.parse(savedAnalysisData);
+        console.log('💾 Restoring saved analysis data:', parsedData);
+        
+        // Restore analysis result
+        if (parsedData.analysisResult) {
+          setAnalysisResult(parsedData.analysisResult);
+          console.log('✅ Restored analysis result:', parsedData.analysisResult);
+        }
+        
+        // Restore image preview
+        if (parsedData.previewUrl) {
+          setPreviewUrl(parsedData.previewUrl);
+          console.log('✅ Restored image preview');
+        }
+        
+        // Restore file info if available
+        if (parsedData.fileName) {
+          console.log('📄 Had saved file:', parsedData.fileName);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading saved analysis data:', error);
+    }
+  }, []);
+
+  // Save analysis data to localStorage whenever it changes
+  const saveAnalysisData = (newAnalysisResult = null, newPreviewUrl = null, fileName = null) => {
+    try {
+      const dataToSave = {
+        analysisResult: newAnalysisResult || analysisResult,
+        previewUrl: newPreviewUrl || previewUrl,
+        fileName: fileName,
+        timestamp: Date.now()
+      };
+      
+      localStorage.setItem('bodyImageAnalysisData', JSON.stringify(dataToSave));
+      console.log('💾 Saved analysis data to localStorage');
+    } catch (error) {
+      console.error('Error saving analysis data:', error);
+    }
+  };
+
+  // Clear analysis data
+  const clearAnalysisData = () => {
+    try {
+      localStorage.removeItem('bodyImageAnalysisData');
+      setAnalysisResult(null);
+      setPreviewUrl('');
+      setSelectedFile(null);
+      setError('');
+      console.log('🗑️ Cleared analysis data');
+    } catch (error) {
+      console.error('Error clearing analysis data:', error);
+    }
+  };
 
   // Xử lý khi người dùng chọn file ảnh
   const handleFileChange = (event) => {
@@ -30,12 +101,17 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
     if (file) {
       setSelectedFile(file);
       setError('');
+      // Clear previous analysis when new image is selected
       setAnalysisResult(null);
       
       // Tạo URL preview ảnh
       const reader = new FileReader();
       reader.onload = () => {
-        setPreviewUrl(reader.result);
+        const newPreviewUrl = reader.result;
+        setPreviewUrl(newPreviewUrl);
+        
+        // Save image preview to localStorage (clear previous analysis)
+        saveAnalysisData(null, newPreviewUrl, file.name);
       };
       reader.readAsDataURL(file);
     }
@@ -45,8 +121,16 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
   const handleWaistChange = (event) => {
     const value = event.target.value;
     setWaistCircumference(value);
+    
+    // Immediately save to formData with correct field name
     if (onAnalysisComplete) {
-      handleChange('waist_circumference', value);
+      const changeEvent = {
+        target: {
+          name: 'waistSize',  // Use the correct field name in formData
+          value: value,
+        },
+      };
+      onAnalysisComplete(formData.bodyType, changeEvent);
     }
   };
 
@@ -54,16 +138,30 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
   const handleChestChange = (event) => {
     const value = event.target.value;
     setChestCircumference(value);
+    
+    // Immediately save to formData with correct field name
     if (onAnalysisComplete) {
-      handleChange('chest_circumference', value);
+      const changeEvent = {
+        target: {
+          name: 'chestSize',  // Use the correct field name in formData
+          value: value,
+        },
+      };
+      onAnalysisComplete(formData.bodyType, changeEvent);
     }
   };
 
-  // Helper function to update formData
+  // Helper function to update formData - keeping for backward compatibility
   const handleChange = (name, value) => {
+    const fieldMap = {
+      'waist_circumference': 'waistSize',
+      'chest_circumference': 'chestSize'
+    };
+    
+    const fieldName = fieldMap[name] || name;
     const changeEvent = {
       target: {
-        name: name,
+        name: fieldName,
         value: value,
       },
     };
@@ -131,6 +229,9 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
       
       setAnalysisResult(result);
       
+      // Save analysis result to localStorage
+      saveAnalysisData(result, previewUrl, selectedFile?.name);
+      
       console.log('=== BODY IMAGE ANALYZER: CLAUDE RESULT ===');
       console.log('Received analysis result:', result);
       console.log('Body type from Claude:', result?.bodyType);
@@ -141,17 +242,30 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
         console.log('✅ Claude API returned valid body type:', result.bodyType);
         console.log('Calling onAnalysisComplete with body type:', result.bodyType);
         
+        // FIXED: Call onAnalysisComplete with proper bodyType parameter  
         onAnalysisComplete(result.bodyType);
         
         // Update the measurements as well
         if (waistCircumference) {
           console.log('📏 Also updating waist circumference:', waistCircumference);
-          handleChange('waist_circumference', waistCircumference);
+          const waistChangeEvent = {
+            target: {
+              name: 'waistSize',
+              value: waistCircumference,
+            },
+          };
+          onAnalysisComplete(result.bodyType, waistChangeEvent);
         }
         
         if (chestCircumference) {
           console.log('📏 Also updating chest circumference:', chestCircumference);
-          handleChange('chest_circumference', chestCircumference);
+          const chestChangeEvent = {
+            target: {
+              name: 'chestSize',
+              value: chestCircumference,
+            },
+          };
+          onAnalysisComplete(result.bodyType, chestChangeEvent);
         }
         
         console.log('Body type update completed successfully');
@@ -352,6 +466,17 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
         >
           {loading ? <CircularProgress size={24} /> : 'Phân tích'}
         </Button>
+
+        {(previewUrl || analysisResult) && (
+          <Button
+            variant="outlined"
+            color="secondary"
+            onClick={clearAnalysisData}
+            disabled={loading}
+          >
+            Xóa dữ liệu
+          </Button>
+        )}
       </Box>
       
       {previewUrl && (

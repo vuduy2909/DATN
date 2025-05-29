@@ -3,6 +3,8 @@ package com.capstone.wellnessnavigatorgym.controller;
 import com.capstone.wellnessnavigatorgym.dto.*;
 import com.capstone.wellnessnavigatorgym.entity.*;
 import com.capstone.wellnessnavigatorgym.service.*;
+import com.capstone.wellnessnavigatorgym.utils.BuildDecisionTree;
+import com.capstone.wellnessnavigatorgym.dto.tree.TreeNode;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -34,6 +36,7 @@ import java.util.regex.Matcher;
 import java.util.stream.Collectors;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.concurrent.ThreadLocalRandom;
 
 @RestController
 @RequestMapping("/api/v1/track-data-ai")
@@ -76,10 +79,11 @@ public class TrackDataAiController {
     @Value("${claude.api.version:2023-06-01}")
     private String claudeApiVersion;
 
-    @Value("${claude.api.model:claude-3-5-haiku-20240307}")
+    @Value("${claude.api.model:claude-3-5-sonnet-20241022}")
     private String claudeModel;
 
-    // Đường dẫn file XML - Sửa lại đường dẫn nhất quán
+    // XML file path is no longer needed as the system now uses database training data
+    // private static final String XML_FILE_PATH = "D:/DATN/CODE/start-gym-BE/start-gym-BE/wellness-navigator-gym/src/main/resources/static/DataTraining.xml";
     private static final String XML_FILE_PATH = "D:/DATN/CODE/start-gym-BE/start-gym-BE/wellness-navigator-gym/src/main/resources/static/DataTraining.xml";
 
     // Simple DTO classes to replace missing ones
@@ -638,14 +642,68 @@ public class TrackDataAiController {
                 return ResponseEntity.badRequest().body(new RecommendationDTO(null, "Customer not found"));
             }
 
-            // For now, assign a default course until decision tree is available
-            List<Course> defaultCourses = courseService.findAll();
+            // ===== AI RECOMMENDATION SYSTEM =====
             Course recommendations = null;
-            if (!defaultCourses.isEmpty()) {
-                recommendations = defaultCourses.get(0);
-                logger.info("Using first available course as default: {}", recommendations.getCourseId());
-            } else {
-                return ResponseEntity.ok(new RecommendationDTO(null, "No courses available in system"));
+            List<Course> allCourses = courseService.findAll();
+            
+            try {
+                // Step 1: Get all training data to build decision tree
+                List<TrackDataAi> trainingData = trackDataAiService.getAllTrackDataAi();
+                logger.info("Found {} training records for decision tree", trainingData.size());
+                
+                if (trainingData.isEmpty()) {
+                    logger.warn("No training data available. Using fallback recommendation.");
+                    if (!allCourses.isEmpty()) {
+                        recommendations = allCourses.get(0); // Fallback to first course
+                    }
+                } else {
+                    // Step 2: Build decision tree
+                    BuildDecisionTree decisionTreeBuilder = new BuildDecisionTree(trainingData);
+                    decisionTreeBuilder.setCourses(allCourses);
+                    
+                    TreeNode decisionTreeRoot = decisionTreeBuilder.buildDecisionTree();
+                    
+                    if (decisionTreeRoot == null) {
+                        logger.warn("Failed to build decision tree. Using fallback recommendation.");
+                        if (!allCourses.isEmpty()) {
+                            recommendations = allCourses.get(0);
+                        }
+                    } else {
+                        // Step 3: Extract user data for decision tree
+                        Map<String, Object> userData = extractUserDataFromTrackDataAi(userDataDTO);
+                        logger.info("User data for AI recommendation: {}", userData);
+                        
+                        // Step 4: Traverse decision tree to get recommendation
+                        recommendations = decisionTreeBuilder.traverseDecisionTree(decisionTreeRoot, userData);
+                        
+                        if (recommendations != null) {
+                            logger.info("AI recommended course ID: {} - {}", 
+                                recommendations.getCourseId(), recommendations.getCourseName());
+                        } else {
+                            logger.warn("AI could not find suitable course. Using fallback.");
+                            if (!allCourses.isEmpty()) {
+                                recommendations = allCourses.get(0);
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                logger.error("Error in AI recommendation process: {}", e.getMessage(), e);
+                // Fallback to first available course
+                if (!allCourses.isEmpty()) {
+                    recommendations = allCourses.get(0);
+                    logger.info("Using fallback course due to AI error: {}", recommendations.getCourseId());
+                }
+            }
+            
+            // Final fallback if no courses available
+            if (recommendations == null) {
+                if (allCourses.isEmpty()) {
+                    return ResponseEntity.ok(new RecommendationDTO(null, "No courses available in system"));
+                } else {
+                    recommendations = allCourses.get(0);
+                    logger.info("Using final fallback course: {}", recommendations.getCourseId());
+                }
             }
 
             // Set the recommended course_id on the UserDataDTO before saving
@@ -658,11 +716,12 @@ public class TrackDataAiController {
 
             // Không lưu khóa học đề xuất vào CustomerCourse ngay lập tức, 
             // mà sẽ đợi người dùng xác nhận ở bước tiếp theo
-            logger.info("Pending recommended course " + recommendations.getCourseId() + " for user " + userDataDTO.getCustomerId());
+            logger.info("Recommended course {} for user {} using AI system", 
+                recommendations.getCourseId(), userDataDTO.getCustomerId());
 
             return ResponseEntity.ok(new RecommendationDTO(
                 recommendations, 
-                "Course recommendations generated successfully",
+                "Course recommendations generated successfully using AI decision tree",
                 userDataAi.getUser_data_id()
             ));
         } catch (Exception e) {
@@ -2803,6 +2862,58 @@ public class TrackDataAiController {
             logger.error("Error loading step data: " + e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error loading step data: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/generate-xml-from-database")
+    public ResponseEntity<?> generateXmlFromDatabase() {
+        try {
+            logger.info("Generating XML file from database training data");
+            
+            // Get all training data from database
+            List<TrackDataAi> trainingData = trackDataAiService.getAllTrackDataAi();
+            
+            if (trainingData.isEmpty()) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("success", false);
+                errorResponse.put("message", "No training data available in database");
+                return ResponseEntity.badRequest().body(errorResponse);
+            }
+            
+            // Build decision tree
+            BuildDecisionTree decisionTreeBuilder = new BuildDecisionTree(trainingData);
+            List<Course> allCourses = courseService.findAll();
+            decisionTreeBuilder.setCourses(allCourses);
+            
+            TreeNode decisionTreeRoot = decisionTreeBuilder.buildDecisionTree();
+            
+            if (decisionTreeRoot == null) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("success", false);
+                errorResponse.put("message", "Failed to build decision tree from database data");
+                return ResponseEntity.badRequest().body(errorResponse);
+            }
+            
+            // Export to XML file
+            decisionTreeBuilder.exportTreeToXml(decisionTreeRoot, XML_FILE_PATH);
+            
+            logger.info("Successfully generated XML file from {} training records", trainingData.size());
+            
+            Map<String, Object> successResponse = new HashMap<>();
+            successResponse.put("success", true);
+            successResponse.put("message", "XML file generated successfully from database training data");
+            successResponse.put("xmlPath", XML_FILE_PATH);
+            successResponse.put("trainingRecords", trainingData.size());
+            successResponse.put("availableCourses", allCourses.size());
+            
+            return ResponseEntity.ok(successResponse);
+            
+        } catch (Exception e) {
+            logger.error("Error generating XML from database: {}", e.getMessage(), e);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", "Error generating XML: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
 }
