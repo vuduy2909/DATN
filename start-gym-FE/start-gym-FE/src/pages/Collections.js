@@ -135,8 +135,13 @@ const Collections = () => {
     const recommendedFromDetails = userData.recommendedCourses || [];
     const enrolledCourseIds = userEnrolledCourses.map(c => c.courseId);
     
-    const additionalRecommended = recommendedFromDetails
-      .filter(rec => !enrolledCourseIds.includes(rec.courseId))
+    // Ensure recommendedFromDetails is always an array
+    const recommendedArray = Array.isArray(recommendedFromDetails) 
+      ? recommendedFromDetails 
+      : recommendedFromDetails ? [recommendedFromDetails] : [];
+    
+    const additionalRecommended = recommendedArray
+      .filter(rec => rec && !enrolledCourseIds.includes(rec.courseId))
       .map(rec => ({
         ...rec,
         isRecommended: true,
@@ -145,6 +150,7 @@ const Collections = () => {
     
     const finalCourses = [...userEnrolledCourses, ...additionalRecommended];
     
+    console.log('All user courses:', finalCourses);
     return finalCourses;
   }, [myCourses, userData.recommendedCourses, user]);
 

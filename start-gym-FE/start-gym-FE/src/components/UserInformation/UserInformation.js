@@ -51,6 +51,9 @@ const UserInformation = () => {
     const [userData, setUserData] = useState([]);
     const [recommendedCourse, setRecommendedCourse] = useState('')
     const [lengthCourse, setLengthCourse] = useState(0)
+    const [dashboardStats, setDashboardStats] = useState(null);
+    const [activityChartData, setActivityChartData] = useState([]);
+    const [progressChartData, setProgressChartData] = useState([]);
     const theme = useTheme();
     const navigate = useNavigate();
 
@@ -80,9 +83,33 @@ const UserInformation = () => {
                 setUserData(res)
                 setRecommendedCourse(res.recommendedCourses.find(course => course.recommendedStatus === true))
                 setLengthCourse(res.recommendedCourses.length)
+                
+                // Lấy thống kê dashboard
+                fetchDashboardStats();
             } catch (error) {
+                console.error("Error fetching user data:", error);
             }
         }
+        
+        // Hàm lấy thông tin dashboard
+        const fetchDashboardStats = async () => {
+            try {
+                const dashboardResponse = await request.get('/user-dashboard/stats');
+                
+                // Lưu thông tin dashboard
+                if (dashboardResponse) {
+                    setDashboardStats(dashboardResponse);
+                    
+                    // Cập nhật dữ liệu biểu đồ
+                    if (dashboardResponse.activityChartData && dashboardResponse.progressChartData) {
+                        setActivityChartData(dashboardResponse.activityChartData);
+                        setProgressChartData(dashboardResponse.progressChartData);
+                    }
+                }
+            } catch (error) {
+                console.error("Error fetching dashboard stats:", error);
+            }
+        };
 
         if (user) {
             fetchUserData();
@@ -272,7 +299,7 @@ const UserInformation = () => {
                             <Grid item xs={12} sm={6} md={3}>
                                 <StatCard
                                     title="Weekly Activity"
-                                    value="35%"
+                                    value={dashboardStats?.weeklyActivity ? `${Math.round(dashboardStats.weeklyActivity)}%` : "35%"}
                                     icon={<TrendingUp />}
                                     gradient={`linear-gradient(135deg, ${redThemeColors.primary} 0%, ${redThemeColors.secondary} 100%)`}
                                 />
@@ -280,7 +307,7 @@ const UserInformation = () => {
                             <Grid item xs={12} sm={6} md={3}>
                                 <StatCard
                                     title="Worked This Week"
-                                    value="40:00:05"
+                                    value={dashboardStats?.workedTimeThisWeek || "40:00:05"}
                                     icon={<Schedule />}
                                     gradient={`linear-gradient(135deg, ${redThemeColors.warning} 0%, #e67e22 100%)`}
                                 />
@@ -288,7 +315,7 @@ const UserInformation = () => {
                             <Grid item xs={12} sm={6} md={3}>
                                 <StatCard
                                     title="Course In Progress"
-                                    value={lengthCourse}
+                                    value={dashboardStats?.coursesInProgress || lengthCourse}
                                     icon={<FolderOpen />}
                                     gradient={`linear-gradient(135deg, ${redThemeColors.info} 0%, #2980b9 100%)`}
                                 />
@@ -296,7 +323,7 @@ const UserInformation = () => {
                             <Grid item xs={12} sm={6} md={3}>
                                 <StatCard
                                     title="BMI"
-                                    value={recommendedCourse?.bmi ? Number(recommendedCourse.bmi).toFixed(2) : '0.00'}
+                                    value={dashboardStats?.bmi ? Number(dashboardStats.bmi).toFixed(2) : recommendedCourse?.bmi ? Number(recommendedCourse.bmi).toFixed(2) : '0.00'}
                                     icon={<FitnessCenter />}
                                     gradient={`linear-gradient(135deg, ${redThemeColors.success} 0%, #2ecc71 100%)`}
                                 />
@@ -329,7 +356,7 @@ const UserInformation = () => {
                                             <Analytics sx={{ mr: 1, color: redThemeColors.primary }} />
                                             Activity Chart
                                         </Typography>
-                                        <ChartLine />
+                                        <ChartLine chartData={activityChartData} />
                                     </Card>
                                 </Grow>
                             </Grid>
@@ -357,7 +384,7 @@ const UserInformation = () => {
                                             <Timeline sx={{ mr: 1, color: redThemeColors.primary }} />
                                             Progress
                                         </Typography>
-                                        <ChartCircle />
+                                        <ChartCircle chartData={progressChartData} />
                                     </Card>
                                 </Grow>
                             </Grid>

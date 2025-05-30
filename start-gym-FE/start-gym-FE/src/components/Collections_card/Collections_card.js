@@ -35,12 +35,20 @@ const CollectionCard = ({
   joinType = null, 
   isRecommended = false,
   onDeleteCourse,
-  courseData = null  // Add courseData prop for VIP info
+  courseData = null,  // Add courseData prop for VIP info
+  isPurchasedVip = false  // Thêm prop mới
 }) => {
   const { user } = useAuth();
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
+  
+  // Debug log
+  console.log(`CollectionCard ${id} - ${title}:`, { 
+    isUserCourse, 
+    isVipCourse: courseData?.isVip, 
+    isPurchasedVip 
+  });
   
   // Dialog states
   const [showInfoDialog, setShowInfoDialog] = useState(false);
@@ -70,9 +78,6 @@ const CollectionCard = ({
 
   // Check if this is a VIP course
   const isVipCourse = courseData && courseData.isVip === true && courseData.price && Number(courseData.price) > 0;
-  
-  // Check if this is a purchased VIP course (in My Course context)
-  const isPurchasedVip = isUserCourse && courseData && courseData.isVip === true;
   
   const formatPrice = (price) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -259,7 +264,7 @@ const CollectionCard = ({
           <path d="M0 1H413.5" stroke="#6A6B6C" strokeWidth="0.5" />
         </svg>
         
-          <p className={styles.collection_duration}>Duration: {duration || 'Unknown'}</p>
+        <p className={styles.collection_duration}>Duration: {duration || 'Unknown'}</p>
         
         {isVipCourse && !isPurchasedVip && courseData.price && (
           <p className={styles.vip_price}>
@@ -269,7 +274,7 @@ const CollectionCard = ({
           </p>
         )}
         
-          <div className={styles.course_actions}>
+        <div className={styles.course_actions}>
           {isVipCourse && !isPurchasedVip ? (
             // VIP Course not purchased yet - show purchase buttons
             <>
@@ -372,14 +377,14 @@ const CollectionCard = ({
             <>
               <Link to={`/collections/${id}/days/1`} className={styles.link}>
                 <button className={isPurchasedVip ? styles.detail_btn_center : styles.detail_btn}>
-                {isUserCourse ? 'Tiếp tục học' : (
+                {isUserCourse || isPurchasedVip ? 'Tiếp tục học' : (
                   <>
                     Xem<br/>chi tiết
                   </>
                 )}
               </button>
             </Link>
-            {!isUserCourse ? (
+            {!isUserCourse && !isPurchasedVip ? (
               <CourseJoinButton 
                 courseId={id}
                 courseName={title}
@@ -473,44 +478,65 @@ const CollectionCard = ({
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setShowInfoDialog(false)}>Đóng</Button>
-          <Button 
-            variant="contained" 
-            onClick={() => {
-              setShowInfoDialog(false);
-              handlePurchaseClick();
-            }}
-            sx={{
-              backgroundColor: '#FFD700',
-              color: '#000',
-              fontWeight: 'bold',
-              height: '48px',
-              minWidth: '100px',
-              display: 'flex',
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'flex-start',
-              paddingLeft: '8px',
-              paddingRight: '8px',
-              gap: '6px',
-              '&:hover': {
-                backgroundColor: '#FFC000'
-              }
-            }}
-          >
-            <FontAwesomeIcon icon={faShoppingCart} style={{ fontSize: '14px', flexShrink: 0 }} />
-            <Box sx={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              alignItems: 'center',
-              justifyContent: 'center',
-              lineHeight: 1,
-              fontSize: '11px',
-              fontWeight: 500
-            }}>
-              <div>MUA</div>
-              <div>NGAY</div>
-            </Box>
-          </Button>
+          {!isPurchasedVip && (
+            <Button 
+              variant="contained" 
+              onClick={() => {
+                setShowInfoDialog(false);
+                handlePurchaseClick();
+              }}
+              sx={{
+                backgroundColor: '#FFD700',
+                color: '#000',
+                fontWeight: 'bold',
+                height: '48px',
+                minWidth: '100px',
+                display: 'flex',
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'flex-start',
+                paddingLeft: '8px',
+                paddingRight: '8px',
+                gap: '6px',
+                '&:hover': {
+                  backgroundColor: '#FFC000'
+                }
+              }}
+            >
+              <FontAwesomeIcon icon={faShoppingCart} style={{ fontSize: '14px', flexShrink: 0 }} />
+              <Box sx={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center',
+                justifyContent: 'center',
+                lineHeight: 1,
+                fontSize: '11px',
+                fontWeight: 500
+              }}>
+                <div>MUA</div>
+                <div>NGAY</div>
+              </Box>
+            </Button>
+          )}
+          {isPurchasedVip && (
+            <Link to={`/collections/${id}/days/1`} style={{ textDecoration: 'none' }}>
+              <Button 
+                variant="contained" 
+                sx={{
+                  backgroundColor: '#4CAF50',
+                  color: 'white',
+                  fontWeight: 'bold',
+                  height: '48px',
+                  minWidth: '100px',
+                  '&:hover': {
+                    backgroundColor: '#388E3C'
+                  }
+                }}
+              >
+                Tiếp tục học
+              </Button>
+            </Link>
+          )}
         </DialogActions>
       </Dialog>
 
@@ -655,6 +681,17 @@ const Collections_card = ({ selectedCategory, recommendedCourses, loading, onCou
   const [filteredCards, setFilteredCards] = useState([]);
   const [userCourses, setUserCourses] = useState(recommendedCourses || []);
 
+  // Debug log for recommended courses
+  console.log('Collections_card received recommendedCourses:', recommendedCourses);
+
+  // Debug purchased VIP courses
+  useEffect(() => {
+    if (userCourses && userCourses.length > 0) {
+      const purchasedVipCourses = userCourses.filter(course => course.isVip === true);
+      console.log('Purchased VIP courses:', purchasedVipCourses);
+    }
+  }, [userCourses]);
+
   const getCardsFunction = async () => {
     try {
       setLoadingCourses(true);
@@ -722,6 +759,10 @@ const Collections_card = ({ selectedCategory, recommendedCourses, loading, onCou
   useEffect(() => {
     if (!dataCourse || dataCourse.length === 0) return;
     
+    // Lấy danh sách courseId của các khóa học người dùng đã mua
+    const purchasedCourseIds = userCourses.map(course => course.courseId);
+    console.log('Purchased course IDs:', purchasedCourseIds);
+    
     let filtered;
     
     if (selectedCategory === "My Course") {
@@ -740,21 +781,62 @@ const Collections_card = ({ selectedCategory, recommendedCourses, loading, onCou
           isRecommended: userCourse.isRecommended,
           // Đảm bảo thông tin VIP được truyền đúng
           isVip: userCourse.isVip || false,
-          price: userCourse.price
+          price: userCourse.price,
+          // Khóa học VIP trong My Course đã được mua rồi
+          isPurchasedVip: userCourse.isVip === true
         }));
+        
+        // Sắp xếp: khóa học VIP hiển thị đầu tiên
+        filtered.sort((a, b) => {
+          if (a.isVip && !b.isVip) return -1;
+          if (!a.isVip && b.isVip) return 1;
+          return 0;
+        });
       } else {
         // No user courses, show empty state
         filtered = [];
       }
     } else if (selectedCategory === "All") {
-      filtered = dataCourse;
+      // Đánh dấu các khóa học đã mua trong tab All
+      filtered = dataCourse.map(course => {
+        const isPurchased = purchasedCourseIds.includes(course.courseId);
+        return {
+          ...course,
+          isUserCourse: isPurchased,
+          // Nếu khóa học đã mua và là VIP, đánh dấu là VIP đã mua
+          isPurchasedVip: isPurchased && course.isVip === true
+        };
+      });
+      
+      // Sắp xếp: khóa học VIP hiển thị đầu tiên
+      filtered.sort((a, b) => {
+        if (a.isVip && !b.isVip) return -1;
+        if (!a.isVip && b.isVip) return 1;
+        return 0;
+      });
     } else {
       filtered = dataCourse.filter(course => {
         const typeName = course.courseType?.courseTypeName;
         return typeName === selectedCategory;
+      }).map(course => {
+        const isPurchased = purchasedCourseIds.includes(course.courseId);
+        return {
+          ...course,
+          isUserCourse: isPurchased,
+          // Nếu khóa học đã mua và là VIP, đánh dấu là VIP đã mua
+          isPurchasedVip: isPurchased && course.isVip === true
+        };
+      });
+      
+      // Sắp xếp: khóa học VIP hiển thị đầu tiên
+      filtered.sort((a, b) => {
+        if (a.isVip && !b.isVip) return -1;
+        if (!a.isVip && b.isVip) return 1;
+        return 0;
       });
     }
     
+    console.log('Filtered cards:', filtered);
     setFilteredCards(filtered || []);
   }, [selectedCategory, dataCourse, userCourses]);
 
@@ -802,6 +884,7 @@ const Collections_card = ({ selectedCategory, recommendedCourses, loading, onCou
             onJoinSuccess={onCourseJoinSuccess}
             onDeleteCourse={handleDeleteCourse}
             courseData={course}
+            isPurchasedVip={course.isPurchasedVip || false}
           />
         ))
       ) : (

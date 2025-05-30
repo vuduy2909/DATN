@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react'
 import styles from './ChartLine.module.css'
 import Chart from 'chart.js/auto';
 
-const ChartLine = () => {
+const ChartLine = ({ chartData }) => {
 
     const chartRef = useRef(null);
     const chartInstance = useRef(null);
@@ -13,20 +13,30 @@ const ChartLine = () => {
         }
         const myChartRef = chartRef.current.getContext('2d');
 
+        // Dữ liệu mặc định
+        let labels = ['Day 1', 'Day 10', 'Day 15', 'Day 20', 'Day 25', 'Day 30'];
+        let data = [50, 60, 80, 70, 70, 90, 100];
+        
+        // Sử dụng dữ liệu từ API nếu có
+        if (chartData && chartData.data && chartData.data.length > 0) {
+            labels = chartData.data.map(item => item.day);
+            data = chartData.data.map(item => item.activity);
+        }
+
         chartInstance.current = new Chart(myChartRef, {
             type: 'line',
             data: {
-                labels: ['Day 1', 'Day 10', 'Day 15', 'Day 20', 'Day 25', 'Day 30'],
+                labels: labels,
                 datasets: [{
                     label: 'Activity chart',
-                    data: [50, 60, 80, 70, 70, 90, 100],
+                    data: data,
                     fill: false,
                     borderColor: '#d35255',
                     tension: 0.1
                 }]
             }
         })
-    })
+    }, [chartData])
 
     return (
         <div>

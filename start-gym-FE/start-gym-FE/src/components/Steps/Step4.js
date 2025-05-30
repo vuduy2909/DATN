@@ -88,7 +88,7 @@ const Step4 = ({ formData, handleChange, handleNext, handlePrevious }) => {
 
     const handleNextStep = () => {
         if (selectedFrequency) {
-            handleNext();
+        handleNext();
         }
     };
     
@@ -198,8 +198,8 @@ const Step4 = ({ formData, handleChange, handleNext, handlePrevious }) => {
                                             
                                             {/* Icon */}
                                             <Box sx={{ mr: 3 }}>
-                                                <CardMedia
-                                                    component="img"
+                                    <CardMedia
+                                        component="img"
                                                     sx={{ 
                                                         height: 80, 
                                                         width: 80,
@@ -278,20 +278,20 @@ const Step4 = ({ formData, handleChange, handleNext, handlePrevious }) => {
                                                     }}
                                                 >
                                                     buổi/tuần
-                                                </Typography>
+                                        </Typography>
                                             </Box>
                                         </Box>
                                     </CardContent>
-                                </CardActionArea>
-                            </Card>
-                        ))}
+                            </CardActionArea>
+                        </Card>
+                    ))}
                     </Box>
 
                     {/* Navigation Buttons */}
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
-                        <Button
-                            variant="outlined"
-                            onClick={handlePrevious}
+                    <Button
+                        variant="outlined"
+                        onClick={handlePrevious}
                             startIcon={<ArrowBack />}
                             size="large"
                             sx={{ 
@@ -309,9 +309,9 @@ const Step4 = ({ formData, handleChange, handleNext, handlePrevious }) => {
                                 },
                                 transition: 'all 0.3s ease-in-out'
                             }}
-                        >
-                            Bước trước
-                        </Button>
+                    >
+                        Bước trước
+                    </Button>
                         
                         <Button
                             variant="contained"

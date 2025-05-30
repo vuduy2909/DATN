@@ -326,9 +326,9 @@ const Account = () => {
     };
 
     if (loadingUser) {
-        return (
-            <div>
-                <Header />
+    return (
+        <div>
+            <Header />
                 <Container maxWidth="lg" sx={{ py: 4 }}>
                     <Grid container spacing={3}>
                         <Grid item xs={12} md={4}>
@@ -434,8 +434,8 @@ const Account = () => {
                                 </CardContent>
                             </Card>
                         </Grow>
-                    </Grid>
-
+                        </Grid>
+                        
                     {/* Settings Content */}
                     <Grid item xs={12} md={8}>
                         <Grow in timeout={1200}>
@@ -495,17 +495,17 @@ const Account = () => {
                                                 <Typography variant="h5" sx={{ mb: 3, color: redTheme.text, fontWeight: 'bold', display: 'flex', alignItems: 'center' }}>
                                                     <Edit sx={{ mr: 1, color: redTheme.primary }} />
                                                     Chỉnh sửa thông tin cá nhân
-                                                </Typography>
-
+                                    </Typography>
+                                    
                                                 <Box component="form" onSubmit={handleProfileSubmit}>
                                                     <Grid container spacing={3}>
                                                         <Grid item xs={12} md={6}>
-                                                            <TextField
+                                        <TextField
                                                                 key="email-field"
-                                                                fullWidth
-                                                                label="Email"
-                                                                value={profileData.customerEmail}
-                                                                onChange={(e) => handleProfileChange('customerEmail', e.target.value)}
+                                            fullWidth
+                                            label="Email"
+                                            value={profileData.customerEmail}
+                                            onChange={(e) => handleProfileChange('customerEmail', e.target.value)}
                                                                 variant="outlined"
                                                                 type="email"
                                                                 sx={{
@@ -519,12 +519,12 @@ const Account = () => {
                                                         </Grid>
                                                         
                                                         <Grid item xs={12} md={6}>
-                                                            <TextField
+                                        <TextField
                                                                 key="phone-field"
-                                                                fullWidth
+                                            fullWidth
                                                                 label="Số điện thoại"
-                                                                value={profileData.customerPhone}
-                                                                onChange={(e) => handleProfileChange('customerPhone', e.target.value)}
+                                            value={profileData.customerPhone}
+                                            onChange={(e) => handleProfileChange('customerPhone', e.target.value)}
                                                                 variant="outlined"
                                                                 sx={{
                                                                     '& .MuiOutlinedInput-root': {
@@ -537,15 +537,15 @@ const Account = () => {
                                                         </Grid>
                                                         
                                                         <Grid item xs={12}>
-                                                            <TextField
+                                        <TextField
                                                                 key="address-field"
-                                                                fullWidth
+                                            fullWidth
                                                                 label="Địa chỉ"
-                                                                value={profileData.customerAddress}
-                                                                onChange={(e) => handleProfileChange('customerAddress', e.target.value)}
+                                            value={profileData.customerAddress}
+                                            onChange={(e) => handleProfileChange('customerAddress', e.target.value)}
                                                                 variant="outlined"
-                                                                multiline
-                                                                rows={2}
+                                            multiline
+                                            rows={2}
                                                                 sx={{
                                                                     '& .MuiOutlinedInput-root': {
                                                                         '&:hover fieldset': { borderColor: redTheme.primary },
@@ -559,31 +559,31 @@ const Account = () => {
                                                         <Grid item xs={12} md={6}>
                                                             <FormControl fullWidth>
                                                                 <InputLabel sx={{ '&.Mui-focused': { color: redTheme.primary } }}>Giới tính</InputLabel>
-                                                                <Select
-                                                                    value={profileData.customerGender}
+                                            <Select
+                                                value={profileData.customerGender}
                                                                     label="Giới tính"
-                                                                    onChange={(e) => handleProfileChange('customerGender', e.target.value)}
+                                                onChange={(e) => handleProfileChange('customerGender', e.target.value)}
                                                                     sx={{
                                                                         '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: redTheme.primary },
                                                                         '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: redTheme.primary }
                                                                     }}
-                                                                >
+                                            >
                                                                     <MenuItem value="Male">Nam</MenuItem>
                                                                     <MenuItem value="Female">Nữ</MenuItem>
-                                                                </Select>
-                                                            </FormControl>
+                                            </Select>
+                                        </FormControl>
                                                         </Grid>
-                                                        
+                                        
                                                         <Grid item xs={12} md={6}>
-                                                            <TextField
+                                        <TextField
                                                                 key="dob-field"
-                                                                fullWidth
+                                            fullWidth
                                                                 label="Ngày sinh"
-                                                                value={profileData.customerDateOfBirth}
-                                                                onChange={(e) => handleProfileChange('customerDateOfBirth', e.target.value)}
+                                            value={profileData.customerDateOfBirth}
+                                            onChange={(e) => handleProfileChange('customerDateOfBirth', e.target.value)}
                                                                 variant="outlined"
                                                                 type="date"
-                                                                InputLabelProps={{ shrink: true }}
+                                            InputLabelProps={{ shrink: true }}
                                                                 sx={{
                                                                     '& .MuiOutlinedInput-root': {
                                                                         '&:hover fieldset': { borderColor: redTheme.primary },
@@ -595,10 +595,10 @@ const Account = () => {
                                                         </Grid>
                                                         
                                                         <Grid item xs={12}>
-                                                            <Button
-                                                                type="submit"
-                                                                variant="contained"
-                                                                disabled={loading}
+                                        <Button
+                                            type="submit"
+                                            variant="contained"
+                                            disabled={loading}
                                                                 startIcon={loading ? <CircularProgress size={20} /> : <Save />}
                                                                 sx={{
                                                                     background: `linear-gradient(135deg, ${redTheme.primary} 0%, ${redTheme.secondary} 100%)`,
@@ -616,12 +616,12 @@ const Account = () => {
                                                                 }}
                                                             >
                                                                 {loading ? 'Đang cập nhật...' : 'Cập nhật thông tin'}
-                                                            </Button>
+                                        </Button>
                                                         </Grid>
                                                     </Grid>
-                                                </Box>
-                                            </CardContent>
-                                        </Card>
+                                    </Box>
+                                </CardContent>
+                            </Card>
                                     )}
                                     
                                     {currentTab === 1 && (
@@ -712,11 +712,11 @@ const Account = () => {
                                                 <Box component="form" onSubmit={handlePasswordSubmit}>
                                                     <Grid container spacing={3}>
                                                         <Grid item xs={12}>
-                                                            <TextField
-                                                                fullWidth
+                                        <TextField
+                                            fullWidth
                                                                 label="Mật khẩu hiện tại"
                                                                 type={showPasswords.old ? 'text' : 'password'}
-                                                                value={passwordData.oldPassword}
+                                            value={passwordData.oldPassword}
                                                                 onChange={(e) => setPasswordData(prev => ({ ...prev, oldPassword: e.target.value }))}
                                                                 variant="outlined"
                                                                 InputProps={{
@@ -739,11 +739,11 @@ const Account = () => {
                                                         </Grid>
                                                         
                                                         <Grid item xs={12}>
-                                                            <TextField
-                                                                fullWidth
+                                        <TextField
+                                            fullWidth
                                                                 label="Mật khẩu mới"
                                                                 type={showPasswords.new ? 'text' : 'password'}
-                                                                value={passwordData.newPassword}
+                                            value={passwordData.newPassword}
                                                                 onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
                                                                 variant="outlined"
                                                                 InputProps={{
@@ -766,11 +766,11 @@ const Account = () => {
                                                         </Grid>
                                                         
                                                         <Grid item xs={12}>
-                                                            <TextField
-                                                                fullWidth
+                                        <TextField
+                                            fullWidth
                                                                 label="Xác nhận mật khẩu mới"
                                                                 type={showPasswords.confirm ? 'text' : 'password'}
-                                                                value={passwordData.confirmPassword}
+                                            value={passwordData.confirmPassword}
                                                                 onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
                                                                 variant="outlined"
                                                                 InputProps={{
@@ -793,10 +793,10 @@ const Account = () => {
                                                         </Grid>
                                                         
                                                         <Grid item xs={12}>
-                                                            <Button
-                                                                type="submit"
-                                                                variant="contained"
-                                                                disabled={loading}
+                                        <Button
+                                            type="submit"
+                                            variant="contained"
+                                            disabled={loading}
                                                                 startIcon={loading ? <CircularProgress size={20} /> : <Security />}
                                                                 sx={{
                                                                     background: `linear-gradient(135deg, ${redTheme.warning} 0%, #fbbf24 100%)`,
@@ -814,19 +814,19 @@ const Account = () => {
                                                                 }}
                                                             >
                                                                 {loading ? 'Đang cập nhật...' : 'Đổi mật khẩu'}
-                                                            </Button>
+                                        </Button>
                                                         </Grid>
                                                     </Grid>
-                                                </Box>
-                                            </CardContent>
-                                        </Card>
+                                    </Box>
+                                </CardContent>
+                            </Card>
                                     )}
                                 </Box>
                             </Paper>
                         </Grow>
+                        </Grid>
                     </Grid>
-                </Grid>
-            </Container>
+                </Container>
 
             <Snackbar
                 open={snackbar.open}

@@ -39,7 +39,7 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
     const [confirmError, setConfirmError] = useState('');
     const [confirmed, setConfirmed] = useState(false);
     const [localRecommendation, setLocalRecommendation] = useState(null);
-
+    
     const steps = [
         'Thông tin tập luyện',
         'Thông tin cơ bản', 
@@ -52,6 +52,7 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
 
     useEffect(() => {
         console.log('Step7 useEffect triggered with recommendationResult:', recommendationResult);
+        console.log('Original form data from parent component:', formData);
         
         // Try to load from localStorage if no recommendation result
         if (!recommendationResult) {
@@ -70,50 +71,165 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
         // Check if we have a valid recommendation result from props
         if (recommendationResult) {
             console.log('Received recommendation results:', recommendationResult);
-            console.log('Recommended course:', recommendationResult.recommendedCourse);
-            console.log('User metrics:', recommendationResult.userMetrics);
+            
+            // Lấy dữ liệu khóa học được đề xuất
+            const recommendedCourse = recommendationResult.recommendedCourse || recommendationResult.recommendedCourses;
+            console.log('Recommended course:', recommendedCourse);
+            
+            // Ưu tiên lấy dữ liệu metrics từ API nếu có, nếu không thì dùng formData
+            const userMetricsData = recommendationResult.userMetrics || formData;
+            console.log('User metrics from API:', recommendationResult.userMetrics);
+            console.log('Final user metrics being used:', userMetricsData);
+            
+            // Ensure actions is present with the most accurate data
+            const enhancedResult = {
+                ...recommendationResult,
+                // Đảm bảo luôn có userMetrics
+                userMetrics: userMetricsData,
+                // Đảm bảo luôn có actions với dữ liệu chính xác nhất
+                actions: {
+                    // Ưu tiên dữ liệu từ API trước, sau đó đến formData
+                    formData: userMetricsData,
+                    recommendedCourseId: recommendedCourse?.courseId
+                }
+            };
+            
+            console.log('Enhanced recommendation with accurate user data:', enhancedResult);
             
             // Save to localStorage for persistence
             try {
-                localStorage.setItem('recommendationData', JSON.stringify(recommendationResult));
-                console.log('Saved recommendation data to localStorage');
+                localStorage.setItem('recommendationData', JSON.stringify(enhancedResult));
+                console.log('Saved enhanced recommendation data to localStorage');
             } catch (e) {
                 console.error('Error saving to localStorage:', e);
             }
         }
-    }, [recommendationResult]);
+    }, [recommendationResult, formData]);
 
     // Use recommendation data from props or localStorage
     const activeRecommendation = recommendationResult || localRecommendation;
 
     const handleConfirmRecommendation = async () => {
-        console.log('handleConfirmRecommendation called');
+        console.log('handleConfirmRecommendation called with activeRecommendation:', activeRecommendation);
         
-        // Check if we have the required data from actions
-        if (!activeRecommendation || !activeRecommendation.actions) {
-            console.error('No actions data available to confirm recommendation');
-            setConfirmError('Không thể xác nhận đề xuất: Thiếu thông tin cần thiết.');
+        // Lấy dữ liệu chính xác nhất có thể
+        let actionFormData = null;
+        let recommendedCourseId = null;
+        
+        // Check if we have the required data
+        if (!activeRecommendation) {
+            console.error('No recommendation data available to confirm');
+            setConfirmError('Không thể xác nhận đề xuất: Thiếu dữ liệu đề xuất.');
             
-            // Even without proper data, we can navigate to collections
             setTimeout(() => {
                 handleGoToCollections();
-            }, 1000);
+            }, 2000);
             
             return;
         }
         
-        const { formData: actionFormData, recommendedCourseId } = activeRecommendation.actions;
+        // Debug chi tiết để xem dữ liệu
+        console.log('Active recommendation full data:', JSON.stringify(activeRecommendation, null, 2));
         
-        if (!actionFormData || !recommendedCourseId) {
-            console.error('Missing formData or recommendedCourseId in actions');
-            setConfirmError('Không thể xác nhận đề xuất: Thiếu dữ liệu form hoặc ID khóa học.');
+        // Kiểm tra và lấy dữ liệu theo thứ tự ưu tiên
+        if (activeRecommendation.actions && activeRecommendation.actions.formData) {
+            // 1. Ưu tiên dữ liệu từ actions.formData nếu có
+            actionFormData = activeRecommendation.actions.formData;
+            
+            // Đảm bảo lấy đúng courseId là số
+            let rawCourseId = activeRecommendation.actions.recommendedCourseId;
+            
+            if (rawCourseId) {
+                // Xử lý trường hợp là object có courseId hoặc id
+                if (typeof rawCourseId === 'object') {
+                    if (rawCourseId.courseId) {
+                        recommendedCourseId = Number(rawCourseId.courseId);
+                    } else if (rawCourseId.id) {
+                        recommendedCourseId = Number(rawCourseId.id);
+                    }
+                } 
+                // Xử lý trường hợp là số hoặc chuỗi
+                else if (typeof rawCourseId === 'number') {
+                    recommendedCourseId = rawCourseId;
+                } else if (typeof rawCourseId === 'string' && !isNaN(rawCourseId)) {
+                    recommendedCourseId = Number(rawCourseId);
+                }
+            }
+            
+            console.log('Using formData from actions:', actionFormData, 'CourseId:', recommendedCourseId);
+        } 
+        
+        // Nếu không có courseId từ actions, thử lấy từ recommendedCourse hoặc recommendedCourses
+        if (!recommendedCourseId || isNaN(recommendedCourseId)) {
+            const recommendedCourse = activeRecommendation.recommendedCourse || activeRecommendation.recommendedCourses;
+            console.log('Trying to extract courseId from recommendedCourse:', recommendedCourse);
+            
+            if (recommendedCourse) {
+                if (typeof recommendedCourse === 'object') {
+                    if (recommendedCourse.courseId) {
+                        recommendedCourseId = Number(recommendedCourse.courseId);
+                    } else if (recommendedCourse.id) {
+                        recommendedCourseId = Number(recommendedCourse.id);
+                    }
+                } else if (typeof recommendedCourse === 'number') {
+                    recommendedCourseId = recommendedCourse;
+                } else if (typeof recommendedCourse === 'string' && !isNaN(recommendedCourse)) {
+                    recommendedCourseId = Number(recommendedCourse);
+                }
+            }
+            
+            // Nếu vẫn không có form data, lấy từ userMetrics hoặc formData
+            if (!actionFormData) {
+                actionFormData = activeRecommendation.userMetrics || formData;
+                console.log('Using metrics/formData as fallback:', actionFormData);
+            }
+        }
+        
+        // Kiểm tra cuối cùng trước khi gửi API
+        if (!recommendedCourseId || isNaN(recommendedCourseId)) {
+            console.error('Missing or invalid recommendedCourseId', recommendedCourseId);
+            setConfirmError('Không thể xác nhận đề xuất: Thiếu hoặc sai ID khóa học.');
             
             setTimeout(() => {
                 handleGoToCollections();
-            }, 1000);
+            }, 2000);
             
             return;
         }
+        
+        if (!actionFormData) {
+            console.error('No form data available');
+            setConfirmError('Không thể xác nhận đề xuất: Không có dữ liệu người dùng.');
+            
+            setTimeout(() => {
+                handleGoToCollections();
+            }, 2000);
+            
+            return;
+        }
+        
+        // Đảm bảo customerId có giá trị hợp lệ
+        if (!actionFormData.customerId) {
+            console.warn('No customerId in form data, trying to get from localStorage');
+            // Thử lấy từ localStorage
+            try {
+                const userStr = localStorage.getItem('user');
+                if (userStr) {
+                    const user = JSON.parse(userStr);
+                    if (user && user.id) {
+                        actionFormData.customerId = user.id;
+                        console.log('Using customerId from localStorage:', user.id);
+                    }
+                }
+            } catch (e) {
+                console.error('Error parsing user from localStorage:', e);
+            }
+        }
+        
+        // Log dữ liệu sẽ gửi đi để kiểm tra
+        console.log('FINAL DATA BEING SENT TO API:');
+        console.log('Form data:', actionFormData);
+        console.log('Course ID:', recommendedCourseId);
         
         setConfirmLoading(true);
         setConfirmError('');
@@ -122,7 +238,11 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
             // Import UserFormService
             const UserFormService = (await import('../../services/UserFormService')).default;
             
-            console.log('Confirming recommendation with formData and courseId:', actionFormData, recommendedCourseId);
+            // Debug chi tiết requestData
+            console.log('DEBUG CONFIRM REQUEST:');
+            console.log('actionFormData:', JSON.stringify(actionFormData));
+            console.log('recommendedCourseId:', recommendedCourseId);
+            console.log('recommendedCourseId type:', typeof recommendedCourseId);
             
             // Call the confirmation API with formData and courseId
             const response = await UserFormService.confirmRecommendation(actionFormData, recommendedCourseId);
@@ -145,11 +265,23 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
             let errorMessage = 'Có lỗi xảy ra khi xác nhận đề xuất. Vui lòng thử lại sau.';
             
             // Check for specific error from backend
-            if (error.response && error.response.data) {
+            if (error.response) {
+                console.error('API error response:', error.response);
+                
                 if (typeof error.response.data === 'string') {
                     errorMessage = error.response.data;
-                } else if (error.response.data.message) {
-                    errorMessage = error.response.data.message;
+                } else if (error.response.data) {
+                    if (error.response.data.message) {
+                        errorMessage = error.response.data.message;
+                    } else {
+                        // Trích xuất thông tin lỗi từ các trường khác nếu có
+                        errorMessage = JSON.stringify(error.response.data);
+                    }
+                }
+                
+                // Thêm mã lỗi nếu có
+                if (error.response.status) {
+                    errorMessage += ` (Error ${error.response.status})`;
                 }
             }
             
@@ -165,33 +297,39 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
     };
 
     // Get the recommendation from the API result
-    const recommendedCourse = activeRecommendation?.recommendedCourse;
+    const recommendedCourse = activeRecommendation?.recommendedCourses || activeRecommendation?.recommendedCourse;
     const hasApiRecommendations = !!recommendedCourse;
     const userMetrics = activeRecommendation?.userMetrics || {};
+    
+    // DEBUG: Log values to help diagnose the issue
+    console.log('DEBUG Step7: activeRecommendation', activeRecommendation);
+    console.log('DEBUG Step7: recommendedCourse', recommendedCourse);
+    console.log('DEBUG Step7: hasApiRecommendations', hasApiRecommendations);
+    console.log('DEBUG Step7: userMetrics', userMetrics);
 
     // Helper functions to map data
-    const mapTrainingFrequency = (value) => {
+        const mapTrainingFrequency = (value) => {
         if (!value) return "Không xác định";
-        switch(value) {
+                switch(value) {
             case "Never": return "Chưa từng tập";
             case "Occasionally": return "2 buổi/tuần";
             case "Moderate": return "3 buổi/tuần";
             case "Regularly": return "4 buổi/tuần";
             case "Advanced": return "5+ buổi/tuần";
-            default: return value;
-        }
+                    default: return value;
+                }
     };
 
-    const mapTrainingGoal = (value) => {
+        const mapTrainingGoal = (value) => {
         if (!value) return "Không xác định";
         if (value.includes("Weight Loss")) return "Giảm cân";
         if (value.includes("Strength Training")) return "Tăng cơ bắp";
         if (value.includes("Cardiovascular")) return "Tăng sức bền";
         if (value.includes("Flexibility")) return "Tăng độ dẻo";
         if (value.includes("Functional")) return "Duy trì vóc dáng";
-        return value;
-    };
-
+            return value;
+        };
+        
     if (loading) {
         return (
             <Container maxWidth="md" sx={{ py: 4, textAlign: 'center' }}>
@@ -281,6 +419,25 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
                         />
                     </Box>
 
+                    {/* Debug Alert - Hiển thị thông tin debug về dữ liệu */}
+                    {!hasApiRecommendations && (
+                        <Alert 
+                            severity="warning" 
+                            variant="filled"
+                            sx={{ mb: 3 }}
+                        >
+                            <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                                Không có dữ liệu khóa học được đề xuất
+                            </Typography>
+                            <Typography variant="body2">
+                                Chi tiết: {activeRecommendation?.message || 'Không có chi tiết lỗi'}
+                            </Typography>
+                            <Typography variant="body2" sx={{ mt: 1 }}>
+                                Thử liên hệ với quản trị viên để được hỗ trợ hoặc chọn khóa học trực tiếp từ danh sách.
+                            </Typography>
+                        </Alert>
+                    )}
+
                     {/* Recommendation Results */}
                     {hasApiRecommendations ? (
                         <Grid container spacing={3} sx={{ mb: 4 }}>
@@ -299,25 +456,25 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
                                         
                                         <Box sx={{ bgcolor: '#f0f8ff', p: 3, borderRadius: 2, mb: 2 }}>
                                             <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#1565c0', mb: 1 }}>
-                                                {recommendedCourse.title || recommendedCourse.course_name || 'Khóa học chưa xác định'}
+                                                {recommendedCourse.name || recommendedCourse.courseName || 'Khóa học chưa xác định'}
                                             </Typography>
                                             <Typography variant="body1" sx={{ color: '#7f8c8d', mb: 2 }}>
-                                                {recommendedCourse.description || recommendedCourse.course_description || 'Mô tả khóa học chưa có'}
+                                                {recommendedCourse.description || 'Mô tả khóa học chưa có'}
                                             </Typography>
                                             
                                             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
                                                 <Chip 
-                                                    label={`Cấp độ: ${recommendedCourse.level || recommendedCourse.course_level || 'Chưa xác định'}`} 
+                                                    label={`Cấp độ: ${recommendedCourse.level || 'Chưa xác định'}`} 
                                                     color="primary" 
                                                     size="small" 
                                                 />
                                                 <Chip 
-                                                    label={`Thời lượng: ${recommendedCourse.duration || recommendedCourse.course_duration || 'N/A'} phút`} 
+                                                    label={`Thời lượng: ${recommendedCourse.duration || 'N/A'}`} 
                                                     color="secondary" 
                                                     size="small" 
                                                 />
                                                 <Chip 
-                                                    label={`Loại: ${recommendedCourse.category || recommendedCourse.course_category || recommendedCourse.course_type || 'Chưa phân loại'}`} 
+                                                    label={`Loại: ${recommendedCourse.courseType?.courseTypeName || recommendedCourse.courseType?.name || 'Chưa phân loại'}`} 
                                                     color="info" 
                                                     size="small" 
                                                 />
@@ -446,31 +603,51 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
                             </Grid>
                         </Grid>
                     ) : (
-                        <Alert severity="info" sx={{ mb: 4 }}>
-                            Không có dữ liệu đề xuất. Vui lòng thử lại hoặc liên hệ hỗ trợ.
-                        </Alert>
+                        <Box sx={{ textAlign: 'center', my: 6, p: 4, border: '1px dashed #ccc', borderRadius: 2 }}>
+                            <img 
+                                src="/images/no-data.svg" 
+                                alt="Không có dữ liệu" 
+                                style={{ width: 180, height: 180, marginBottom: 16 }}
+                                onError={(e) => {e.target.src = 'https://cdn-icons-png.flaticon.com/512/7486/7486754.png'}}
+                            />
+                            <Typography variant="h5" sx={{ color: '#666', mb: 2 }}>
+                                Không có dữ liệu đề xuất
+                            </Typography>
+                            <Typography variant="body1" sx={{ color: '#888', mb: 3 }}>
+                                {activeRecommendation?.message || 'Không thể tìm thấy khóa học phù hợp. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.'}
+                            </Typography>
+                            <Button 
+                                variant="contained"
+                                color="primary"
+                                onClick={handleGoToCollections}
+                                startIcon={<CheckCircle />}
+                                sx={{ fontWeight: 'bold' }}
+                            >
+                                Xem danh sách khóa học
+                            </Button>
+                        </Box>
                     )}
-
+                    
                     {/* Status Messages */}
                     {confirmError && (
                         <Alert severity="error" sx={{ mb: 3 }}>
                             {confirmError}
                         </Alert>
                     )}
-
+                    
                     {confirmed && (
                         <Alert severity="success" sx={{ mb: 3 }}>
                             ✅ Đề xuất đã được xác nhận thành công! Đang chuyển hướng...
                         </Alert>
                     )}
-
+            
                     {/* Action Buttons */}
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
-                        <Button
-                            variant="outlined"
-                            onClick={handlePrevious}
+                                    <Button
+                                        variant="outlined"
+                                        onClick={handlePrevious}
                             startIcon={<ArrowBack />}
-                            disabled={confirmLoading || confirmed}
+                                        disabled={confirmLoading || confirmed}
                             size="large"
                             sx={{ 
                                 borderRadius: 6,
@@ -491,14 +668,14 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
                                 },
                                 transition: 'all 0.3s ease-in-out'
                             }}
-                        >
-                            Quay lại
-                        </Button>
-                        
-                        <Button
-                            variant="contained"
-                            onClick={handleConfirmRecommendation}
-                            disabled={confirmLoading || confirmed}
+                                    >
+                                        Quay lại
+                                    </Button>
+                                    
+                                    <Button
+                                        variant="contained"
+                                        onClick={handleConfirmRecommendation}
+                                        disabled={confirmLoading || confirmed}
                             endIcon={confirmLoading ? <CircularProgress size={20} color="inherit" /> : <FitnessCenter />}
                             size="large"
                             sx={{ 
@@ -532,7 +709,7 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
                             }}
                         >
                             {confirmed ? 'Đã xác nhận!' : confirmLoading ? 'Đang xử lý...' : 'Xác nhận & Bắt đầu'}
-                        </Button>
+                                    </Button>
                     </Box>
                 </Paper>
             </Container>

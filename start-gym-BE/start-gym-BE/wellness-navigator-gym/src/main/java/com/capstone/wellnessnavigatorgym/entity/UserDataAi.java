@@ -36,7 +36,7 @@ public class UserDataAi {
     // Thêm trường để track thời gian
     @Column(name = "created_date")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    private LocalDateTime created_date;
+    private LocalDateTime createdDate;
     
     @Column(name = "updated_date")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
@@ -80,7 +80,7 @@ public class UserDataAi {
     // Automatically set timestamps
     @PrePersist
     protected void onCreate() {
-        created_date = LocalDateTime.now();
+        createdDate = LocalDateTime.now();
         updated_date = LocalDateTime.now();
     }
     

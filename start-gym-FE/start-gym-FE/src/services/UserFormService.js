@@ -198,7 +198,19 @@ const UserFormService = {
       });
       
       console.log('UserFormService: Received Step7 data:', response);
-      return response;
+      
+      // Ensure consistent property naming between API and frontend
+      const formattedResponse = {
+        ...response,
+        recommendedCourses: response.recommendedCourse || response.recommendedCourses,
+        actions: {
+          formData: JSON.parse(formDataJson),
+          recommendedCourseId: recommendedCourseId
+        }
+      };
+      
+      console.log('UserFormService: Formatted response for Step7:', formattedResponse);
+      return formattedResponse;
     } catch (error) {
       console.error('Error fetching Step7 data:', error);
       throw error;
@@ -218,9 +230,50 @@ const UserFormService = {
         headers['Authorization'] = `Bearer ${token}`;
       }
       
+      // Đảm bảo recommendedCourseId là số nguyên hợp lệ
+      let validCourseId = recommendedCourseId;
+      
+      // Kiểm tra và chuyển đổi recommendedCourseId
+      if (recommendedCourseId === null || recommendedCourseId === undefined) {
+        console.error('UserFormService: recommendedCourseId is null or undefined');
+        throw new Error('Không thể xác nhận đề xuất: ID khóa học không hợp lệ');
+      } else if (typeof recommendedCourseId === 'object') {
+        // Nếu là object, thử lấy courseId hoặc id
+        if (recommendedCourseId.courseId) {
+          validCourseId = Number(recommendedCourseId.courseId);
+        } else if (recommendedCourseId.id) {
+          validCourseId = Number(recommendedCourseId.id);
+        } else {
+          console.error('UserFormService: recommendedCourseId object does not have courseId or id');
+          throw new Error('Không thể xác nhận đề xuất: ID khóa học không hợp lệ');
+        }
+      } else if (typeof recommendedCourseId === 'string') {
+        // Nếu là string, chuyển đổi sang số
+        if (!isNaN(recommendedCourseId)) {
+          validCourseId = Number(recommendedCourseId);
+        } else {
+          console.error('UserFormService: recommendedCourseId string is not a valid number');
+          throw new Error('Không thể xác nhận đề xuất: ID khóa học không hợp lệ');
+        }
+      } else if (typeof recommendedCourseId === 'number') {
+        // Nếu đã là số, giữ nguyên
+        validCourseId = recommendedCourseId;
+      } else {
+        console.error('UserFormService: recommendedCourseId has unsupported type', typeof recommendedCourseId);
+        throw new Error('Không thể xác nhận đề xuất: ID khóa học không hợp lệ');
+      }
+      
+      // Kiểm tra cuối cùng
+      if (isNaN(validCourseId)) {
+        console.error('UserFormService: validCourseId is NaN after processing');
+        throw new Error('Không thể xác nhận đề xuất: ID khóa học không hợp lệ');
+      }
+      
+      console.log('UserFormService: Using validated courseId:', validCourseId);
+      
       const requestData = {
         formData: formData,
-        recommendedCourseId: recommendedCourseId
+        recommendedCourseId: validCourseId
       };
       
       const response = await request.post('/track-data-ai/confirm-recommendation', requestData, { headers });

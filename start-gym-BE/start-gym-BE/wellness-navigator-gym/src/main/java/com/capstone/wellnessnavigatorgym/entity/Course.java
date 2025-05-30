@@ -56,6 +56,9 @@ public class Course {
     private CourseType courseType;
 
     public Course(Integer courseId) {
+        if (courseId == null) {
+            throw new IllegalArgumentException("courseId cannot be null when creating Course");
+        }
         this.courseId = courseId;
     }
 

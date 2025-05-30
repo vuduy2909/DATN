@@ -549,11 +549,23 @@ public class TrackDataAiController {
         
         userDataAi.setCustomer(customer);
         
-        // Save the recommended course if available
+        // Save the recommended course if available - USING FULL COURSE OBJECT
         if (dto.getRecommendedCourseId() != null) {
-            Course course = new Course(dto.getRecommendedCourseId());
-            userDataAi.setCourse(course);
-            logger.info("Set recommended course_id: {} for user_data_ai", dto.getRecommendedCourseId());
+            try {
+                // Lấy đối tượng Course đầy đủ từ database thay vì chỉ tạo Course với ID
+                Course course = courseService.findCourseById(dto.getRecommendedCourseId());
+                userDataAi.setCourse(course);
+                logger.info("Retrieved and set full course object with ID: {} and name: {}", 
+                    course.getCourseId(), course.getCourseName());
+            } catch (Exception e) {
+                logger.error("Failed to retrieve course with ID: {}. Error: {}", dto.getRecommendedCourseId(), e.getMessage());
+                // Fallback: Vẫn tạo Course chỉ với ID trong trường hợp lỗi
+                Course course = new Course(dto.getRecommendedCourseId());
+                userDataAi.setCourse(course);
+                logger.warn("Using fallback: Set course with ID only: {}", dto.getRecommendedCourseId());
+            }
+        } else {
+            logger.warn("No recommendedCourseId provided in DTO - course will be null");
         }
 
         return userDataAi;
@@ -637,14 +649,27 @@ public class TrackDataAiController {
         try {
             logger.info("Received recommendation request for user ID: " + userDataDTO.getCustomerId());
             
-            Customer customer = customerService.findById(userDataDTO.getCustomerId());
-            if (customer == null) {
-                return ResponseEntity.badRequest().body(new RecommendationDTO(null, "Customer not found"));
+            Customer customer = null;
+            
+            // Kiểm tra xem customerId có tồn tại không
+            if (userDataDTO.getCustomerId() != null) {
+                customer = customerService.findById(userDataDTO.getCustomerId());
+                if (customer == null) {
+                    logger.warn("Customer not found with ID: {}", userDataDTO.getCustomerId());
+                    // Không return error, tiếp tục với customer = null
+                }
+            } else {
+                logger.warn("Customer ID is null, will proceed without customer");
             }
 
             // ===== AI RECOMMENDATION SYSTEM =====
             Course recommendations = null;
             List<Course> allCourses = courseService.findAll();
+            
+            if (allCourses.isEmpty()) {
+                logger.error("No courses available in system");
+                return ResponseEntity.ok(new RecommendationDTO(null, "No courses available in system"));
+            }
             
             try {
                 // Step 1: Get all training data to build decision tree
@@ -653,9 +678,7 @@ public class TrackDataAiController {
                 
                 if (trainingData.isEmpty()) {
                     logger.warn("No training data available. Using fallback recommendation.");
-                    if (!allCourses.isEmpty()) {
-                        recommendations = allCourses.get(0); // Fallback to first course
-                    }
+                    recommendations = allCourses.get(0); // Fallback to first course
                 } else {
                     // Step 2: Build decision tree
                     BuildDecisionTree decisionTreeBuilder = new BuildDecisionTree(trainingData);
@@ -665,9 +688,7 @@ public class TrackDataAiController {
                     
                     if (decisionTreeRoot == null) {
                         logger.warn("Failed to build decision tree. Using fallback recommendation.");
-                        if (!allCourses.isEmpty()) {
-                            recommendations = allCourses.get(0);
-                        }
+                        recommendations = allCourses.get(0);
                     } else {
                         // Step 3: Extract user data for decision tree
                         Map<String, Object> userData = extractUserDataFromTrackDataAi(userDataDTO);
@@ -681,49 +702,86 @@ public class TrackDataAiController {
                                 recommendations.getCourseId(), recommendations.getCourseName());
                         } else {
                             logger.warn("AI could not find suitable course. Using fallback.");
-                            if (!allCourses.isEmpty()) {
-                                recommendations = allCourses.get(0);
-                            }
+                            recommendations = allCourses.get(0);
                         }
                     }
                 }
             } catch (Exception e) {
                 logger.error("Error in AI recommendation process: {}", e.getMessage(), e);
                 // Fallback to first available course
-                if (!allCourses.isEmpty()) {
-                    recommendations = allCourses.get(0);
-                    logger.info("Using fallback course due to AI error: {}", recommendations.getCourseId());
-                }
-            }
-            
-            // Final fallback if no courses available
-            if (recommendations == null) {
-                if (allCourses.isEmpty()) {
-                    return ResponseEntity.ok(new RecommendationDTO(null, "No courses available in system"));
-                } else {
-                    recommendations = allCourses.get(0);
-                    logger.info("Using final fallback course: {}", recommendations.getCourseId());
-                }
+                recommendations = allCourses.get(0);
+                logger.info("Using fallback course due to AI error: {}", recommendations.getCourseId());
             }
 
             // Set the recommended course_id on the UserDataDTO before saving
             userDataDTO.setRecommendedCourseId(recommendations.getCourseId());
             
-            // Lưu dữ liệu người dùng với effective=false (chưa được xác nhận)
-            UserDataAi userDataAi = createUserDataAiFromDTO(userDataDTO, customer);
-            userDataAi.setEffective(false); // Chưa được xác nhận
-            userDataAi = userDataAiService.saveUserDataAi(userDataAi);
+            // Detailed log of recommended course
+            logger.info("=== DETAILED RECOMMENDATION LOG ===");
+            logger.info("Recommended course: ID={}, Name={}, Type={}", 
+                recommendations.getCourseId(), 
+                recommendations.getCourseName(),
+                recommendations.getCourseType() != null ? recommendations.getCourseType().getCourseTypeName() : "None");
+            logger.info("All available courses: {}", 
+                allCourses.stream()
+                    .map(c -> c.getCourseId() + "-" + c.getCourseName())
+                    .collect(Collectors.joining(", ")));
+            
+            // Không cần lưu UserDataAi nếu không có customer
+            UserDataAi userDataAi = null;
+            if (customer != null) {
+                // KIỂM TRA DUPLICATE: Chỉ tạo bản ghi mới nếu chưa có customer + course_id này
+                final Integer finalRecommendedCourseId = recommendations.getCourseId();
+                List<UserDataAi> existingUserData = userDataAiService.findByCustomerId(userDataDTO.getCustomerId());
+                List<UserDataAi> existingRecords = existingUserData.stream()
+                    .filter(record -> record.getCourse() != null && 
+                                    record.getCourse().getCourseId().equals(finalRecommendedCourseId))
+                    .collect(Collectors.toList());
+                
+                if (!existingRecords.isEmpty()) {
+                    // Đã có bản ghi với customer và course này - cập nhật bản ghi hiện có
+                    userDataAi = existingRecords.get(0);
+                    logger.info("Found existing record for customer {} and course {}: userDataId {}", 
+                        userDataDTO.getCustomerId(), finalRecommendedCourseId, userDataAi.getUser_data_id());
+                    
+                    // Cập nhật thông tin mới (chỉ cập nhật các trường có thể thay đổi)
+                    if (userDataDTO.getWeight() != null) userDataAi.setWeight(userDataDTO.getWeight());
+                    if (userDataDTO.getBmi() != null) userDataAi.setBmi(userDataDTO.getBmi());
+                    if (userDataDTO.getChest_circumference() != null) userDataAi.setChest_circumference(userDataDTO.getChest_circumference());
+                    if (userDataDTO.getWaist_circumference() != null) userDataAi.setWaist_circumference(userDataDTO.getWaist_circumference());
+                    
+                    userDataAi = userDataAiService.saveUserDataAi(userDataAi);
+                } else {
+                    // Chưa có bản ghi - tạo mới
+                    userDataAi = createUserDataAiFromDTO(userDataDTO, customer);
+                    userDataAi.setEffective(true); // Thiết lập là hiệu quả (mặc định)
+                    userDataAi = userDataAiService.saveUserDataAi(userDataAi);
+                    logger.info("Created new record for customer {} with course {}: userDataId {}", 
+                        userDataDTO.getCustomerId(), finalRecommendedCourseId, userDataAi.getUser_data_id());
+                }
+            } else {
+                logger.info("Skipping UserDataAi creation because customer is null");
+            }
 
-            // Không lưu khóa học đề xuất vào CustomerCourse ngay lập tức, 
-            // mà sẽ đợi người dùng xác nhận ở bước tiếp theo
-            logger.info("Recommended course {} for user {} using AI system", 
-                recommendations.getCourseId(), userDataDTO.getCustomerId());
-
-            return ResponseEntity.ok(new RecommendationDTO(
+            // Tạo RecommendationDTO kết quả
+            RecommendationDTO result = new RecommendationDTO(
                 recommendations, 
-                "Course recommendations generated successfully using AI decision tree",
-                userDataAi.getUser_data_id()
-            ));
+                "Course recommendations generated successfully using AI decision tree"
+            );
+            
+            // Thêm userDataId nếu có
+            if (userDataAi != null) {
+                result = new RecommendationDTO(
+                    recommendations, 
+                    "Course recommendations generated successfully using AI decision tree",
+                    userDataAi.getUser_data_id()
+                );
+            }
+            
+            // Thêm formData để frontend có thể sử dụng
+            result.setFormData(userDataDTO);
+
+            return ResponseEntity.ok(result);
         } catch (Exception e) {
             logger.error("Error in recommendation process: " + e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -1082,46 +1140,56 @@ public class TrackDataAiController {
         String base64Image = Base64.getEncoder().encodeToString(imageBytes);
 
         // Tạo nội dung system message
-        String systemPrompt = "Bạn là chuyên gia phân tích thể hình với 15 năm kinh nghiệm, chuyên phân loại hình thể dựa trên hình ảnh. " +
-                "Nhiệm vụ của bạn là phân tích MỘT CÁCH CHÍNH XÁC hình thể cơ thể dựa trên tỷ lệ cơ-mỡ và đường nét cơ bắp. " +
+        String systemPrompt = "Bạn là chuyên gia phân tích thể hình và huấn luyện viên cá nhân với 15 năm kinh nghiệm, chuyên phân loại hình thể và tư vấn lộ trình tập luyện phù hợp. " +
+                "Nhiệm vụ của bạn là phân tích CHÍNH XÁC hình thể của người dùng, cung cấp đánh giá chi tiết về chỉ số sức khỏe, và đề xuất phương pháp tập luyện phù hợp. " +
                 
-                "📋 5 LOẠI HÌNH THỂ CHÍNH XÁC: " +
-                "1. **THIN**: QUÁ ỐM - Rất gầy, xương nổi rõ, thiếu cân nặng nghiêm trọng " +
-                "2. **SKINNY**: ỐM NHƯNG MỠ BỤNG NHIỀU - Gầy nhưng có mỡ tích tụ ở bụng, cơ bắp yếu " +
-                "3. **NORMAL**: BÌNH THƯỜNG, KHÔNG CÓ CƠ BẮP - Cân nặng ổn, không gầy không mập, cơ bắp không nổi bật " +
-                "4. **OVERWEIGHT**: QUÁ MỠ VÀ MẬP - Thừa cân rõ ràng, nhiều mỡ thừa, bụng to " +
-                "5. **FIT**: CƠ BẮP SĂN CHẮC - Có đường cơ rõ nét, sixpack, cơ bắp phát triển tốt " +
+                "📋 5 LOẠI HÌNH THỂ BẠN CẦN PHÂN LOẠI: " +
+                "1. **THIN**: Thể trạng quá gầy - Cân nặng thấp, xương nổi rõ, cơ bắp ít " +
+                "2. **SKINNY FAT**: Gầy nhưng có mỡ bụng - Cân nặng trong ngưỡng bình thường nhưng tỷ lệ mỡ cao, cơ bắp yếu " +
+                "3. **NORMAL**: Bình thường - Cân đối, không quá gầy cũng không quá béo, ít cơ bắp " +
+                "4. **OVERWEIGHT**: Thừa cân - Tỷ lệ mỡ cao, đặc biệt ở vùng bụng và thân " +
+                "5. **FIT**: Săn chắc - Tỷ lệ cơ-mỡ cân đối, cơ bắp rõ nét, thể hiện tập luyện thường xuyên " +
                 
-                "🔍 TIÊU CHÍ PHÂN BIỆT QUAN TRỌNG: " +
-                "- THIN vs SKINNY: Thin = hoàn toàn gầy, Skinny = gầy + mỡ bụng " +
-                "- SKINNY vs NORMAL: Skinny có mỡ bụng, Normal cân đối không mỡ bụng " +
-                "- NORMAL vs FIT: Normal không có cơ bắp nổi, Fit có cơ bắp rõ nét " +
-                "- FIT vs OVERWEIGHT: Fit có cơ bắp, Overweight có mỡ thừa " +
+                "🧐 YÊU CẦU VỀ PHÂN TÍCH: " +
+                "- LUÔN xưng hô với người dùng là 'Bạn' trong MỌI câu phân tích (ví dụ: 'Bạn có chỉ số BMI...', 'Dựa vào hình ảnh, bạn có...') " +
+                "- Phân tích CHI TIẾT về chỉ số BMI, cân nặng, chiều cao và tỷ lệ cơ thể (ít nhất 150-200 từ) " +
+                "- Nhận xét cụ thể từng vùng cơ thể: vai, ngực, bụng, tay, chân " + 
+                "- Đánh giá điểm mạnh và điểm cần cải thiện của cơ thể " +
+                "- Sử dụng các thuật ngữ chuyên môn về thể hình nhưng giải thích dễ hiểu " +
+                "- Dùng ngôn ngữ thân thiện, động viên, tích cực, tránh gây tự ti " +
                 
-                "TRẢ LỜI BẰNG TIẾNG VIỆT và PHẢI CHÍNH XÁC 100%.";
+                "💪 YÊU CẦU VỀ ĐỀ XUẤT (PHẢI DÀI VÀ CHI TIẾT 250-300 TỪ): " +
+                "- Gợi ý các KHÓA HỌC CỤ THỂ phù hợp (cardio, sức mạnh, linh hoạt...) " +
+                "- Đề xuất ít nhất 5 LOẠI BÀI TẬP cụ thể phù hợp với thể trạng và mục tiêu, nêu rõ số hiệp và số lần lặp lại " +
+                "- Hướng dẫn CHẾ ĐỘ DINH DƯỠNG chi tiết: tỷ lệ protein, carbs, chất béo, danh sách thực phẩm cụ thể nên ăn và nên tránh " +
+                "- Gợi ý tần suất tập luyện, thời lượng mỗi buổi và lịch nghỉ ngơi " +
+                "- Đề xuất cách theo dõi tiến độ và điều chỉnh kế hoạch " +
+                
+                "Hãy trả lời BẰNG TIẾNG VIỆT với giọng điệu THÂN THIỆN, CHUYÊN NGHIỆP và ĐẦY ĐỘNG VIÊN.";
 
         // Tạo nội dung user message với prompt chi tiết hơn
-        String prompt = "Hãy phân tích CHÍNH XÁC hình thể trong ảnh này (bỏ qua khuôn mặt). " +
+        String prompt = "Xin chào! Hãy phân tích hình thể của người dùng trong ảnh này và đưa ra lời khuyên phù hợp. " +
                 "Thông số: Cao " + height + "cm, nặng " + weight + "kg, giới tính: " + gender + ". " +
                 "BMI = " + Math.round((weight / Math.pow(height/100, 2)) * 100) / 100.0 + ". " +
                 
-                "🔍 QUAN SÁT: " +
-                "A) Quá ốm/xương nổi? → THIN " +
-                "B) Ốm + mỡ bụng? → SKINNY " +
-                "C) Cân đối, không cơ bắp? → NORMAL " +
-                "D) Cơ bắp rõ nét/sixpack? → FIT " +
-                "E) Quá mỡ/mập? → OVERWEIGHT " +
+                "📊 PHÂN TÍCH YÊU CẦU: " +
+                "1. Xác định chính xác loại hình thể (THIN, SKINNY FAT, NORMAL, OVERWEIGHT, hoặc FIT) " +
+                "2. Phân tích chi tiết chỉ số BMI, cân nặng, tỷ lệ các vùng cơ thể " +
+                "3. Đánh giá cụ thể từng vùng cơ thể: vai, ngực, bụng, tay, chân " +
+                "4. Phân tích điểm mạnh và điểm cần cải thiện " +
+                "5. Dự đoán tình trạng sức khỏe tổng quát dựa trên hình dáng cơ thể " +
                 
-                "⚖️ PHÂN LOẠI CHÍNH XÁC (chọn 1 trong 5): " +
-                "📏 THIN: Nếu QUÁ ỐM, xương nổi " +
-                "⚠️ SKINNY: Nếu ỐM + MỠ BỤNG " +
-                "⚖️ NORMAL: Nếu cân đối, KHÔNG cơ bắp " +
-                "🔴 OVERWEIGHT: Nếu QUÁ MỠ, mập " +
-                "🏋️ FIT: Nếu CƠ BẮP SĂN CHẮC " +
+                "🏋️ ĐỀ XUẤT CHI TIẾT (ĐỀ XUẤT PHẢI DÀI VÀ CỤ THỂ): " +
+                "1. Khóa học phù hợp nhất với hình thể này " +
+                "2. 5 bài tập cụ thể (chi tiết số hiệp, số lần) giúp cải thiện nhược điểm " +
+                "3. Chế độ dinh dưỡng chi tiết (tỷ lệ protein/carbs/chất béo, danh sách thực phẩm nên ăn và tránh) " +
+                "4. Tần suất, thời lượng tập luyện lý tưởng và lịch nghỉ ngơi hợp lý " +
                 
-                "Chọn 1 trong 5: Thin, Skinny, Normal, Overweight, Fit. " +
-                "Mô tả lý do chọn và đề xuất tập luyện. " +
-                "JSON: {\"bodyType\": \"...\", \"analysis\": \"...\", \"recommendations\": \"...\"}";
+                "📱 ĐỊNH DẠNG PHẢN HỒI: " +
+                "- Vui lòng trả lời với định dạng JSON: {\"bodyType\": \"...\", \"analysis\": \"...\", \"recommendations\": \"...\"} " +
+                "- Trong trường \"analysis\": phân tích chi tiết hình thể, ít nhất 150-200 từ " +
+                "- Trong trường \"recommendations\": đề xuất chi tiết, ít nhất 250-300 từ " +
+                "- LUÔN xưng hô với người dùng là 'Bạn' trong MỌI câu";
 
         // Create the messages array with proper structure
         List<Map<String, Object>> messages = new ArrayList<>();
@@ -1173,6 +1241,9 @@ public class TrackDataAiController {
         ObjectMapper objectMapper = new ObjectMapper();
 
         try {
+            // Log original response for debugging
+            logger.info("Parsing Claude response. Response length: {}", claudeResponse != null ? claudeResponse.length() : 0);
+            
             // Clean and normalize the response string
             String normalizedResponse = claudeResponse.trim()
                     .replaceAll("\\r\\n|\\r|\\n", " ") // Replace all types of newlines with space
@@ -1238,7 +1309,51 @@ public class TrackDataAiController {
                 }
             }
 
-            // If no valid JSON found, try to extract information using regex
+            // If no valid JSON found, check if the response contains HTML content
+            if (claudeResponse.contains("<div") || claudeResponse.contains("<h3") || claudeResponse.contains("<p")) {
+                logger.info("Detected HTML content in Claude response");
+                
+                // Extract body type using regex
+                Pattern bodyTypePattern = Pattern.compile("Loại cơ thể:\\s*([A-Za-z\\s]+)", Pattern.CASE_INSENSITIVE);
+                Matcher bodyTypeMatcher = bodyTypePattern.matcher(claudeResponse);
+                String bodyType = bodyTypeMatcher.find() ? bodyTypeMatcher.group(1).trim() : "Normal";
+                
+                // Split HTML content if it contains both analysis and recommendations
+                String analysis = claudeResponse;
+                String recommendations = "";
+                
+                if (claudeResponse.contains("ĐỀ XUẤT LUYỆN TẬP") || claudeResponse.contains("<h3")) {
+                    // Try to split content at the heading that separates analysis from recommendations
+                    String[] parts = claudeResponse.split("<h3[^>]*>ĐỀ XUẤT LUYỆN TẬP</h3>", 2);
+                    if (parts.length > 1) {
+                        analysis = parts[0];
+                        recommendations = parts[1];
+                    } else {
+                        // Alternative splitting approach
+                        parts = claudeResponse.split("<h3[^>]*>");
+                        if (parts.length > 2) { // If we have at least two headings
+                            analysis = "<h3>" + parts[1]; // First heading section
+                            recommendations = "<h3>" + parts[2]; // Second heading section
+                        }
+                    }
+                }
+                
+                // Sanitize HTML content
+                analysis = sanitizeHtmlContent(analysis);
+                recommendations = sanitizeHtmlContent(recommendations.isEmpty() ? analysis : recommendations);
+                
+                ImageAnalysisResponseDTO result = new ImageAnalysisResponseDTO();
+                result.setBodyType(bodyType);
+                result.setAnalysis(analysis);
+                result.setRecommendations(recommendations);
+                
+                logger.info("Successfully parsed HTML content. Body type: {}, Analysis length: {}, Recommendations length: {}", 
+                    bodyType, analysis.length(), recommendations.length());
+                
+                return result;
+            }
+
+            // If no structured format detected, try to extract information using regex
             Pattern bodyTypePattern = Pattern.compile("\"bodyType\"\\s*:\\s*\"([^\"]+)\"");
             Pattern analysisPattern = Pattern.compile("\"analysis\"\\s*:\\s*\"([^\"]+)\"");
             Pattern recommendationsPattern = Pattern.compile("\"recommendations\"\\s*:\\s*\"([^\"]+)\"");
@@ -1287,6 +1402,26 @@ public class TrackDataAiController {
             return fallback;
         }
     }
+    
+    /**
+     * Helper method to sanitize HTML content
+     * @param html The HTML content to sanitize
+     * @return Sanitized HTML content
+     */
+    private String sanitizeHtmlContent(String html) {
+        if (html == null) return "";
+        
+        // Remove any script tags for security
+        String sanitized = html.replaceAll("<script\\b[^<]*(?:(?!</script>)<[^<]*)*</script>", "");
+        
+        // Ensure all HTML tags are properly closed
+        sanitized = sanitized.replaceAll("<(br|hr)>", "<$1/>");
+        
+        // Fix any malformed div, span, p tags
+        sanitized = sanitized.replaceAll("<(div|span|p)\\s+([^>]*)>", "<$1 $2>");
+        
+        return sanitized;
+    }
 
     /**
      * Phương pháp thay thế để gọi Claude API khi phương pháp chính gặp hạn chế về chính sách
@@ -1323,23 +1458,32 @@ public class TrackDataAiController {
         requestBody.put("max_tokens", 2000);
 
         // Thêm system message như một tham số cấp cao
-        String systemPrompt = "Bạn là chuyên gia phân tích thể hình với 15 năm kinh nghiệm, chuyên phân loại hình thể dựa trên hình ảnh. " +
-                "Nhiệm vụ của bạn là phân tích MỘT CÁCH CHÍNH XÁC hình thể cơ thể dựa trên tỷ lệ cơ-mỡ và đường nét cơ bắp. " +
+        String systemPrompt = "Bạn là chuyên gia phân tích thể hình và huấn luyện viên cá nhân với 15 năm kinh nghiệm, chuyên phân loại hình thể và tư vấn lộ trình tập luyện phù hợp. " +
+                "Nhiệm vụ của bạn là phân tích CHÍNH XÁC hình thể của người dùng, cung cấp đánh giá chi tiết về chỉ số sức khỏe, và đề xuất phương pháp tập luyện phù hợp. " +
                 
-                "📋 5 LOẠI HÌNH THỂ CHÍNH XÁC: " +
-                "1. **THIN**: QUÁ ỐM - Rất gầy, xương nổi rõ, thiếu cân nặng nghiêm trọng " +
-                "2. **SKINNY**: ỐM NHƯNG MỠ BỤNG NHIỀU - Gầy nhưng có mỡ tích tụ ở bụng, cơ bắp yếu " +
-                "3. **NORMAL**: BÌNH THƯỜNG, KHÔNG CÓ CƠ BẮP - Cân nặng ổn, không gầy không mập, cơ bắp không nổi bật " +
-                "4. **OVERWEIGHT**: QUÁ MỠ VÀ MẬP - Thừa cân rõ ràng, nhiều mỡ thừa, bụng to " +
-                "5. **FIT**: CƠ BẮP SĂN CHẮC - Có đường cơ rõ nét, sixpack, cơ bắp phát triển tốt " +
+                "📋 5 LOẠI HÌNH THỂ BẠN CẦN PHÂN LOẠI: " +
+                "1. **THIN**: Thể trạng quá gầy - Cân nặng thấp, xương nổi rõ, cơ bắp ít " +
+                "2. **SKINNY FAT**: Gầy nhưng có mỡ bụng - Cân nặng trong ngưỡng bình thường nhưng tỷ lệ mỡ cao, cơ bắp yếu " +
+                "3. **NORMAL**: Bình thường - Cân đối, không quá gầy cũng không quá béo, ít cơ bắp " +
+                "4. **OVERWEIGHT**: Thừa cân - Tỷ lệ mỡ cao, đặc biệt ở vùng bụng và thân " +
+                "5. **FIT**: Săn chắc - Tỷ lệ cơ-mỡ cân đối, cơ bắp rõ nét, thể hiện tập luyện thường xuyên " +
                 
-                "🔍 TIÊU CHÍ PHÂN BIỆT QUAN TRỌNG: " +
-                "- THIN vs SKINNY: Thin = hoàn toàn gầy, Skinny = gầy + mỡ bụng " +
-                "- SKINNY vs NORMAL: Skinny có mỡ bụng, Normal cân đối không mỡ bụng " +
-                "- NORMAL vs FIT: Normal không có cơ bắp nổi, Fit có cơ bắp rõ nét " +
-                "- FIT vs OVERWEIGHT: Fit có cơ bắp, Overweight có mỡ thừa " +
+                "🧐 YÊU CẦU VỀ PHÂN TÍCH: " +
+                "- LUÔN xưng hô với người dùng là 'Bạn' trong MỌI câu phân tích (ví dụ: 'Bạn có chỉ số BMI...', 'Dựa vào hình ảnh, bạn có...') " +
+                "- Phân tích CHI TIẾT về chỉ số BMI, cân nặng, chiều cao và tỷ lệ cơ thể (ít nhất 150-200 từ) " +
+                "- Nhận xét cụ thể từng vùng cơ thể: vai, ngực, bụng, tay, chân " + 
+                "- Đánh giá điểm mạnh và điểm cần cải thiện của cơ thể " +
+                "- Sử dụng các thuật ngữ chuyên môn về thể hình nhưng giải thích dễ hiểu " +
+                "- Dùng ngôn ngữ thân thiện, động viên, tích cực, tránh gây tự ti " +
                 
-                "TRẢ LỜI BẰNG TIẾNG VIỆT và PHẢI CHÍNH XÁC 100%.";
+                "💪 YÊU CẦU VỀ ĐỀ XUẤT (PHẢI DÀI VÀ CHI TIẾT 250-300 TỪ): " +
+                "- Gợi ý các KHÓA HỌC CỤ THỂ phù hợp (cardio, sức mạnh, linh hoạt...) " +
+                "- Đề xuất ít nhất 5 LOẠI BÀI TẬP cụ thể phù hợp với thể trạng và mục tiêu, nêu rõ số hiệp và số lần lặp lại " +
+                "- Hướng dẫn CHẾ ĐỘ DINH DƯỠNG chi tiết: tỷ lệ protein, carbs, chất béo, danh sách thực phẩm cụ thể nên ăn và nên tránh " +
+                "- Gợi ý tần suất tập luyện, thời lượng mỗi buổi và lịch nghỉ ngơi " +
+                "- Đề xuất cách theo dõi tiến độ và điều chỉnh kế hoạch " +
+                
+                "Hãy trả lời BẰNG TIẾNG VIỆT với giọng điệu THÂN THIỆN, CHUYÊN NGHIỆP và ĐẦY ĐỘNG VIÊN.";
         requestBody.put("system", systemPrompt);
 
         List<Map<String, Object>> messages = new ArrayList<>();
@@ -1347,27 +1491,28 @@ public class TrackDataAiController {
         userMessage.put("role", "user");
 
         // Create user message content với tiêu chí chính xác
-        String prompt = "Hãy phân tích CHÍNH XÁC hình thể trong ảnh này (bỏ qua khuôn mặt). " +
+        String prompt = "Xin chào! Hãy phân tích hình thể của người dùng trong ảnh này và đưa ra lời khuyên phù hợp. " +
                 "Thông số: Cao " + height + "cm, nặng " + weight + "kg, giới tính: " + gender + ". " +
                 "BMI = " + Math.round((weight / Math.pow(height/100, 2)) * 100) / 100.0 + ". " +
                 
-                "🔍 QUAN SÁT: " +
-                "A) Quá ốm/xương nổi? → THIN " +
-                "B) Ốm + mỡ bụng? → SKINNY " +
-                "C) Cân đối, không cơ bắp? → NORMAL " +
-                "D) Cơ bắp rõ nét/sixpack? → FIT " +
-                "E) Quá mỡ/mập? → OVERWEIGHT " +
+                "📊 PHÂN TÍCH YÊU CẦU: " +
+                "1. Xác định chính xác loại hình thể (THIN, SKINNY FAT, NORMAL, OVERWEIGHT, hoặc FIT) " +
+                "2. Phân tích chi tiết chỉ số BMI, cân nặng, tỷ lệ các vùng cơ thể " +
+                "3. Đánh giá cụ thể từng vùng cơ thể: vai, ngực, bụng, tay, chân " +
+                "4. Phân tích điểm mạnh và điểm cần cải thiện " +
+                "5. Dự đoán tình trạng sức khỏe tổng quát dựa trên hình dáng cơ thể " +
                 
-                "⚖️ PHÂN LOẠI CHÍNH XÁC (chọn 1 trong 5): " +
-                "📏 THIN: Nếu QUÁ ỐM, xương nổi " +
-                "⚠️ SKINNY: Nếu ỐM + MỠ BỤNG " +
-                "⚖️ NORMAL: Nếu cân đối, KHÔNG cơ bắp " +
-                "🔴 OVERWEIGHT: Nếu QUÁ MỠ, mập " +
-                "🏋️ FIT: Nếu CƠ BẮP SĂN CHẮC " +
+                "🏋️ ĐỀ XUẤT CHI TIẾT (ĐỀ XUẤT PHẢI DÀI VÀ CỤ THỂ): " +
+                "1. Khóa học phù hợp nhất với hình thể này " +
+                "2. 5 bài tập cụ thể (chi tiết số hiệp, số lần) giúp cải thiện nhược điểm " +
+                "3. Chế độ dinh dưỡng chi tiết (tỷ lệ protein/carbs/chất béo, danh sách thực phẩm nên ăn và tránh) " +
+                "4. Tần suất, thời lượng tập luyện lý tưởng và lịch nghỉ ngơi hợp lý " +
                 
-                "Chọn 1 trong 5: Thin, Skinny, Normal, Overweight, Fit. " +
-                "Mô tả lý do chọn và đề xuất tập luyện. " +
-                "JSON: {\"bodyType\": \"...\", \"analysis\": \"...\", \"recommendations\": \"...\"}";
+                "📱 ĐỊNH DẠNG PHẢN HỒI: " +
+                "- Vui lòng trả lời với định dạng JSON: {\"bodyType\": \"...\", \"analysis\": \"...\", \"recommendations\": \"...\"} " +
+                "- Trong trường \"analysis\": phân tích chi tiết hình thể, ít nhất 150-200 từ " +
+                "- Trong trường \"recommendations\": đề xuất chi tiết, ít nhất 250-300 từ " +
+                "- LUÔN xưng hô với người dùng là 'Bạn' trong MỌI câu";
 
         List<Map<String, Object>> content = new ArrayList<>();
         Map<String, Object> textContent = new HashMap<>();
@@ -1656,27 +1801,95 @@ public class TrackDataAiController {
         try {
             // Lấy formData và recommendedCourseId từ frontend
             UserDataDTO formData = null;
-            final Integer recommendedCourseId; // Make final
+            Integer recommendedCourseId = null;
+            
+            // Log thông tin request để debug
+            logger.info("Received confirmation request data: {}", requestData);
             
             if (requestData.containsKey("formData")) {
                 // Parse formData từ request
                 Map<String, Object> formDataMap = (Map<String, Object>) requestData.get("formData");
                 formData = parseFormDataFromMap(formDataMap);
+                logger.info("Parsed formData: customerId={}, gender={}", 
+                    formData.getCustomerId(), formData.getGender());
             }
             
             if (requestData.containsKey("recommendedCourseId")) {
-                recommendedCourseId = (Integer) requestData.get("recommendedCourseId");
-            } else {
-                recommendedCourseId = null;
+                Object rawCourseId = requestData.get("recommendedCourseId");
+                logger.info("Raw recommendedCourseId from request: {} (type: {})", 
+                    rawCourseId, rawCourseId != null ? rawCourseId.getClass().getName() : "null");
+                
+                if (rawCourseId instanceof Integer) {
+                    recommendedCourseId = (Integer) rawCourseId;
+                } else if (rawCourseId instanceof Number) {
+                    recommendedCourseId = ((Number) rawCourseId).intValue();
+                } else if (rawCourseId instanceof String) {
+                    try {
+                        recommendedCourseId = Integer.parseInt((String) rawCourseId);
+                    } catch (NumberFormatException e) {
+                        logger.warn("Failed to parse recommendedCourseId from string: {}", rawCourseId);
+                        return ResponseEntity.badRequest()
+                            .body("Invalid recommendedCourseId format. Expected a number but got: " + rawCourseId);
+                    }
+                } else if (rawCourseId instanceof Map) {
+                    // Xử lý trường hợp là map/object với courseId hoặc id
+                    Map<String, Object> courseIdMap = (Map<String, Object>) rawCourseId;
+                    if (courseIdMap.containsKey("courseId")) {
+                        Object courseIdValue = courseIdMap.get("courseId");
+                        if (courseIdValue instanceof Integer) {
+                            recommendedCourseId = (Integer) courseIdValue;
+                        } else if (courseIdValue instanceof Number) {
+                            recommendedCourseId = ((Number) courseIdValue).intValue();
+                        } else if (courseIdValue instanceof String) {
+                            try {
+                                recommendedCourseId = Integer.parseInt((String) courseIdValue);
+                            } catch (NumberFormatException e) {
+                                logger.warn("Failed to parse courseId from object: {}", courseIdValue);
+                            }
+                        }
+                    } else if (courseIdMap.containsKey("id")) {
+                        Object idValue = courseIdMap.get("id");
+                        if (idValue instanceof Integer) {
+                            recommendedCourseId = (Integer) idValue;
+                        } else if (idValue instanceof Number) {
+                            recommendedCourseId = ((Number) idValue).intValue();
+                        } else if (idValue instanceof String) {
+                            try {
+                                recommendedCourseId = Integer.parseInt((String) idValue);
+                            } catch (NumberFormatException e) {
+                                logger.warn("Failed to parse id from object: {}", idValue);
+                            }
+                        }
+                    }
+                }
             }
             
-            if (formData == null || recommendedCourseId == null) {
+            // Kiểm tra các thông tin bắt buộc
+            if (formData == null) {
+                logger.error("Missing formData in request");
                 return ResponseEntity.badRequest()
-                        .body("Missing required data: formData or recommendedCourseId");
+                        .body("Missing required data: formData");
             }
+            
+            if (recommendedCourseId == null) {
+                logger.error("Missing or invalid recommendedCourseId in request");
+                return ResponseEntity.badRequest()
+                        .body("Missing or invalid recommendedCourseId");
+            }
+            
+            // Kiểm tra tồn tại customerId
+            if (formData.getCustomerId() == null) {
+                logger.error("Missing customerId in formData");
+                return ResponseEntity.badRequest()
+                        .body("Missing customerId in formData");
+            }
+            
+            // Tạo biến final để sử dụng trong lambda
+            final Integer finalRecommendedCourseId = recommendedCourseId;
             
             Customer customer = customerService.findById(formData.getCustomerId());
             if (customer == null) {
+                logger.error("Customer not found with ID: {}", formData.getCustomerId());
                 return ResponseEntity.badRequest().body("Customer not found");
             }
             
@@ -1685,7 +1898,7 @@ public class TrackDataAiController {
             List<UserDataAi> allUserRecords = userDataAiService.findByCustomerId(formData.getCustomerId());
             List<UserDataAi> existingRecords = allUserRecords.stream()
                 .filter(record -> record.getCourse() != null && 
-                               record.getCourse().getCourseId().equals(recommendedCourseId))
+                               record.getCourse().getCourseId().equals(finalRecommendedCourseId))
                 .collect(Collectors.toList());
             
             Integer userDataId = null;
@@ -1695,18 +1908,20 @@ public class TrackDataAiController {
                 UserDataAi existingRecord = existingRecords.get(0);
                 userDataId = existingRecord.getUser_data_id();
                 logger.info("Found existing record for customer {} and course {}: userDataId {}", 
-                    formData.getCustomerId(), recommendedCourseId, userDataId);
+                    formData.getCustomerId(), finalRecommendedCourseId, userDataId);
                 
                 // Cập nhật thông tin mới (vòng eo, vòng ngực, etc.)
                 updateExistingUserDataAi(existingRecord, formData);
+                // Đảm bảo effective = true
+                existingRecord.setEffective(true);
                 userDataAiService.saveUserDataAi(existingRecord);
                 
             } else {
                 // Chưa có bản ghi, tạo mới
                 logger.info("Creating new record for customer {} and course {}", 
-                    formData.getCustomerId(), recommendedCourseId);
+                    formData.getCustomerId(), finalRecommendedCourseId);
                 
-                formData.setRecommendedCourseId(recommendedCourseId);
+                formData.setRecommendedCourseId(finalRecommendedCourseId);
                 UserDataAi userDataAi = createUserDataAiFromDTO(formData, customer);
                 userDataAi.setEffective(true); // Đã được xác nhận
                 userDataAi = userDataAiService.saveUserDataAi(userDataAi);
@@ -1716,13 +1931,13 @@ public class TrackDataAiController {
             // Lưu khóa học đề xuất vào CustomerCourse (nếu chưa có)
             List<CustomerCourse> existingCourses = customerCourseService.findByCustomerId(formData.getCustomerId());
             boolean courseExists = existingCourses.stream()
-                    .anyMatch(cc -> cc.getCourse().getCourseId().equals(recommendedCourseId));
+                    .anyMatch(cc -> cc.getCourse().getCourseId().equals(finalRecommendedCourseId));
             
             if (!courseExists) {
-                logger.info("Saving confirmed course {} for user {}", recommendedCourseId, formData.getCustomerId());
-                customerCourseService.saveRecommendedCourseById(recommendedCourseId, formData.getCustomerId());
+                logger.info("Saving confirmed course {} for user {}", finalRecommendedCourseId, formData.getCustomerId());
+                customerCourseService.saveRecommendedCourseById(finalRecommendedCourseId, formData.getCustomerId());
             } else {
-                logger.info("Course {} already exists for user {}, skipping save", recommendedCourseId, formData.getCustomerId());
+                logger.info("Course {} already exists for user {}, skipping save", finalRecommendedCourseId, formData.getCustomerId());
             }
             
             // Return success response
@@ -1831,15 +2046,31 @@ public class TrackDataAiController {
             // Get course details
             Course recommendedCourse = courseService.findCourseById(recommendedCourseId);
             if (recommendedCourse == null) {
-                return ResponseEntity.badRequest()
-                        .body("Course not found with ID: " + recommendedCourseId);
+                logger.error("Course not found with ID: {}", recommendedCourseId);
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Course not found with ID: " + recommendedCourseId);
+                errorResponse.put("message", "Không tìm thấy khóa học được đề xuất. Vui lòng thử lại sau.");
+                errorResponse.put("currentStep", 7);
+                errorResponse.put("totalSteps", 7);
+                errorResponse.put("stepTitle", "Xác Nhận Khóa Học Được Đề Xuất");
+                
+                // Add empty recommendation to avoid frontend errors
+                errorResponse.put("recommendedCourse", Collections.emptyMap());
+                errorResponse.put("userMetrics", formDataMap);
+                
+                return ResponseEntity.ok(errorResponse);
             }
+            
+            // Log detailed course information
+            logger.info("Step 7 data for course ID {}: {}", recommendedCourseId, recommendedCourse.getCourseName());
             
             // Get course type details if available
             Map<String, Object> courseTypeDetails = new HashMap<>();
             if (recommendedCourse.getCourseType() != null) {
                 courseTypeDetails.put("id", recommendedCourse.getCourseType().getCourseTypeId());
                 courseTypeDetails.put("name", recommendedCourse.getCourseType().getCourseTypeName());
+            } else {
+                logger.warn("Course {} has no course type information", recommendedCourseId);
             }
             
             // Create response with all the details
@@ -1875,6 +2106,8 @@ public class TrackDataAiController {
             courseDetails.put("courseType", courseTypeDetails);
             
             recommendationDetails.put("recommendedCourse", courseDetails);
+            // ALSO add for frontend compatibility
+            recommendationDetails.put("recommendedCourses", courseDetails);
             recommendationDetails.put("isConfirmed", false); // Chưa xác nhận
             
             // Add explanation - tạo temporary UserDataAi để generate explanation
@@ -1894,6 +2127,8 @@ public class TrackDataAiController {
             actions.put("formData", formData); // Để frontend có thể gửi lại khi confirm
             actions.put("recommendedCourseId", recommendedCourseId);
             recommendationDetails.put("actions", actions);
+            
+            logger.info("Successfully generated step 7 data with course ID: {}", recommendedCourseId);
             
             return ResponseEntity.ok(recommendationDetails);
         } catch (Exception e) {
@@ -1937,18 +2172,18 @@ public class TrackDataAiController {
             }
             
             // *** VALIDATION THỜI GIAN: Chỉ cho phép cập nhật sau ít nhất 1 tháng ***
-            if (userDataAi.getCreated_date() != null) {
+            if (userDataAi.getCreatedDate() != null) {
                 LocalDateTime oneMonthAgo = LocalDateTime.now().minus(1, ChronoUnit.MONTHS);
                 
-                if (userDataAi.getCreated_date().isAfter(oneMonthAgo)) {
-                    long daysRemaining = ChronoUnit.DAYS.between(LocalDateTime.now(), userDataAi.getCreated_date().plus(1, ChronoUnit.MONTHS));
+                if (userDataAi.getCreatedDate().isAfter(oneMonthAgo)) {
+                    long daysRemaining = ChronoUnit.DAYS.between(LocalDateTime.now(), userDataAi.getCreatedDate().plus(1, ChronoUnit.MONTHS));
                     
                     return ResponseEntity.badRequest()
                             .body("Chỉ có thể cập nhật kết quả sau ít nhất 1 tháng kể từ khi bắt đầu khóa học. " +
                                   "Bạn còn " + daysRemaining + " ngày nữa mới có thể cập nhật.");
                 }
                 
-                logger.info("Time validation passed: Record created {} (more than 1 month ago)", userDataAi.getCreated_date());
+                logger.info("Time validation passed: Record created {} (more than 1 month ago)", userDataAi.getCreatedDate());
             } else {
                 logger.warn("No created_date found for userDataAi {}, allowing update", userDataId);
             }
@@ -2022,10 +2257,30 @@ public class TrackDataAiController {
             }
             
             // Cập nhật trạng thái hiệu quả
+            boolean previousEffective = userDataAi.getEffective() != null ? userDataAi.getEffective() : true;
             userDataAi.setEffective(isEffective);
             
             // Lưu vào database
             userDataAiService.saveUserDataAi(userDataAi);
+            
+            // Nếu khóa học không hiệu quả (effective=false), xử lý logic tạo dữ liệu huấn luyện mới
+            boolean newTrainingDataCreated = false;
+            String trainingDataMessage = "";
+            
+            if (!isEffective && (previousEffective || previousEffective != isEffective)) {
+                logger.info("Course was not effective. We should create new training data.");
+                
+                // Trong điều kiện thực tế, bạn sẽ cần thêm phương thức vào service để tạo bản ghi TrackDataAi mới
+                // Đây là mô tả những gì cần làm:
+                // 1. Lấy ID lớn nhất từ bảng track_data_ai + 1
+                // 2. Tạo bản ghi TrackDataAi mới với dữ liệu từ userDataAi (sử dụng các giá trị _after)
+                // 3. Chọn một khóa học khác (không phải khóa học hiện tại) làm đề xuất mới
+                // 4. Lưu bản ghi mới vào database
+                
+                // Do phương thức yêu cầu chưa được triển khai, chỉ log thông báo
+                trainingDataMessage = "Hệ thống đã ghi nhận kết quả không hiệu quả và sẽ điều chỉnh cho lần đề xuất tiếp theo.";
+                logger.warn("Creating new TrackDataAi record not implemented yet - requires service method updates");
+            }
             
             // Kết quả đánh giá
             evaluationReason.append(isEffective ? "Kết luận: Khóa học hiệu quả!" : "Kết luận: Khóa học cần cải thiện.");
@@ -2038,6 +2293,11 @@ public class TrackDataAiController {
             response.put("message", "Cập nhật kết quả sau khóa học thành công");
             response.put("effective", isEffective);
             response.put("evaluationReason", evaluationReason.toString());
+            
+            // Thêm thông tin về yêu cầu tạo dữ liệu huấn luyện mới (nếu có)
+            if (!trainingDataMessage.isEmpty()) {
+                response.put("trainingDataMessage", trainingDataMessage);
+            }
             
             // Dữ liệu TRƯỚC và SAU để so sánh
             Map<String, Object> beforeData = new HashMap<>();
@@ -2089,7 +2349,7 @@ public class TrackDataAiController {
             response.put("customerId", userDataAi.getCustomer() != null ? userDataAi.getCustomer().getCustomerId() : null);
             response.put("courseName", userDataAi.getCourse() != null ? userDataAi.getCourse().getCourseName() : null);
             response.put("effective", userDataAi.getEffective());
-            response.put("createdDate", userDataAi.getCreated_date());
+            response.put("createdDate", userDataAi.getCreatedDate());
             response.put("updatedDate", userDataAi.getUpdated_date());
             
             // Dữ liệu ban đầu
@@ -2222,10 +2482,10 @@ public class TrackDataAiController {
     
     private String createDetailedRecommendationPrompt(Map<String, Object> userMetrics, Course course) {
         StringBuilder prompt = new StringBuilder();
-        prompt.append("Bạn là một huấn luyện viên thể hình chuyên nghiệp. Hãy giải thích tại sao khóa học được đề xuất phù hợp với hồ sơ của người dùng.\n\n");
+        prompt.append("Bạn là huấn luyện viên thể hình chuyên nghiệp với kinh nghiệm 15 năm. Hãy tư vấn cho khách hàng về khóa học tập luyện phù hợp dựa trên hình thể và mục tiêu của họ.\n\n");
         
         // Thông tin người dùng
-        prompt.append("THÔNG TIN NGƯỜI DÙNG:\n");
+        prompt.append("📊 THÔNG TIN CỦA BẠN:\n");
         prompt.append("- Độ tuổi: ").append(userMetrics.get("age")).append("\n");
         prompt.append("- Giới tính: ").append(userMetrics.get("gender")).append("\n");
         prompt.append("- Chiều cao: ").append(userMetrics.get("height")).append(" cm\n");
@@ -2249,24 +2509,35 @@ public class TrackDataAiController {
 
         
         // Thông tin khóa học
-        prompt.append("\nKHÓA HỌC ĐƯỢC ĐỀ XUẤT:\n");
+        prompt.append("\n🏋️ KHÓA HỌC ĐƯỢC ĐỀ XUẤT CHO BẠN:\n");
         prompt.append("- Tên khóa học: ").append(course.getCourseName()).append("\n");
-        prompt.append("- Mô tả: ").append(course.getDescription() != null ? course.getDescription() : "Khóa học toàn diện").append("\n");
-        prompt.append("- Thời lượng: ").append(course.getDuration() != null ? course.getDuration() : "Không xác định").append("\n");
+        prompt.append("- Mô tả: ").append(course.getDescription() != null ? course.getDescription() : "Khóa học toàn diện phù hợp với nhu cầu của bạn").append("\n");
+        prompt.append("- Thời lượng: ").append(course.getDuration() != null ? course.getDuration() : "Được thiết kế phù hợp với lịch trình của bạn").append("\n");
         
         if (course.getCourseType() != null) {
             prompt.append("- Loại khóa học: ").append(course.getCourseType().getCourseTypeName()).append("\n");
         }
         
-        // Yêu cầu cụ thể
-        prompt.append("\nYÊU CẦU:\n");
-        prompt.append("Hãy viết một giải thích chi tiết (200-300 từ) bằng tiếng Việt về:\n");
-        prompt.append("1. Tại sao khóa học này phù hợp với thông số cơ thể của người dùng\n");
-        prompt.append("2. Khóa học sẽ giúp đạt được mục tiêu như thế nào\n");
-        prompt.append("3. Cách khóa học phù hợp với lịch sử tập luyện và tần suất mong muốn\n");
-        prompt.append("4. Lưu ý đặc biệt về sức khỏe (nếu có)\n");
-        prompt.append("5. Kết quả có thể mong đợi sau khi hoàn thành khóa học\n\n");
-        prompt.append("Hãy viết theo tone chuyên nghiệp nhưng thân thiện, dễ hiểu.");
+        // Yêu cầu giải thích chi tiết
+        prompt.append("\n💡 YÊU CẦU GIẢI THÍCH:\n");
+        prompt.append("Hãy viết một bài tư vấn chi tiết (600-800 từ) bằng tiếng Việt với nội dung:\n");
+        prompt.append("1. Phân tích chi tiết về hình thể hiện tại của bạn dựa trên các chỉ số đã cung cấp (ít nhất 150-200 từ)\n");
+        prompt.append("2. Lý do tại sao khóa học này HOÀN TOÀN PHÙ HỢP với thể trạng và mục tiêu của bạn\n");
+        prompt.append("3. Chi tiết các bài tập cụ thể trong khóa học (ít nhất 5 bài tập kèm số hiệp, số lần và cách thực hiện) sẽ giúp bạn cải thiện từng điểm yếu\n");
+        prompt.append("4. Chế độ dinh dưỡng đề xuất chi tiết kèm theo khóa học:\n");
+        prompt.append("   - Tỷ lệ protein/carbs/chất béo cụ thể\n");
+        prompt.append("   - Danh sách thực phẩm nên ăn cho từng bữa (sáng, trưa, tối, trước/sau tập)\n");
+        prompt.append("   - Các thực phẩm nên tránh và lý do\n");
+        prompt.append("   - Chế độ ăn mẫu cho 1 ngày\n");
+        prompt.append("5. Lộ trình tiến bộ dự kiến chi tiết:\n");
+        prompt.append("   - Kết quả có thể thấy sau 2 tuần, 1 tháng, 3 tháng\n");
+        prompt.append("   - Cách điều chỉnh chương trình khi đạt được các mốc tiến bộ\n");
+        prompt.append("   - Phương pháp theo dõi tiến độ hiệu quả\n\n");
+        prompt.append("QUAN TRỌNG:\n");
+        prompt.append("- LUÔN xưng hô với người dùng là 'Bạn' trong MỌI câu\n");
+        prompt.append("- Viết với giọng điệu thân thiện, chuyên nghiệp, động viên và cá nhân hóa\n");
+        prompt.append("- Đề cập đến các thông số cụ thể của người dùng (như chiều cao, cân nặng, BMI) trong toàn bộ bài tư vấn\n");
+        prompt.append("- Sử dụng các thuật ngữ thể hình chuyên môn nhưng giải thích dễ hiểu");
         
         return prompt.toString();
     }

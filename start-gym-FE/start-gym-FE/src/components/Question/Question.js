@@ -177,11 +177,15 @@ const Question = () => {
             const survey = await collectionService.postRecommend(formData);
             console.log("Survey response:", survey);
             
-            if (survey && survey.recommendedCourses && survey.recommendedCourses.length > 0) {
+            if (survey && survey.recommendedCourses) {
                 setRecommendationResult({
-                    recommendedCourse: survey.recommendedCourses[0],
-                    userMetrics: survey.userMetrics || {},
-                    userDataId: survey.userDataId
+                    recommendedCourses: survey.recommendedCourses,
+                    userMetrics: formData || {},
+                    userDataId: survey.userDataId,
+                    actions: {
+                        formData: formData,
+                        recommendedCourseId: survey.recommendedCourses.courseId
+                    }
                 });
                 setCurrentStep(7); // Move to step 7 instead of navigating
             } else {

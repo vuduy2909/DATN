@@ -59,7 +59,7 @@ const Step1 = ({ formData, handleChange, handleNext }) => {
 
     const handleNextStep = () => {
         if (selectedFrequency) {
-            handleNext();
+        handleNext();
         }
     };
 
@@ -169,17 +169,17 @@ const Step1 = ({ formData, handleChange, handleNext }) => {
                                             
                                             {/* Icon */}
                                             <Box sx={{ mr: 3 }}>
-                                                <CardMedia
-                                                    component="img"
+                                    <CardMedia
+                                        component="img"
                                                     sx={{ 
                                                         height: 80, 
                                                         width: 80,
                                                         borderRadius: 2,
                                                         boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
                                                     }}
-                                                    image={frequency.imageSrc}
-                                                    alt={frequency.label}
-                                                />
+                                        image={frequency.imageSrc}
+                                        alt={frequency.label}
+                                    />
                                             </Box>
                                             
                                             {/* Content */}
@@ -192,8 +192,8 @@ const Step1 = ({ formData, handleChange, handleNext }) => {
                                                         mb: 0.5
                                                     }}
                                                 >
-                                                    {frequency.label}
-                                                </Typography>
+                                            {frequency.label}
+                                        </Typography>
                                                 
                                                 <Typography 
                                                     variant="body2" 
@@ -221,9 +221,9 @@ const Step1 = ({ formData, handleChange, handleNext }) => {
                                             />
                                         </Box>
                                     </CardContent>
-                                </CardActionArea>
-                            </Card>
-                        ))}
+                            </CardActionArea>
+                        </Card>
+                    ))}
                     </Box>
 
                     {/* Next Button */}

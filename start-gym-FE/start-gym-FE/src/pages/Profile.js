@@ -500,9 +500,9 @@ const Profile = () => {
                                 </CardContent>
                             </Card>
                         </Grow>
+                        </Grid>
                     </Grid>
-                </Grid>
-            </Container>
+                </Container>
             <Footer />
         </div>
     );
