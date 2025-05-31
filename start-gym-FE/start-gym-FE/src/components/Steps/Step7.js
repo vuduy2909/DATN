@@ -143,7 +143,7 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
                 // Xử lý trường hợp là object có courseId hoặc id
                 if (typeof rawCourseId === 'object') {
                     if (rawCourseId.courseId) {
-                        recommendedCourseId = Number(rawCourseId.courseId);
+                recommendedCourseId = Number(rawCourseId.courseId);
                     } else if (rawCourseId.id) {
                         recommendedCourseId = Number(rawCourseId.id);
                     }
@@ -152,7 +152,7 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
                 else if (typeof rawCourseId === 'number') {
                     recommendedCourseId = rawCourseId;
                 } else if (typeof rawCourseId === 'string' && !isNaN(rawCourseId)) {
-                    recommendedCourseId = Number(rawCourseId);
+                recommendedCourseId = Number(rawCourseId);
                 }
             }
             
@@ -272,7 +272,7 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
                     errorMessage = error.response.data;
                 } else if (error.response.data) {
                     if (error.response.data.message) {
-                        errorMessage = error.response.data.message;
+                    errorMessage = error.response.data.message;
                     } else {
                         // Trích xuất thông tin lỗi từ các trường khác nếu có
                         errorMessage = JSON.stringify(error.response.data);

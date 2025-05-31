@@ -52,3 +52,8 @@ Thumbs.db
 
 # Cursor workspace
 .cursor/
+# Ignore Microsoft Word documents
+*.docx
+
+# Ignore CSV files
+*.csv
