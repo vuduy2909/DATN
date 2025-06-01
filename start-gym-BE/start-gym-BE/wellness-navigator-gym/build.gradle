@@ -15,10 +15,20 @@ configurations {
     compileOnly {
         extendsFrom annotationProcessor
     }
+    // Fix dependency conflicts
+    all*.exclude group: 'com.google.guava', module: 'guava-jdk5'
+    
+    // Force newer version of Guava that's compatible with both Java 8 and Firebase
+    all {
+        resolutionStrategy.force 'com.google.guava:guava:31.1-jre'
+    }
 }
 
 repositories {
     mavenCentral()
+    // Add Google repository for Firebase dependencies
+    maven { url "https://maven-central.storage-download.googleapis.com/maven2/" }
+    maven { url "https://oss.sonatype.org/content/repositories/snapshots" }
 }
 
 dependencies {
@@ -40,8 +50,13 @@ dependencies {
     testImplementation 'org.springframework.security:spring-security-test'
     //     https://mvnrepository.com/artifact/io.jsonwebtoken/jjwt
     implementation group: 'io.jsonwebtoken', name: 'jjwt', version: '0.9.1'
-    // https://mvnrepository.com/artifact/com.google.api-client/google-api-client
-    implementation group: 'com.google.api-client', name: 'google-api-client', version: '1.30.9'
+    
+    // Firebase dependencies with compatible versions for Java 8
+    implementation 'com.google.firebase:firebase-admin:9.1.1'
+    implementation 'com.google.api-client:google-api-client:2.2.0'
+    implementation 'com.google.cloud:google-cloud-storage:2.22.4'
+    implementation 'com.google.auth:google-auth-library-oauth2-http:1.16.0'
+    
     // Jackson for JSON processing
     implementation 'com.fasterxml.jackson.core:jackson-databind'
     // For logging

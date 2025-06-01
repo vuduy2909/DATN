@@ -5,7 +5,10 @@ import com.capstone.wellnessnavigatorgym.dto.customer.CustomerUserDetailDto;
 import com.capstone.wellnessnavigatorgym.dto.response.MessageResponse;
 import com.capstone.wellnessnavigatorgym.entity.Customer;
 import com.capstone.wellnessnavigatorgym.service.ICustomerService;
+import com.capstone.wellnessnavigatorgym.service.FirebaseStorageService;
 import com.capstone.wellnessnavigatorgym.utils.ConverterMaxCode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -19,6 +22,7 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.annotation.PostConstruct;
 import javax.validation.Valid;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -32,11 +36,26 @@ import java.util.*;
 @CrossOrigin(origins = "http://localhost:3000")
 public class CustomerController {
 
+    private static final Logger logger = LoggerFactory.getLogger(CustomerController.class);
+
     @Autowired
     private ICustomerService customerService;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired(required = false)
+    private FirebaseStorageService firebaseStorageService;
+
+    @PostConstruct
+    public void init() {
+        if (firebaseStorageService != null) {
+            logger.info("📋 FirebaseStorageService was successfully injected");
+            logger.info("📋 Firebase availability: {}", firebaseStorageService.isAvailable() ? "AVAILABLE ✅" : "NOT AVAILABLE ❌");
+        } else {
+            logger.warn("❌ FirebaseStorageService was NOT autowired - Firebase functionality will be disabled");
+        }
+    }
 
     @GetMapping("/list")
     public ResponseEntity<Page<Customer>> findAllCustomer(@RequestParam(value = "type", required = false) Optional<String> type,
@@ -149,36 +168,74 @@ public class CustomerController {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String username = authentication.getName();
             
-            // Create upload directory if it doesn't exist
-            String uploadDir = "uploads/avatars/";
-            Path uploadPath = Paths.get(uploadDir);
-            if (!Files.exists(uploadPath)) {
-                Files.createDirectories(uploadPath);
+            String avatarUrl = null;
+            String uploadMethod = "local"; // Default to local
+            
+            // Try Firebase Storage if available
+            boolean firebaseAvailable = firebaseStorageService != null && firebaseStorageService.isAvailable();
+            
+            if (firebaseAvailable) {
+                try {
+                    avatarUrl = firebaseStorageService.uploadAvatar(file, username);
+                    logger.info("✅ Avatar uploaded to Firebase Storage successfully for user: {}", username);
+                    uploadMethod = "firebase";
+                } catch (Exception firebaseError) {
+                    logger.warn("⚠️ Firebase upload failed for user {}, falling back to local storage: {}", 
+                               username, firebaseError.getMessage());
+                    firebaseAvailable = false;
+                }
+            } else {
+                logger.info("ℹ️ Firebase Storage not available, using local storage for user: {}", username);
             }
             
-            // Generate unique filename
-            String originalFileName = file.getOriginalFilename();
-            String fileExtension = originalFileName.substring(originalFileName.lastIndexOf("."));
-            String newFileName = "avatar_" + username + "_" + System.currentTimeMillis() + fileExtension;
-            
-            // Save file
-            Path filePath = uploadPath.resolve(newFileName);
-            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+            // Fall back to local storage if Firebase is not available or upload failed
+            if (!firebaseAvailable) {
+                try {
+                    // Create upload directory if it doesn't exist
+                    String uploadDir = "uploads/avatars/";
+                    Path uploadPath = Paths.get(uploadDir);
+                    if (!Files.exists(uploadPath)) {
+                        Files.createDirectories(uploadPath);
+                    }
+                    
+                    // Generate filename using Firebase naming convention
+                    String originalFileName = file.getOriginalFilename();
+                    String fileExtension = originalFileName.substring(originalFileName.lastIndexOf("."));
+                    String newFileName = "avatar_" + username + fileExtension;
+                    
+                    // Save file locally
+                    Path filePath = uploadPath.resolve(newFileName);
+                    Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+                    
+                    avatarUrl = "/uploads/avatars/" + newFileName;
+                    uploadMethod = "local";
+                    logger.info("📁 Avatar saved locally for user: {}", username);
+                    
+                } catch (IOException localError) {
+                    logger.error("❌ Both Firebase and local storage failed for user {}: {}", 
+                                username, localError.getMessage());
+                    throw localError;
+                }
+            }
             
             // Update customer avatar in database
-            String avatarUrl = "/uploads/avatars/" + newFileName;
             customerService.updateCustomerAvatar(username, avatarUrl);
+            logger.info("✅ Database updated with new avatar URL for user: {}", username);
             
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Avatar uploaded successfully");
             response.put("avatarUrl", avatarUrl);
+            response.put("uploadMethod", uploadMethod);
+            response.put("timestamp", new java.util.Date());
             
             return ResponseEntity.ok(response);
             
         } catch (IOException e) {
+            logger.error("❌ Avatar upload failed for user: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body("Failed to upload avatar: " + e.getMessage());
         } catch (Exception e) {
+            logger.error("❌ Unexpected error during avatar upload: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body("An error occurred: " + e.getMessage());
         }
@@ -274,5 +331,123 @@ public class CustomerController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body("Failed to update profile: " + e.getMessage());
         }
+    }
+
+    @GetMapping("/test-firebase")
+    public ResponseEntity<?> testFirebaseConnection() {
+        try {
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Firebase Storage service is available");
+            response.put("firebaseConfigured", firebaseStorageService != null);
+            response.put("timestamp", new java.util.Date());
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("❌ Firebase test failed: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("Firebase test failed: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/avatar-status")
+    public ResponseEntity<?> getAvatarStatus() {
+        try {
+            // Get current user
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String username = authentication.getName();
+            
+            CustomerUserDetailDto customerDetail = customerService.findUserDetailByUsername(username);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("username", username);
+            response.put("currentAvatarUrl", customerDetail.getCustomerImg());
+            response.put("hasAvatar", customerDetail.getCustomerImg() != null && !customerDetail.getCustomerImg().isEmpty());
+            response.put("isFirebaseUrl", customerDetail.getCustomerImg() != null && customerDetail.getCustomerImg().contains("firebasestorage.googleapis.com"));
+            response.put("timestamp", new java.util.Date());
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("❌ Failed to get avatar status: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("Failed to get avatar status: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/firebase-status")
+    public ResponseEntity<?> getFirebaseStatus() {
+        Map<String, Object> status = new HashMap<>();
+        
+        boolean firebaseServiceInjected = firebaseStorageService != null;
+        boolean firebaseAvailable = firebaseServiceInjected && firebaseStorageService.isAvailable();
+        
+        status.put("firebaseServiceInjected", firebaseServiceInjected);
+        status.put("firebaseAvailable", firebaseAvailable);
+        status.put("timestamp", new java.util.Date());
+        
+        if (firebaseAvailable) {
+            status.put("message", "Firebase storage is fully operational");
+            status.put("storageMethod", "firebase");
+        } else if (firebaseServiceInjected) {
+            status.put("message", "Firebase service is injected but storage client is not available");
+            status.put("storageMethod", "local (fallback)");
+            status.put("reason", "Firebase Storage client initialization failed");
+        } else {
+            status.put("message", "Firebase service is not available");
+            status.put("storageMethod", "local (fallback)");
+            status.put("reason", "Firebase service bean was not autowired");
+        }
+        
+        return ResponseEntity.ok(status);
+    }
+    
+    @GetMapping("/firebase-diagnostics")
+    public ResponseEntity<?> getFirebaseDiagnostics() {
+        Map<String, Object> diagnostics = new HashMap<>();
+        
+        // Basic status info
+        boolean firebaseServiceInjected = firebaseStorageService != null;
+        boolean firebaseAvailable = firebaseServiceInjected && firebaseStorageService.isAvailable();
+        
+        diagnostics.put("timestamp", new java.util.Date());
+        diagnostics.put("firebaseAvailable", firebaseAvailable);
+        
+        // Get sample user data to check storage pattern
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication.getName();
+        CustomerUserDetailDto customerDetail = customerService.findUserDetailByUsername(username);
+        
+        // Add current storage info
+        Map<String, Object> storageInfo = new HashMap<>();
+        storageInfo.put("currentStorageMethod", firebaseAvailable ? "Firebase Storage" : "Local Storage");
+        storageInfo.put("currentAvatarUrl", customerDetail.getCustomerImg());
+        storageInfo.put("isFirebaseUrl", customerDetail.getCustomerImg() != null && 
+                                        customerDetail.getCustomerImg().contains("firebasestorage.googleapis.com"));
+        storageInfo.put("isLocalUrl", customerDetail.getCustomerImg() != null && 
+                                     customerDetail.getCustomerImg().startsWith("/uploads/"));
+        
+        diagnostics.put("storageInfo", storageInfo);
+        
+        // Add bucket configurations that we're trying to use
+        Map<String, Object> bucketInfo = new HashMap<>();
+        bucketInfo.put("primaryBucketFormat", "capstone-project-2909.firebasestorage.app");
+        bucketInfo.put("alternativeBucketFormat", "capstone-project-2909.appspot.com");
+        bucketInfo.put("expectedFirebaseUrlPattern", "https://firebasestorage.googleapis.com/v0/b/capstone-project-2909.firebasestorage.app/o/...");
+        
+        diagnostics.put("bucketInfo", bucketInfo);
+        
+        // Add troubleshooting suggestions
+        List<String> troubleshootingTips = new ArrayList<>();
+        if (!firebaseAvailable) {
+            troubleshootingTips.add("Check that your service account key is correctly placed in resources/config/");
+            troubleshootingTips.add("Verify that the bucket name in FirebaseConfig.java matches your Firebase project");
+            troubleshootingTips.add("Ensure your service account has Storage Admin permissions");
+            troubleshootingTips.add("Check Firebase console for bucket name format: https://console.firebase.google.com/project/capstone-project-2909/storage");
+        }
+        
+        diagnostics.put("troubleshootingTips", troubleshootingTips);
+        
+        return ResponseEntity.ok(diagnostics);
     }
 }

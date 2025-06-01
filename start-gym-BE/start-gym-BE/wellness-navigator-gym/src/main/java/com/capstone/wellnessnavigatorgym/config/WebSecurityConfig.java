@@ -72,7 +72,10 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
                         "/api/v1/cart/**",
                         "/api/v1/customer-course/debug-customer/**",
                         "/api/v1/customer-course/fix-vanba-account",
-                        "/uploads/**")
+                        // Static resources - allow without authentication
+                        "/uploads/**",
+                        "/images/**",
+                        "/static/**")
                 .permitAll()
                 // Các API cần authentication để thêm khóa học hoặc thao tác cá nhân
                 .antMatchers("/api/v1/customer/detail",

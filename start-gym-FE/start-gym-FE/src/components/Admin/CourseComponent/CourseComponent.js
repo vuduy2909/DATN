@@ -17,7 +17,10 @@ import {
     CircularProgress,
     Avatar,
     Switch,
-    FormControlLabel
+    FormControlLabel,
+    TextField,
+    InputAdornment,
+    Pagination
 } from '@mui/material';
 import { 
     Delete as DeleteIcon, 
@@ -27,9 +30,10 @@ import {
     Visibility as VisibilityIcon,
     VisibilityOff as VisibilityOffIcon,
     PlayArrow as PlayIcon,
-    Stop as StopIcon
+    Stop as StopIcon,
+    Search as SearchIcon
 } from '@mui/icons-material';
-import { axiosInstance } from '../../../utils/axiosInstance';
+import { axiosInstance, getImageUrl } from '../../../utils/axiosInstance';
 import { useNavigate } from 'react-router-dom';
 
 const CourseComponent = () => {
@@ -62,19 +66,29 @@ const CourseComponent = () => {
     // Fetch all courses
     const fetchCourses = async () => {
         setIsLoading(true);
+        setCourses([]);
         
         try {
             console.log('Fetching courses...');
-            const response = await axiosInstance.get('/course'); // Sử dụng endpoint course hiện có
-            console.log('Response:', response.data);
             
-            if (response.data && Array.isArray(response.data)) {
+            // Use the correct admin endpoint to fetch courses
+            const response = await axiosInstance.get('/admin/courses');
+            console.log('Courses fetched:', response.data);
+            
+            // If response data is an array, use it directly
+            if (Array.isArray(response.data)) {
                 setCourses(response.data);
-                console.log('Courses loaded:', response.data.length);
-            } else {
+            } 
+            // If response data has a key for the courses array
+            else if (response.data && Array.isArray(response.data.courses)) {
+                setCourses(response.data.courses);
+            } 
+            // Fallback
+            else {
                 setCourses([]);
-                showSnackbar('No courses data received', 'warning');
+                console.warn('Unexpected response format:', response.data);
             }
+            
         } catch (error) {
             console.error('Error fetching courses:', error);
             showSnackbar(`Error loading courses: ${error.message}`, 'error');
@@ -89,8 +103,8 @@ const CourseComponent = () => {
         try {
             console.log('Toggling course status:', courseId, 'from', currentStatus);
             
-            // Gọi API để update status
-            await axiosInstance.put(`/course/${courseId}/status`, {
+            // Call API to update status with the correct admin endpoint and payload format
+            await axiosInstance.put(`/admin/courses/${courseId}/status`, {
                 status: !currentStatus
             });
             
@@ -99,7 +113,7 @@ const CourseComponent = () => {
                 'success'
             );
             
-            fetchCourses(); // Refresh danh sách
+            fetchCourses(); // Refresh the list
             
         } catch (error) {
             console.error('Error toggling course status:', error);
@@ -113,7 +127,7 @@ const CourseComponent = () => {
         if (window.confirm(`Are you sure you want to delete "${courseName}"?`)) {
             try {
                 console.log('Deleting course:', courseId);
-                await axiosInstance.delete(`/course/${courseId}`);
+                await axiosInstance.delete(`/admin/courses/${courseId}`);
                 
                 showSnackbar('Course deleted successfully! 🗑️', 'success');
                 fetchCourses();
@@ -172,6 +186,9 @@ const CourseComponent = () => {
             </Box>
         );
     }
+
+    console.log("Course data:", courses);
+    console.log("Loading state:", isLoading);
 
     return (
         <Box sx={{ padding: 2 }}>
@@ -279,12 +296,22 @@ const CourseComponent = () => {
                                 <TableRow key={course.courseId} hover>
                                     <TableCell>
                                         <Avatar 
-                                            src={course.image} 
+                                            src={getImageUrl(course.image)} 
                                             alt={course.courseName}
                                             sx={{ width: 50, height: 50 }}
                                             variant="rounded"
+                                            imgProps={{
+                                                onError: (e) => {
+                                                    console.log('Image failed to load, using fallback');
+                                                    e.target.onerror = null; // Prevent infinite loop
+                                                    // Use the first letter of course name as placeholder text
+                                                    const letter = course.courseName?.charAt(0) || 'C';
+                                                    // Generate SVG fallback with course initial
+                                                    e.target.src = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='50' height='50' style='background:%23d35255' viewBox='0 0 50 50'><text x='50%' y='50%' font-size='24' fill='white' text-anchor='middle' dominant-baseline='middle'>${letter}</text></svg>`;
+                                                }
+                                            }}
                                         >
-                                            {course.courseName?.charAt(0)}
+                                            {course.courseName?.charAt(0) || 'C'}
                                         </Avatar>
                                     </TableCell>
                                     <TableCell>

@@ -5,19 +5,30 @@ import com.capstone.wellnessnavigatorgym.entity.CustomerType;
 import com.capstone.wellnessnavigatorgym.entity.VipPayment;
 import com.capstone.wellnessnavigatorgym.entity.Comment;
 import com.capstone.wellnessnavigatorgym.entity.Course;
+import com.capstone.wellnessnavigatorgym.entity.CourseType;
 import com.capstone.wellnessnavigatorgym.repository.ICustomerRepository;
 import com.capstone.wellnessnavigatorgym.repository.ICustomerTypeRepository;
 import com.capstone.wellnessnavigatorgym.repository.IVipPaymentRepository;
 import com.capstone.wellnessnavigatorgym.repository.ICourseRepository;
 import com.capstone.wellnessnavigatorgym.repository.ICommentRepository;
+import com.capstone.wellnessnavigatorgym.repository.ICourseTypeRepository;
 import com.capstone.wellnessnavigatorgym.service.PaymentStatusService;
+import com.capstone.wellnessnavigatorgym.service.FirebaseStorageService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+import javax.persistence.Query;
+import javax.persistence.Tuple;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -28,6 +39,8 @@ import java.util.stream.Collectors;
 @CrossOrigin(origins = "http://localhost:3000")
 @PreAuthorize("hasRole('ROLE_ADMIN')")
 public class AdminController {
+
+    private static final Logger logger = LoggerFactory.getLogger(AdminController.class);
 
     @Autowired
     private PaymentStatusService paymentStatusService;
@@ -46,6 +59,15 @@ public class AdminController {
 
     @Autowired
     private ICommentRepository commentRepository;
+
+    @Autowired
+    private ICourseTypeRepository courseTypeRepository;
+
+    @Autowired
+    private FirebaseStorageService firebaseStorageService;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     /**
      * Test endpoint đơn giản
@@ -989,6 +1011,614 @@ public class AdminController {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error getting revenue transactions: " + e.getMessage());
+        }
+    }
+
+    // ===== COURSE CRUD ENDPOINTS =====
+    
+    @GetMapping("/courses/{courseId}")
+    public ResponseEntity<?> getCourseById(@PathVariable Integer courseId) {
+        try {
+            Course course = courseRepository.findById(courseId).orElse(null);
+            if (course == null) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("message", "Course not found with ID: " + courseId);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+            }
+            
+            return ResponseEntity.ok(course);
+            
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("message", "Failed to retrieve course: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+    
+    @PutMapping("/courses/{courseId}")
+    public ResponseEntity<?> updateCourse(@PathVariable Integer courseId, @RequestBody Map<String, Object> courseData) {
+        try {
+            Course course = courseRepository.findById(courseId).orElse(null);
+            if (course == null) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("message", "Course not found with ID: " + courseId);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+            }
+            
+            // Update course fields
+            if (courseData.containsKey("courseName")) {
+                course.setCourseName((String) courseData.get("courseName"));
+            }
+            if (courseData.containsKey("description")) {
+                course.setDescription((String) courseData.get("description"));
+            }
+            if (courseData.containsKey("duration")) {
+                course.setDuration((String) courseData.get("duration"));
+            }
+            if (courseData.containsKey("status")) {
+                course.setStatus((Boolean) courseData.get("status"));
+            }
+            if (courseData.containsKey("price")) {
+                course.setPrice(new BigDecimal(courseData.get("price").toString()));
+            }
+            if (courseData.containsKey("isVip")) {
+                course.setIsVip((Boolean) courseData.get("isVip"));
+            }
+            if (courseData.containsKey("averageRating")) {
+                course.setAverageRating(Double.parseDouble(courseData.get("averageRating").toString()));
+            }
+            // Handle new fields
+            if (courseData.containsKey("weeklySessions")) {
+                course.setWeeklySessions((String) courseData.get("weeklySessions"));
+            }
+            if (courseData.containsKey("recommendedFor")) {
+                course.setRecommendedFor((String) courseData.get("recommendedFor"));
+            }
+            if (courseData.containsKey("difficultyLevel")) {
+                course.setDifficultyLevel((String) courseData.get("difficultyLevel"));
+            }
+            if (courseData.containsKey("image")) {
+                course.setImage((String) courseData.get("image"));
+            }
+            
+            // Handle course type update
+            if (courseData.containsKey("courseTypeId")) {
+                Integer courseTypeId = Integer.parseInt(courseData.get("courseTypeId").toString());
+                CourseType courseType = courseTypeRepository.findById(courseTypeId).orElse(null);
+                if (courseType != null) {
+                    course.setCourseType(courseType);
+                }
+            }
+            
+            // Update timestamps
+            course.setUpdatedDate(LocalDateTime.now());
+            
+            courseRepository.save(course);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Course updated successfully");
+            response.put("courseId", courseId);
+            response.put("timestamp", LocalDateTime.now());
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("message", "Failed to update course: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+    
+    @PutMapping("/courses/{courseId}/status")
+    public ResponseEntity<?> toggleCourseStatus(@PathVariable Integer courseId, @RequestBody Map<String, Object> statusData) {
+        try {
+            Course course = courseRepository.findById(courseId).orElse(null);
+            if (course == null) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("message", "Course not found with ID: " + courseId);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+            }
+            
+            Boolean newStatus = (Boolean) statusData.get("status");
+            course.setStatus(newStatus);
+            course.setUpdatedDate(LocalDateTime.now());
+            
+            courseRepository.save(course);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Course status updated successfully");
+            response.put("courseId", courseId);
+            response.put("newStatus", newStatus);
+            response.put("timestamp", LocalDateTime.now());
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("message", "Failed to update course status: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+    
+    @DeleteMapping("/courses/{courseId}")
+    public ResponseEntity<?> deleteCourse(@PathVariable Integer courseId) {
+        try {
+            Course course = courseRepository.findById(courseId).orElse(null);
+            if (course == null) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("message", "Course not found with ID: " + courseId);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+            }
+            
+            // Soft delete by setting status to false
+            course.setStatus(false);
+            course.setUpdatedDate(LocalDateTime.now());
+            courseRepository.save(course);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Course deleted successfully (soft delete)");
+            response.put("courseId", courseId);
+            response.put("timestamp", LocalDateTime.now());
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("message", "Failed to delete course: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+    
+    // ===== COURSE DAYS MANAGEMENT =====
+    
+    @GetMapping("/courses/{courseId}/days")
+    public ResponseEntity<?> getCourseDays(@PathVariable Integer courseId) {
+        try {
+            // Query to get course days with exercises
+            String sql = "SELECT cd.course_day_id, cd.course_id, cd.day_id, d.day_name, cd.status, " +
+                        "e.exercise_id, e.exercise_name, e.target, e.body_part, e.instructions " +
+                        "FROM course_days cd " +
+                        "JOIN days d ON cd.day_id = d.day_id " +
+                        "LEFT JOIN exercise_day ed ON d.day_id = ed.day_id AND ed.course_id = cd.course_id " +
+                        "LEFT JOIN exercise e ON ed.exercise_id = e.exercise_id " +
+                        "WHERE cd.course_id = :courseId AND cd.status = true " +
+                        "ORDER BY d.day_id, e.exercise_id";
+            
+            List<Tuple> results = entityManager.createNativeQuery(sql, Tuple.class)
+                .setParameter("courseId", courseId)
+                .getResultList();
+            
+            // Group results by day
+            Map<Integer, Map<String, Object>> daysMap = new LinkedHashMap<>();
+            
+            for (Tuple result : results) {
+                Integer dayId = ((Number) result.get("day_id")).intValue();
+                
+                if (!daysMap.containsKey(dayId)) {
+                    Map<String, Object> dayInfo = new HashMap<>();
+                    dayInfo.put("dayId", dayId);
+                    dayInfo.put("dayName", result.get("day_name"));
+                    dayInfo.put("courseId", courseId);
+                    dayInfo.put("status", result.get("status"));
+                    dayInfo.put("exercises", new ArrayList<>());
+                    daysMap.put(dayId, dayInfo);
+                }
+                
+                // Add exercise if exists
+                if (result.get("exercise_id") != null) {
+                    Map<String, Object> exercise = new HashMap<>();
+                    exercise.put("exerciseId", result.get("exercise_id"));
+                    exercise.put("exerciseName", result.get("exercise_name"));
+                    exercise.put("target", result.get("target"));
+                    exercise.put("bodyPart", result.get("body_part"));
+                    exercise.put("instructions", result.get("instructions"));
+                    
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> exercises = (List<Map<String, Object>>) daysMap.get(dayId).get("exercises");
+                    exercises.add(exercise);
+                }
+            }
+            
+            List<Map<String, Object>> courseDays = new ArrayList<>(daysMap.values());
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("courseDays", courseDays);
+            response.put("totalDays", courseDays.size());
+            response.put("courseId", courseId);
+            
+            return ResponseEntity.ok(courseDays);
+            
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("message", "Failed to fetch course days: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+    
+    @PostMapping("/courses/{courseId}/days")
+    public ResponseEntity<?> addCourseDay(@PathVariable Integer courseId, @RequestBody Map<String, Object> dayData) {
+        try {
+            String dayName = (String) dayData.get("dayName");
+            
+            if (dayName == null || dayName.trim().isEmpty()) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("message", "Day name is required");
+                return ResponseEntity.badRequest().body(errorResponse);
+            }
+            
+            // First create a new day
+            String insertDaySQL = "INSERT INTO days (day_name) VALUES (:dayName)";
+            Query insertDayQuery = entityManager.createNativeQuery(insertDaySQL);
+            insertDayQuery.setParameter("dayName", dayName);
+            insertDayQuery.executeUpdate();
+            
+            // Get the newly created day ID
+            String getLastIdSQL = "SELECT LAST_INSERT_ID()";
+            Number dayId = (Number) entityManager.createNativeQuery(getLastIdSQL).getSingleResult();
+            
+            // Create course_days association
+            String insertCourseDaySQL = "INSERT INTO course_days (course_id, day_id, status) VALUES (:courseId, :dayId, true)";
+            Query insertCourseDayQuery = entityManager.createNativeQuery(insertCourseDaySQL);
+            insertCourseDayQuery.setParameter("courseId", courseId);
+            insertCourseDayQuery.setParameter("dayId", dayId);
+            insertCourseDayQuery.executeUpdate();
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Day added successfully");
+            response.put("dayId", dayId);
+            response.put("dayName", dayName);
+            response.put("courseId", courseId);
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("message", "Failed to add course day: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+    
+    @DeleteMapping("/courses/{courseId}/days/{dayId}")
+    public ResponseEntity<?> deleteCourseDay(@PathVariable Integer courseId, @PathVariable Integer dayId) {
+        try {
+            // Soft delete by setting status to false
+            String updateSQL = "UPDATE course_days SET status = false WHERE course_id = :courseId AND day_id = :dayId";
+            Query updateQuery = entityManager.createNativeQuery(updateSQL);
+            updateQuery.setParameter("courseId", courseId);
+            updateQuery.setParameter("dayId", dayId);
+            
+            int updatedRows = updateQuery.executeUpdate();
+            
+            if (updatedRows == 0) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("message", "Course day not found");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+            }
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Course day deleted successfully");
+            response.put("dayId", dayId);
+            response.put("courseId", courseId);
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("message", "Failed to delete course day: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+    
+    // ===== COURSE EXERCISES MANAGEMENT =====
+    
+    @PostMapping("/courses/{courseId}/days/{dayId}/exercises")
+    public ResponseEntity<?> addExerciseToDay(@PathVariable Integer courseId, 
+                                              @PathVariable Integer dayId, 
+                                              @RequestBody Map<String, Object> exerciseData) {
+        try {
+            Integer exerciseId = null;
+            if (exerciseData.containsKey("exerciseId")) {
+                exerciseId = Integer.parseInt(exerciseData.get("exerciseId").toString());
+            }
+            
+            if (exerciseId == null) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("message", "Exercise ID is required");
+                return ResponseEntity.badRequest().body(errorResponse);
+            }
+            
+            // Check if exercise exists
+            String checkExerciseSQL = "SELECT COUNT(*) FROM exercise WHERE exercise_id = :exerciseId";
+            BigInteger exerciseExists = (BigInteger) entityManager.createNativeQuery(checkExerciseSQL)
+                .setParameter("exerciseId", exerciseId)
+                .getSingleResult();
+            
+            if (exerciseExists.intValue() == 0) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("message", "Exercise not found with ID: " + exerciseId);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+            }
+            
+            // Check if the combination already exists
+            String checkExistingSQL = "SELECT COUNT(*) FROM exercise_day " +
+                                      "WHERE course_id = :courseId AND day_id = :dayId AND exercise_id = :exerciseId";
+            BigInteger alreadyExists = (BigInteger) entityManager.createNativeQuery(checkExistingSQL)
+                .setParameter("courseId", courseId)
+                .setParameter("dayId", dayId)
+                .setParameter("exerciseId", exerciseId)
+                .getSingleResult();
+            
+            if (alreadyExists.intValue() > 0) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("message", "This exercise is already added to this day");
+                return ResponseEntity.badRequest().body(errorResponse);
+            }
+            
+            // Get order number (default to 1 if not provided)
+            Integer orderNum = 1;
+            if (exerciseData.containsKey("order") && exerciseData.get("order") != null) {
+                orderNum = Integer.parseInt(exerciseData.get("order").toString());
+            }
+            
+            // Insert exercise-day relationship
+            String insertSQL = "INSERT INTO exercise_day (course_id, day_id, exercise_id, order_num, status) " +
+                              "VALUES (:courseId, :dayId, :exerciseId, :orderNum, true)";
+            
+            Query insertQuery = entityManager.createNativeQuery(insertSQL);
+            insertQuery.setParameter("courseId", courseId);
+            insertQuery.setParameter("dayId", dayId);
+            insertQuery.setParameter("exerciseId", exerciseId);
+            insertQuery.setParameter("orderNum", orderNum);
+            
+            insertQuery.executeUpdate();
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Exercise added successfully");
+            response.put("courseId", courseId);
+            response.put("dayId", dayId);
+            response.put("exerciseId", exerciseId);
+            response.put("orderNum", orderNum);
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("message", "Failed to add exercise: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+    
+    @GetMapping("/courses/{courseId}/days/{dayId}/exercises")
+    public ResponseEntity<?> getDayExercises(@PathVariable Integer courseId, @PathVariable Integer dayId) {
+        try {
+            // Query to get exercises for a specific day in a course
+            String sql = "SELECT e.exercise_id, e.exercise_name, e.description, e.body_part, e.target, " +
+                         "e.equipment, e.gif_url, e.instructions, e.secondary_muscles, ed.order_num " +
+                         "FROM exercise e " +
+                         "JOIN exercise_day ed ON e.exercise_id = ed.exercise_id " +
+                         "WHERE ed.course_id = :courseId AND ed.day_id = :dayId " +
+                         "ORDER BY ed.order_num";
+            
+            List<Map<String, Object>> dayExercises = new ArrayList<>();
+            
+            List<Object[]> results = entityManager.createNativeQuery(sql)
+                .setParameter("courseId", courseId)
+                .setParameter("dayId", dayId)
+                .getResultList();
+            
+            for (Object[] result : results) {
+                Map<String, Object> exercise = new HashMap<>();
+                exercise.put("exerciseId", result[0]);
+                exercise.put("exerciseName", result[1]);
+                exercise.put("description", result[2]);
+                exercise.put("bodyPart", result[3]);
+                exercise.put("target", result[4]);
+                exercise.put("equipment", result[5]);
+                exercise.put("gifUrl", result[6]);
+                exercise.put("instructions", result[7]);
+                exercise.put("secondaryMuscles", result[8]);
+                exercise.put("orderNum", result[9]);
+                dayExercises.add(exercise);
+            }
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("courseId", courseId);
+            response.put("dayId", dayId);
+            response.put("exercises", dayExercises);
+            response.put("count", dayExercises.size());
+            
+            return ResponseEntity.ok(dayExercises);
+            
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("message", "Failed to retrieve day exercises: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+    @DeleteMapping("/courses/{courseId}/days/{dayId}/exercises/{exerciseId}")
+    public ResponseEntity<?> removeExerciseFromDay(@PathVariable Integer courseId,
+                                                   @PathVariable Integer dayId,
+                                                   @PathVariable Integer exerciseId) {
+        try {
+            // Remove exercise from day by setting status to false
+            String updateSQL = "UPDATE exercise_day SET status = false WHERE day_id = :dayId AND exercise_id = :exerciseId AND course_id = :courseId";
+            Query updateQuery = entityManager.createNativeQuery(updateSQL);
+            updateQuery.setParameter("dayId", dayId);
+            updateQuery.setParameter("exerciseId", exerciseId);
+            updateQuery.setParameter("courseId", courseId);
+            
+            int updatedRows = updateQuery.executeUpdate();
+            
+            if (updatedRows == 0) {
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("message", "Exercise not found in this day");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+            }
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Exercise removed from day successfully");
+            response.put("dayId", dayId);
+            response.put("exerciseId", exerciseId);
+            response.put("courseId", courseId);
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("Error removing exercise from day: {}", e.getMessage());
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("message", "Failed to remove exercise from day: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+    
+    // ===== COURSE TYPES ENDPOINT =====
+    
+    @GetMapping("/exercises")
+    public ResponseEntity<?> getAllExercises() {
+        try {
+            // Create a native query for exercises
+            String sql = "SELECT e.* FROM exercise e ORDER BY e.exercise_name";
+            List<Map<String, Object>> exercises = new ArrayList<>();
+            
+            List<Object[]> results = entityManager.createNativeQuery(sql).getResultList();
+            
+            for (Object[] result : results) {
+                Map<String, Object> exercise = new HashMap<>();
+                exercise.put("exerciseId", result[0]);
+                exercise.put("exerciseName", result[1]);
+                exercise.put("description", result[2]);
+                exercise.put("bodyPart", result[3]);
+                exercise.put("target", result[4]);
+                exercise.put("equipment", result[5]);
+                exercise.put("gifUrl", result[6]);
+                exercise.put("instructions", result[7]);
+                exercise.put("secondaryMuscles", result[8]);
+                exercises.add(exercise);
+            }
+            
+            return ResponseEntity.ok(exercises);
+            
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("message", "Failed to retrieve exercises: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+    @GetMapping("/course-types")
+    public ResponseEntity<?> getCourseTypes() {
+        try {
+            String sql = "SELECT course_type_id, course_type_name FROM course_type WHERE status = true ORDER BY course_type_id";
+            List<Tuple> results = entityManager.createNativeQuery(sql, Tuple.class).getResultList();
+            
+            List<Map<String, Object>> courseTypes = results.stream()
+                .map(result -> {
+                    Map<String, Object> type = new HashMap<>();
+                    type.put("courseTypeId", result.get("course_type_id"));
+                    type.put("courseTypeName", result.get("course_type_name"));
+                    return type;
+                })
+                .collect(Collectors.toList());
+            
+            return ResponseEntity.ok(courseTypes);
+            
+        } catch (Exception e) {
+            logger.error("Error fetching course types: {}", e.getMessage());
+            
+            // Return default course types if query fails
+            List<Map<String, Object>> defaultTypes = new ArrayList<>();
+            
+            Map<String, Object> type1 = new HashMap<>();
+            type1.put("courseTypeId", 1);
+            type1.put("courseTypeName", "Strength Training");
+            defaultTypes.add(type1);
+            
+            Map<String, Object> type2 = new HashMap<>();
+            type2.put("courseTypeId", 2);
+            type2.put("courseTypeName", "Cardiovascular");
+            defaultTypes.add(type2);
+            
+            Map<String, Object> type3 = new HashMap<>();
+            type3.put("courseTypeId", 3);
+            type3.put("courseTypeName", "Flexibility");
+            defaultTypes.add(type3);
+            
+            Map<String, Object> type4 = new HashMap<>();
+            type4.put("courseTypeId", 4);
+            type4.put("courseTypeName", "Strength & Endurance");
+            defaultTypes.add(type4);
+            
+            Map<String, Object> type5 = new HashMap<>();
+            type5.put("courseTypeId", 5);
+            type5.put("courseTypeName", "Mind-Body Wellness");
+            defaultTypes.add(type5);
+            
+            Map<String, Object> type6 = new HashMap<>();
+            type6.put("courseTypeId", 6);
+            type6.put("courseTypeName", "Functional Training");
+            defaultTypes.add(type6);
+            
+            Map<String, Object> type7 = new HashMap<>();
+            type7.put("courseTypeId", 7);
+            type7.put("courseTypeName", "Weight Loss");
+            defaultTypes.add(type7);
+            
+            return ResponseEntity.ok(defaultTypes);
+        }
+    }
+
+    @PostMapping("/courses/upload-image")
+    public ResponseEntity<?> uploadCourseImage(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("courseType") String courseType,
+            @RequestParam("courseName") String courseName) {
+        try {
+            // Validate file
+            if (file.isEmpty()) {
+                Map<String, String> error = new HashMap<>();
+                error.put("message", "Please select a file to upload");
+                error.put("status", "error");
+                return ResponseEntity.badRequest().body(error);
+            }
+            
+            // Check file size (5MB limit)
+            if (file.getSize() > 5 * 1024 * 1024) {
+                Map<String, String> error = new HashMap<>();
+                error.put("message", "File size must be less than 5MB");
+                error.put("status", "error");
+                return ResponseEntity.badRequest().body(error);
+            }
+            
+            // Check file type
+            String contentType = file.getContentType();
+            if (contentType == null || !contentType.startsWith("image/")) {
+                Map<String, String> error = new HashMap<>();
+                error.put("message", "Please select an image file");
+                error.put("status", "error");
+                return ResponseEntity.badRequest().body(error);
+            }
+            
+            // Upload to Firebase using the service
+            String imageUrl = firebaseStorageService.uploadCourseImage(file, courseType, courseName);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("imageUrl", imageUrl);
+            response.put("message", "Course image uploaded successfully");
+            response.put("status", "success");
+            response.put("timestamp", LocalDateTime.now());
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("Failed to upload course image: {}", e.getMessage(), e);
+            
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("message", "Failed to upload course image: " + e.getMessage());
+            errorResponse.put("status", "error");
+            errorResponse.put("timestamp", LocalDateTime.now());
+            
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
 } 
