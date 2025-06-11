@@ -212,11 +212,24 @@ const Login = () => {
                                     error.response.data.message || 
                                     (typeof error.response.data === 'string' ? error.response.data : '');
                 
+                // Check for 403 Forbidden status (account banned)
+                if (error.response.status === 403) {
+                    console.log("User is banned (403 Forbidden), redirecting to contact page");
+                    navigate('/contact', { 
+                        state: { 
+                            isBanned: true, 
+                            username: username 
+                        } 
+                    });
+                    return;
+                }
+                
                 // When the server responds with "Bad credentials" for a banned user
                 if (error.response.status === 401 && 
                     (errorMessage.includes("Bad credentials") || 
                      errorMessage.includes("Customer account is banned") ||
-                     errorMessage.includes("disabled"))) {
+                     errorMessage.includes("disabled") ||
+                     errorMessage.includes("banned"))) {
                     
                     // Make a check if this user exists and is banned
                     try {

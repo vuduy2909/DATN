@@ -188,7 +188,7 @@ const Account = () => {
 
         setLoading(true);
         const formData = new FormData();
-        formData.append('avatar', selectedFile);
+        formData.append('file', selectedFile);
         
         // Add old avatar URL for deletion if it exists
         if (userData.customerImg) {
@@ -213,7 +213,20 @@ const Account = () => {
                 URL.revokeObjectURL(previewUrl);
             }
         } catch (error) {
-            const errorMessage = error.response?.data?.message || error.response?.data || 'Upload thất bại';
+            console.log("Full error object:", error);
+            console.log("Error response:", error.response);
+            console.log("Error response data:", error.response?.data);
+            
+            let errorMessage = 'Upload thất bại';
+            if (error.response?.data) {
+                if (typeof error.response.data === 'string') {
+                    errorMessage = error.response.data;
+                } else if (error.response.data.message) {
+                    errorMessage = error.response.data.message;
+                } else if (error.response.data.error) {
+                    errorMessage = error.response.data.error;
+                }
+            }
             showSnackbar(errorMessage, 'error');
             console.log("Error uploading avatar", error);
         } finally {
@@ -264,7 +277,16 @@ const Account = () => {
             showSnackbar('Cập nhật thông tin thành công! 🎉', 'success');
             await refreshUserData();
         } catch (error) {
-            const errorMessage = error.response?.data?.message || error.response?.data || 'Cập nhật thất bại';
+            let errorMessage = 'Cập nhật thất bại';
+            if (error.response?.data) {
+                if (typeof error.response.data === 'string') {
+                    errorMessage = error.response.data;
+                } else if (error.response.data.message) {
+                    errorMessage = error.response.data.message;
+                } else if (error.response.data.error) {
+                    errorMessage = error.response.data.error;
+                }
+            }
             showSnackbar(errorMessage, 'error');
             console.log("Error updating profile", error);
         } finally {
@@ -327,7 +349,16 @@ const Account = () => {
             setPasswordData({ oldPassword: '', newPassword: '', confirmPassword: '' });
             await refreshUserData();
         } catch (error) {
-            const errorMessage = error.response?.data?.message || error.response?.data || 'Đổi mật khẩu thất bại. Vui lòng kiểm tra mật khẩu cũ.';
+            let errorMessage = 'Đổi mật khẩu thất bại. Vui lòng kiểm tra mật khẩu cũ.';
+            if (error.response?.data) {
+                if (typeof error.response.data === 'string') {
+                    errorMessage = error.response.data;
+                } else if (error.response.data.message) {
+                    errorMessage = error.response.data.message;
+                } else if (error.response.data.error) {
+                    errorMessage = error.response.data.error;
+                }
+            }
             showSnackbar(errorMessage, 'error');
             console.log("Error changing password", error);
         } finally {

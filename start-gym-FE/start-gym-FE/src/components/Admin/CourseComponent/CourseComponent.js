@@ -96,28 +96,39 @@ const CourseComponent = () => {
         setIsLoading(true);
         
         try {
-            console.log('Fetching courses...');
-            const response = await axiosInstance.get('/course'); // Sử dụng endpoint course hiện có
-            console.log('Response:', response.data);
+            console.log('Fetching admin courses...');
+            const response = await axiosInstance.get('/admin/courses'); // Use correct admin endpoint
+            console.log('Admin courses response:', response.data);
             
-            if (response.data && Array.isArray(response.data)) {
-                setCourses(response.data);
-                setTotalCourses(response.data.length);
-            } 
-            // If response data has a key for the courses array
-            else if (response.data && Array.isArray(response.data.courses)) {
+            // Handle response data structure
+            if (response.data && Array.isArray(response.data.courses)) {
                 setCourses(response.data.courses);
                 setTotalCourses(response.data.courses.length);
+                console.log(`Loaded ${response.data.courses.length} courses for admin`);
             } 
-            // Fallback
+            // Fallback for direct array response
+            else if (response.data && Array.isArray(response.data)) {
+                setCourses(response.data);
+                setTotalCourses(response.data.length);
+                console.log(`Loaded ${response.data.length} courses (direct array)`);
+            } 
+            // Empty fallback
             else {
                 setCourses([]);
                 setTotalCourses(0);
-                console.warn('Unexpected response format:', response.data);
+                console.warn('Unexpected admin courses response format:', response.data);
             }
         } catch (error) {
-            console.error('Error fetching courses:', error);
-            showSnackbar(`Error loading courses: ${error.message}`, 'error');
+            console.error('Error fetching admin courses:', error);
+            console.error('Error details:', error.response?.data || error.message);
+            
+            const errorMessage = error.response?.status === 403 
+                ? 'Access denied - admin privileges required'
+                : error.response?.status === 404
+                ? 'Admin courses endpoint not found'
+                : `Error loading courses: ${error.message}`;
+                
+            showSnackbar(errorMessage, 'error');
             setCourses([]);
             setTotalCourses(0);
         } finally {
@@ -137,46 +148,64 @@ const CourseComponent = () => {
 
     // Filter and search logic
     useEffect(() => {
-        let filtered = courses;
+        let filtered = [...courses]; // Create a copy to avoid mutation
 
-        // Search by course name
-        if (searchTerm) {
+        console.log('Applying filters to', courses.length, 'courses');
+        console.log('Filters:', { searchTerm, statusFilter, vipFilter, courseTypeFilter });
+
+        // Search by course name and description
+        if (searchTerm && searchTerm.trim()) {
+            const searchLower = searchTerm.toLowerCase().trim();
             filtered = filtered.filter(course =>
-                course.courseName?.toLowerCase().includes(searchTerm.toLowerCase())
+                (course.courseName?.toLowerCase().includes(searchLower)) ||
+                (course.description?.toLowerCase().includes(searchLower))
             );
+            console.log('After search filter:', filtered.length, 'courses');
         }
 
-        // Filter by status (bit field: 1 = active, 0 = hidden)
+        // Filter by status (bit field: 1/true = active, 0/false = hidden)
         if (statusFilter !== 'all') {
             filtered = filtered.filter(course => {
-                if (statusFilter === 'active') return course.status === 1 || course.status === true;
-                if (statusFilter === 'hidden') return course.status === 0 || course.status === false;
+                const courseStatus = course.status;
+                if (statusFilter === 'active') {
+                    return courseStatus === 1 || courseStatus === true;
+                }
+                if (statusFilter === 'hidden') {
+                    return courseStatus === 0 || courseStatus === false || courseStatus === null;
+                }
                 return true;
             });
+            console.log('After status filter:', filtered.length, 'courses');
         }
 
-        // Filter by VIP status (bit field: 1 = vip, 0 = free)
+        // Filter by VIP status (use both is_vip and isVip fields for compatibility)
         if (vipFilter !== 'all') {
             filtered = filtered.filter(course => {
+                const isVipFromField = course.is_vip === true || course.is_vip === 1;
+                const isVipFromCamelCase = course.isVip === true || course.isVip === 1;
+                const isVipCourse = isVipFromField || isVipFromCamelCase;
+                
                 if (vipFilter === 'vip') {
-                    // VIP courses should have is_vip = true (or 1)
-                    return course.is_vip === true || course.is_vip === 1;
+                    return isVipCourse;
                 }
                 if (vipFilter === 'free') {
-                    // Free courses should have is_vip = false (or 0 or null/undefined)
-                    return course.is_vip === false || course.is_vip === 0 || course.is_vip === null || course.is_vip === undefined;
+                    return !isVipCourse;
                 }
                 return true;
             });
+            console.log('After VIP filter:', filtered.length, 'courses');
         }
 
         // Filter by course type
         if (courseTypeFilter !== 'all') {
-            filtered = filtered.filter(course =>
-                course.courseType?.courseTypeId?.toString() === courseTypeFilter
-            );
+            filtered = filtered.filter(course => {
+                const courseTypeId = course.courseType?.courseTypeId;
+                return courseTypeId?.toString() === courseTypeFilter;
+            });
+            console.log('After course type filter:', filtered.length, 'courses');
         }
 
+        console.log('Final filtered courses:', filtered.length);
         setFilteredCourses(filtered);
         setTotalCourses(filtered.length);
     }, [courses, searchTerm, statusFilter, vipFilter, courseTypeFilter]);
@@ -501,11 +530,11 @@ const CourseComponent = () => {
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {courses.length === 0 ? (
+                        {paginatedCourses.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                                     <Typography variant="body1" color="textSecondary" fontStyle="italic">
-                                        No courses found
+                                        {isLoading ? 'Loading courses...' : 'No courses found matching current filters'}
                                     </Typography>
                                 </TableCell>
                             </TableRow>

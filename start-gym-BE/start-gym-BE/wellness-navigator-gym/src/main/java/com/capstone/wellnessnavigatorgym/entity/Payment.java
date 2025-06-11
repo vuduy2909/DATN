@@ -10,6 +10,7 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 @Entity
+@Table(name = "payment")
 @AllArgsConstructor
 @NoArgsConstructor
 @Getter

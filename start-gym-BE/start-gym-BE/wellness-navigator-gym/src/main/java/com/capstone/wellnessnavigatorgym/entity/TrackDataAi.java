@@ -10,6 +10,7 @@ import javax.persistence.*;
 @Getter
 @RequiredArgsConstructor
 @Entity
+@Table(name = "track_data_ai")
 public class TrackDataAi {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

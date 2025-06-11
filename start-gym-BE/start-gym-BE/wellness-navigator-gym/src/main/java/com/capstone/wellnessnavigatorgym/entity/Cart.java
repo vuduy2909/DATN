@@ -11,6 +11,7 @@ import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.Pattern;
 
 @Entity
+@Table(name = "cart")
 @Getter
 @Setter
 @RequiredArgsConstructor

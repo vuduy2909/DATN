@@ -9,6 +9,7 @@ import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
 
 @Entity
+@Table(name = "cart_detail")
 @Getter
 @Setter
 @RequiredArgsConstructor

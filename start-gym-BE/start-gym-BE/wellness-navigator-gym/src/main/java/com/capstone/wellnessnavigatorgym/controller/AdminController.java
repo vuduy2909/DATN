@@ -1305,18 +1305,34 @@ public class AdminController {
     // ==================== COMMENT MANAGEMENT ENDPOINTS ====================
     
     /**
-     * Lấy tất cả comments
+     * Lấy tất cả comments với error handling cải thiện
      */
     @GetMapping("/comments")
     @Transactional
     public ResponseEntity<?> getAllComments() {
         try {
-            // Use native query để tránh lazy loading issues
-            String query = "SELECT c.*, " +
-                          "cu.customer_name, cu.customer_img, " +
-                          "e.exercise_name, " +
-                          "course.course_name, " +
-                          "d.day_name " +
+            logger.info("=== FETCHING ALL COMMENTS ===");
+            
+            // Cải thiện native query với proper field ordering
+            String query = "SELECT " +
+                          "c.comment_id, " +               // 0
+                          "c.comment_text, " +             // 1
+                          "c.customer_id, " +              // 2
+                          "c.exercise_id, " +              // 3
+                          "c.course_id, " +                // 4
+                          "c.day_id, " +                   // 5
+                          "c.rating, " +                   // 6
+                          "c.status, " +                   // 7
+                          "c.created_date, " +             // 8
+                          "c.updated_date, " +             // 9
+                          "COALESCE(c.is_reported, false) as is_reported, " +  // 10
+                          "COALESCE(c.report_count, 0) as report_count, " +    // 11
+                          "c.report_reason, " +            // 12
+                          "cu.customer_name, " +           // 13
+                          "cu.customer_img, " +            // 14
+                          "e.exercise_name, " +            // 15
+                          "course.course_name, " +         // 16
+                          "d.day_name " +                  // 17
                           "FROM comments c " +
                           "LEFT JOIN customer cu ON c.customer_id = cu.customer_id " +
                           "LEFT JOIN exercise e ON c.exercise_id = e.exercise_id " +
@@ -1327,60 +1343,90 @@ public class AdminController {
             @SuppressWarnings("unchecked")
             List<Object[]> results = entityManager.createNativeQuery(query).getResultList();
             
+            logger.info("Found {} comments in database", results.size());
+            
             List<Map<String, Object>> commentsResponse = results.stream()
                 .map(row -> {
                     Map<String, Object> commentInfo = new HashMap<>();
-                    commentInfo.put("commentId", row[0]);
-                    commentInfo.put("commentText", row[1]);
-                    commentInfo.put("createdAt", row[8]);
-                    commentInfo.put("updatedAt", row[9]);
-                    commentInfo.put("isReported", row[10] != null ? (Boolean) row[10] : false);
-                    commentInfo.put("reportCount", row[11] != null ? row[11] : 0);
-                    commentInfo.put("reportReason", row[12]);
                     
-                    // Customer info
-                    if (row[13] != null) {
-                        Map<String, Object> customerInfo = new HashMap<>();
-                        customerInfo.put("customerId", row[2]);
-                        customerInfo.put("customerName", row[13]);
-                        customerInfo.put("customerImg", row[14]);
-                        commentInfo.put("customer", customerInfo);
-                    }
-                    
-                    // Exercise info
-                    if (row[15] != null) {
-                        Map<String, Object> exerciseInfo = new HashMap<>();
-                        exerciseInfo.put("exerciseId", row[3]);
-                        exerciseInfo.put("exerciseName", row[15]);
-                        commentInfo.put("exercise", exerciseInfo);
-                    }
-                    
-                    // Course info
-                    if (row[16] != null) {
-                        Map<String, Object> courseInfo = new HashMap<>();
-                        courseInfo.put("courseId", row[4]);
-                        courseInfo.put("courseName", row[16]);
-                        commentInfo.put("course", courseInfo);
-                    }
-                    
-                    // Day info
-                    if (row[17] != null) {
-                        Map<String, Object> dayInfo = new HashMap<>();
-                        dayInfo.put("dayId", row[5]);
-                        dayInfo.put("dayName", row[17]);
-                        commentInfo.put("day", dayInfo);
+                    try {
+                        commentInfo.put("commentId", row[0]);
+                        commentInfo.put("commentText", row[1]);
+                        commentInfo.put("rating", row[6]);
+                        commentInfo.put("status", row[7]);
+                        commentInfo.put("createdAt", row[8]);
+                        commentInfo.put("updatedAt", row[9]);
+                        commentInfo.put("isReported", row[10] != null ? (Boolean) row[10] : false);
+                        commentInfo.put("reportCount", row[11] != null ? ((Number) row[11]).intValue() : 0);
+                        commentInfo.put("reportReason", row[12]);
+                        
+                        // Customer info
+                        if (row[2] != null && row[13] != null) {
+                            Map<String, Object> customerInfo = new HashMap<>();
+                            customerInfo.put("customerId", row[2]);
+                            customerInfo.put("customerName", row[13]);
+                            customerInfo.put("customerImg", row[14]);
+                            commentInfo.put("customer", customerInfo);
+                        } else {
+                            commentInfo.put("customer", null);
+                        }
+                        
+                        // Exercise info
+                        if (row[3] != null && row[15] != null) {
+                            Map<String, Object> exerciseInfo = new HashMap<>();
+                            exerciseInfo.put("exerciseId", row[3]);
+                            exerciseInfo.put("exerciseName", row[15]);
+                            commentInfo.put("exercise", exerciseInfo);
+                        } else {
+                            commentInfo.put("exercise", null);
+                        }
+                        
+                        // Course info
+                        if (row[4] != null && row[16] != null) {
+                            Map<String, Object> courseInfo = new HashMap<>();
+                            courseInfo.put("courseId", row[4]);
+                            courseInfo.put("courseName", row[16]);
+                            commentInfo.put("course", courseInfo);
+                        } else {
+                            commentInfo.put("course", null);
+                        }
+                        
+                        // Day info
+                        if (row[5] != null && row[17] != null) {
+                            Map<String, Object> dayInfo = new HashMap<>();
+                            dayInfo.put("dayId", row[5]);
+                            dayInfo.put("dayName", row[17]);
+                            commentInfo.put("day", dayInfo);
+                        } else {
+                            commentInfo.put("day", null);
+                        }
+                        
+                    } catch (Exception e) {
+                        logger.error("Error mapping comment row: {}", e.getMessage());
+                        // Return minimal comment info on error
+                        commentInfo.put("commentId", row[0] != null ? row[0] : 0);
+                        commentInfo.put("commentText", row[1] != null ? row[1] : "");
+                        commentInfo.put("error", "Data mapping error");
                     }
                     
                     return commentInfo;
                 })
                 .collect(Collectors.toList());
             
+            Map<String, Object> response = new HashMap<>();
+            response.put("comments", commentsResponse);
+            response.put("total", commentsResponse.size());
+            
+            logger.info("✅ Successfully fetched {} comments", commentsResponse.size());
             return ResponseEntity.ok(commentsResponse);
             
         } catch (Exception e) {
-            logger.error("Error getting comments: ", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Error getting comments: " + e.getMessage());
+            logger.error("Error fetching comments: {}", e.getMessage(), e);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Failed to fetch comments: " + e.getMessage());
+            errorResponse.put("comments", Collections.emptyList());
+            errorResponse.put("total", 0);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
     
@@ -1391,12 +1437,28 @@ public class AdminController {
     @Transactional
     public ResponseEntity<?> getReportedComments() {
         try {
-            // Native query để lấy chỉ reported comments
-            String query = "SELECT c.*, " +
-                          "cu.customer_name, cu.customer_img, " +
-                          "e.exercise_name, " +
-                          "course.course_name, " +
-                          "d.day_name " +
+            logger.info("=== FETCHING REPORTED COMMENTS ===");
+            
+            // Cải thiện native query với proper field ordering để match với getAllComments
+            String query = "SELECT " +
+                          "c.comment_id, " +               // 0
+                          "c.comment_text, " +             // 1
+                          "c.customer_id, " +              // 2
+                          "c.exercise_id, " +              // 3
+                          "c.course_id, " +                // 4
+                          "c.day_id, " +                   // 5
+                          "c.rating, " +                   // 6
+                          "c.status, " +                   // 7
+                          "c.created_date, " +             // 8
+                          "c.updated_date, " +             // 9
+                          "COALESCE(c.is_reported, false) as is_reported, " +  // 10
+                          "COALESCE(c.report_count, 0) as report_count, " +    // 11
+                          "c.report_reason, " +            // 12
+                          "cu.customer_name, " +           // 13
+                          "cu.customer_img, " +            // 14
+                          "e.exercise_name, " +            // 15
+                          "course.course_name, " +         // 16
+                          "d.day_name " +                  // 17
                           "FROM comments c " +
                           "LEFT JOIN customer cu ON c.customer_id = cu.customer_id " +
                           "LEFT JOIN exercise e ON c.exercise_id = e.exercise_id " +
@@ -1408,60 +1470,86 @@ public class AdminController {
             @SuppressWarnings("unchecked")
             List<Object[]> results = entityManager.createNativeQuery(query).getResultList();
             
+            logger.info("Found {} reported comments in database", results.size());
+            
             List<Map<String, Object>> commentsResponse = results.stream()
                 .map(row -> {
                     Map<String, Object> commentInfo = new HashMap<>();
-                    commentInfo.put("commentId", row[0]);
-                    commentInfo.put("commentText", row[1]);
-                    commentInfo.put("createdAt", row[8]);
-                    commentInfo.put("updatedAt", row[9]);
-                    commentInfo.put("isReported", row[10] != null ? (Boolean) row[10] : false);
-                    commentInfo.put("reportCount", row[11] != null ? row[11] : 0);
-                    commentInfo.put("reportReason", row[12]);
                     
-                    // Customer info
-                    if (row[13] != null) {
-                        Map<String, Object> customerInfo = new HashMap<>();
-                        customerInfo.put("customerId", row[2]);
-                        customerInfo.put("customerName", row[13]);
-                        customerInfo.put("customerImg", row[14]);
-                        commentInfo.put("customer", customerInfo);
-                    }
-                    
-                    // Exercise info
-                    if (row[15] != null) {
-                        Map<String, Object> exerciseInfo = new HashMap<>();
-                        exerciseInfo.put("exerciseId", row[3]);
-                        exerciseInfo.put("exerciseName", row[15]);
-                        commentInfo.put("exercise", exerciseInfo);
-                    }
-                    
-                    // Course info
-                    if (row[16] != null) {
-                        Map<String, Object> courseInfo = new HashMap<>();
-                        courseInfo.put("courseId", row[4]);
-                        courseInfo.put("courseName", row[16]);
-                        commentInfo.put("course", courseInfo);
-                    }
-                    
-                    // Day info
-                    if (row[17] != null) {
-                        Map<String, Object> dayInfo = new HashMap<>();
-                        dayInfo.put("dayId", row[5]);
-                        dayInfo.put("dayName", row[17]);
-                        commentInfo.put("day", dayInfo);
+                    try {
+                        commentInfo.put("commentId", row[0]);
+                        commentInfo.put("commentText", row[1]);
+                        commentInfo.put("rating", row[6]);
+                        commentInfo.put("status", row[7]);
+                        commentInfo.put("createdAt", row[8]);
+                        commentInfo.put("updatedAt", row[9]);
+                        commentInfo.put("isReported", row[10] != null ? (Boolean) row[10] : false);
+                        commentInfo.put("reportCount", row[11] != null ? ((Number) row[11]).intValue() : 0);
+                        commentInfo.put("reportReason", row[12]);
+                        
+                        // Customer info
+                        if (row[2] != null && row[13] != null) {
+                            Map<String, Object> customerInfo = new HashMap<>();
+                            customerInfo.put("customerId", row[2]);
+                            customerInfo.put("customerName", row[13]);
+                            customerInfo.put("customerImg", row[14]);
+                            commentInfo.put("customer", customerInfo);
+                        } else {
+                            commentInfo.put("customer", null);
+                        }
+                        
+                        // Exercise info
+                        if (row[3] != null && row[15] != null) {
+                            Map<String, Object> exerciseInfo = new HashMap<>();
+                            exerciseInfo.put("exerciseId", row[3]);
+                            exerciseInfo.put("exerciseName", row[15]);
+                            commentInfo.put("exercise", exerciseInfo);
+                        } else {
+                            commentInfo.put("exercise", null);
+                        }
+                        
+                        // Course info
+                        if (row[4] != null && row[16] != null) {
+                            Map<String, Object> courseInfo = new HashMap<>();
+                            courseInfo.put("courseId", row[4]);
+                            courseInfo.put("courseName", row[16]);
+                            commentInfo.put("course", courseInfo);
+                        } else {
+                            commentInfo.put("course", null);
+                        }
+                        
+                        // Day info
+                        if (row[5] != null && row[17] != null) {
+                            Map<String, Object> dayInfo = new HashMap<>();
+                            dayInfo.put("dayId", row[5]);
+                            dayInfo.put("dayName", row[17]);
+                            commentInfo.put("day", dayInfo);
+                        } else {
+                            commentInfo.put("day", null);
+                        }
+                        
+                    } catch (Exception e) {
+                        logger.error("Error mapping reported comment row: {}", e.getMessage());
+                        // Return minimal comment info on error
+                        commentInfo.put("commentId", row[0] != null ? row[0] : 0);
+                        commentInfo.put("commentText", row[1] != null ? row[1] : "");
+                        commentInfo.put("error", "Data mapping error");
                     }
                     
                     return commentInfo;
                 })
                 .collect(Collectors.toList());
             
+            logger.info("✅ Successfully fetched {} reported comments", commentsResponse.size());
             return ResponseEntity.ok(commentsResponse);
             
         } catch (Exception e) {
-            logger.error("Error getting reported comments: ", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Error getting reported comments: " + e.getMessage());
+            logger.error("Error fetching reported comments: {}", e.getMessage(), e);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Failed to fetch reported comments: " + e.getMessage());
+            errorResponse.put("comments", Collections.emptyList());
+            errorResponse.put("total", 0);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
     
@@ -3213,6 +3301,305 @@ public class AdminController {
             errorResponse.put("error", e.getMessage());
             errorResponse.put("customerId", customerId);
             
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+    // ==================== FIREBASE EXERCISE MEDIA UPLOAD ====================
+
+    /**
+     * Upload exercise image to Firebase Storage
+     * Stored in: images/Exercise/{muscleGroup}/
+     */
+    @PostMapping("/exercises/upload-image")
+    public ResponseEntity<?> uploadExerciseImage(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("muscleGroup") String muscleGroup,
+            @RequestParam("exerciseName") String exerciseName) {
+        try {
+            // Validate file
+            if (file.isEmpty()) {
+                Map<String, String> error = new HashMap<>();
+                error.put("message", "Please select a file to upload");
+                error.put("status", "error");
+                return ResponseEntity.badRequest().body(error);
+            }
+            
+            // Check file size (10MB limit for images)
+            if (file.getSize() > 10 * 1024 * 1024) {
+                Map<String, String> error = new HashMap<>();
+                error.put("message", "Image file size must be less than 10MB");
+                error.put("status", "error");
+                return ResponseEntity.badRequest().body(error);
+            }
+            
+            // Check file type
+            String contentType = file.getContentType();
+            if (contentType == null || !contentType.startsWith("image/")) {
+                Map<String, String> error = new HashMap<>();
+                error.put("message", "Please select an image file");
+                error.put("status", "error");
+                return ResponseEntity.badRequest().body(error);
+            }
+            
+            // Upload to Firebase Storage
+            String imageUrl = firebaseStorageService.uploadExerciseImage(file, muscleGroup, exerciseName);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("imageUrl", imageUrl);
+            response.put("message", "Exercise image uploaded successfully to Firebase Storage");
+            response.put("status", "success");
+            response.put("muscleGroup", muscleGroup);
+            response.put("exerciseName", exerciseName);
+            response.put("timestamp", LocalDateTime.now());
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("Failed to upload exercise image: {}", e.getMessage(), e);
+            
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("message", "Failed to upload exercise image: " + e.getMessage());
+            errorResponse.put("status", "error");
+            errorResponse.put("timestamp", LocalDateTime.now());
+            
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+    /**
+     * Upload exercise video to Firebase Storage
+     * Stored in: videos/Exercise/{muscleGroup}/
+     */
+    @PostMapping("/exercises/upload-video")
+    public ResponseEntity<?> uploadExerciseVideo(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("muscleGroup") String muscleGroup,
+            @RequestParam("exerciseName") String exerciseName) {
+        try {
+            // Validate file
+            if (file.isEmpty()) {
+                Map<String, String> error = new HashMap<>();
+                error.put("message", "Please select a file to upload");
+                error.put("status", "error");
+                return ResponseEntity.badRequest().body(error);
+            }
+            
+            // Check file size (100MB limit for videos)
+            if (file.getSize() > 100 * 1024 * 1024) {
+                Map<String, String> error = new HashMap<>();
+                error.put("message", "Video file size must be less than 100MB");
+                error.put("status", "error");
+                return ResponseEntity.badRequest().body(error);
+            }
+            
+            // Check file type
+            String contentType = file.getContentType();
+            if (contentType == null || !contentType.startsWith("video/")) {
+                Map<String, String> error = new HashMap<>();
+                error.put("message", "Please select a video file");
+                error.put("status", "error");
+                return ResponseEntity.badRequest().body(error);
+            }
+            
+            // Upload to Firebase Storage
+            String videoUrl = firebaseStorageService.uploadExerciseVideo(file, muscleGroup, exerciseName);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("videoUrl", videoUrl);
+            response.put("message", "Exercise video uploaded successfully to Firebase Storage");
+            response.put("status", "success");
+            response.put("muscleGroup", muscleGroup);
+            response.put("exerciseName", exerciseName);
+            response.put("timestamp", LocalDateTime.now());
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("Failed to upload exercise video: {}", e.getMessage(), e);
+            
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("message", "Failed to upload exercise video: " + e.getMessage());
+            errorResponse.put("status", "error");
+            errorResponse.put("timestamp", LocalDateTime.now());
+            
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+    /**
+     * Upload customer avatar to Firebase Storage (for admin creating customers)
+     * Stored in: images/Avatar/ with format: avatar_{username}.ext
+     */
+    @PostMapping("/customers/upload-avatar")
+    public ResponseEntity<?> uploadCustomerAvatar(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("username") String username) {
+        try {
+            // Validate file
+            if (file.isEmpty()) {
+                Map<String, String> error = new HashMap<>();
+                error.put("message", "Please select a file to upload");
+                error.put("status", "error");
+                return ResponseEntity.badRequest().body(error);
+            }
+            
+            // Check file size (5MB limit for avatars)
+            if (file.getSize() > 5 * 1024 * 1024) {
+                Map<String, String> error = new HashMap<>();
+                error.put("message", "Avatar file size must be less than 5MB");
+                error.put("status", "error");
+                return ResponseEntity.badRequest().body(error);
+            }
+            
+            // Check file type
+            String contentType = file.getContentType();
+            if (contentType == null || !contentType.startsWith("image/")) {
+                Map<String, String> error = new HashMap<>();
+                error.put("message", "Please select an image file");
+                error.put("status", "error");
+                return ResponseEntity.badRequest().body(error);
+            }
+            
+            // Upload to Firebase Storage
+            String avatarUrl = firebaseStorageService.uploadAvatar(file, username);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("avatarUrl", avatarUrl);
+            response.put("message", "Customer avatar uploaded successfully to Firebase Storage");
+            response.put("status", "success");
+            response.put("username", username);
+            response.put("timestamp", LocalDateTime.now());
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("Failed to upload customer avatar: {}", e.getMessage(), e);
+            
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("message", "Failed to upload customer avatar: " + e.getMessage());
+            errorResponse.put("status", "error");
+            errorResponse.put("timestamp", LocalDateTime.now());
+            
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+    /**
+     * Get available muscle groups for exercise categorization
+     */
+    @GetMapping("/exercises/muscle-groups")
+    public ResponseEntity<?> getExerciseMuscleGroups() {
+        try {
+            List<String> muscleGroups = Arrays.asList(
+                "Abs", "Back", "Biceps", "Calves", "Chest", 
+                "Deltoid", "Lats", "Legs", "Triceps"
+            );
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("muscleGroups", muscleGroups);
+            response.put("message", "Available muscle groups for exercise categorization");
+            response.put("timestamp", LocalDateTime.now());
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("Failed to get muscle groups: {}", e.getMessage(), e);
+            
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("message", "Failed to get muscle groups: " + e.getMessage());
+            errorResponse.put("status", "error");
+            errorResponse.put("timestamp", LocalDateTime.now());
+            
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+    // ==================== CUSTOMER BAN MANAGEMENT ENDPOINTS ====================
+    
+    /**
+     * Ban a customer by setting is_enable = 0 in both customer and account tables
+     */
+    @PostMapping("/customers/{customerId}/ban")
+    public ResponseEntity<?> banCustomer(@PathVariable Integer customerId, 
+                                       @RequestBody(required = false) Map<String, Object> requestData) {
+        try {
+            logger.info("=== BANNING CUSTOMER {} ===", customerId);
+            
+            // Find customer
+            Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new RuntimeException("Customer not found with ID: " + customerId));
+            
+            String reason = requestData != null ? (String) requestData.get("reason") : "Admin action";
+            logger.info("Ban reason: {}", reason);
+            
+            // Set customer is_enable = 0 (banned)
+            customer.setIsEnable(false);
+            customerRepository.save(customer);
+            logger.info("✅ Customer {} banned successfully", customerId);
+            
+            // Also disable the associated account
+            if (customer.getAccount() != null) {
+                Account account = customer.getAccount();
+                account.setIsEnable(false);
+                accountRepository.save(account);
+                logger.info("✅ Account {} for customer {} also disabled", account.getUserName(), customerId);
+            }
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Customer banned successfully");
+            response.put("customerId", customerId);
+            response.put("customerName", customer.getCustomerName());
+            response.put("reason", reason);
+            response.put("bannedAt", LocalDateTime.now());
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("Failed to ban customer {}: {}", customerId, e.getMessage());
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Failed to ban customer: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+    
+    /**
+     * Unban a customer by setting is_enable = 1 in both customer and account tables
+     */
+    @PostMapping("/customers/{customerId}/unban")
+    public ResponseEntity<?> unbanCustomer(@PathVariable Integer customerId) {
+        try {
+            logger.info("=== UNBANNING CUSTOMER {} ===", customerId);
+            
+            // Find customer
+            Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new RuntimeException("Customer not found with ID: " + customerId));
+            
+            // Set customer is_enable = 1 (active)
+            customer.setIsEnable(true);
+            customerRepository.save(customer);
+            logger.info("✅ Customer {} unbanned successfully", customerId);
+            
+            // Also enable the associated account
+            if (customer.getAccount() != null) {
+                Account account = customer.getAccount();
+                account.setIsEnable(true);
+                accountRepository.save(account);
+                logger.info("✅ Account {} for customer {} also enabled", account.getUserName(), customerId);
+            }
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Customer unbanned successfully");
+            response.put("customerId", customerId);
+            response.put("customerName", customer.getCustomerName());
+            response.put("unbannedAt", LocalDateTime.now());
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("Failed to unban customer {}: {}", customerId, e.getMessage());
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Failed to unban customer: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }

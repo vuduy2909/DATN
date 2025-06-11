@@ -1,5 +1,7 @@
 package com.capstone.wellnessnavigatorgym.controller;
 
+import java.util.Optional;
+
 import com.capstone.wellnessnavigatorgym.dto.request.ChangePasswordDto;
 import com.capstone.wellnessnavigatorgym.dto.request.LoginRequest;
 import com.capstone.wellnessnavigatorgym.dto.request.SignupRequest;
@@ -67,6 +69,32 @@ public class SecurityController {
 
     @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
+        // First check if user is banned before authentication
+        try {
+            // Check account
+            Optional<Account> accountOpt = accountService.findAccountByUserName(loginRequest.getUsername());
+            if (accountOpt.isPresent()) {
+                Account account = accountOpt.get();
+                boolean accountEnabled = account.getIsEnable() != null ? account.getIsEnable() : true;
+                
+                // Check customer if exists
+                Customer customer = customerService.findByAccountUserName(loginRequest.getUsername());
+                boolean customerEnabled = true;
+                if (customer != null) {
+                    customerEnabled = customer.getIsEnable() != null ? customer.getIsEnable() : true;
+                }
+                
+                // If either account or customer is disabled, reject login
+                if (!accountEnabled || !customerEnabled) {
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(new MessageResponse("Account is banned. Please contact support."));
+                }
+            }
+        } catch (Exception e) {
+            // Log error but continue with normal authentication flow
+            System.err.println("Error checking banned status during login: " + e.getMessage());
+        }
+        
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword())
         );
@@ -272,58 +300,7 @@ public class SecurityController {
         return ResponseEntity.ok(new MessageResponse("update successful"));
     }
     
-    /**
-     * Check if a username exists and is banned (is_enable=false)
-     * This endpoint is public and can be accessed without authentication
-     */
-    @GetMapping("/check-banned-status")
-    public ResponseEntity<?> checkBannedStatus(@RequestParam String username) {
-        Map<String, Object> response = new HashMap<>();
-        response.put("username", username);
-        
-        try {
-            // Check if account exists
-            Optional<Account> accountOpt = accountService.findAccountByUserName(username);
-            if (!accountOpt.isPresent()) {
-                response.put("exists", false);
-                response.put("message", "Username does not exist");
-                return ResponseEntity.ok(response);
-            }
-            
-            Account account = accountOpt.get();
-            response.put("exists", true);
-            
-            // Get the customer linked to this account
-            Customer customer = customerService.findByAccountUserName(username);
-            
-            if (customer == null) {
-                response.put("message", "No customer record found for this user");
-                response.put("accountEnabled", account.getIsEnable());
-                response.put("isBanned", !account.getIsEnable());
-                return ResponseEntity.ok(response);
-            }
-            
-            // Return banned status
-            boolean isBanned = !customer.getIsEnable();
-            
-            response.put("customerId", customer.getCustomerId());
-            response.put("customerName", customer.getCustomerName());
-            response.put("isBanned", isBanned);
-            response.put("accountEnabled", account.getIsEnable());
-            
-            if (isBanned) {
-                response.put("message", "This account is currently banned");
-            } else {
-                response.put("message", "Account is active");
-            }
-            
-            return ResponseEntity.ok(response);
-            
-        } catch (Exception e) {
-            response.put("error", "Error checking banned status: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        }
-    }
+
 }
 
 

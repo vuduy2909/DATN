@@ -704,6 +704,8 @@ public class TrackDataAiController {
         try {
             logger.info("=== ENHANCED C4.5 RECOMMENDATION SYSTEM ===");
             logger.info("Processing recommendation request for customer: {}", userDataDTO.getCustomerId());
+            logger.info("🎯 Key attributes: training_goals='{}', training_frequency='{}'", 
+                userDataDTO.getTraining_goals(), userDataDTO.getTraining_frequency());
             
             // Lấy dữ liệu training và courses
             List<TrackDataAi> allTrainingData = trackDataAiService.getAllTrackDataAi();
@@ -727,19 +729,20 @@ public class TrackDataAiController {
                 // Chuẩn bị dữ liệu người dùng cho traversal
                 Map<String, Object> userData = extractUserDataFromTrackDataAi(userDataDTO);
                 
-                // Log chi tiết dữ liệu người dùng
-                logger.info("User data for traversal:");
+                // Log chi tiết dữ liệu người dùng để debug
+                logger.info("🔍 User data for C4.5 traversal:");
                 userData.forEach((key, value) -> 
-                    logger.info("- {}: {}", key, value));
+                    logger.info("  - {}: '{}'", key, value));
                 
-                // Duyệt cây quyết định
+                // Duyệt cây quyết định với ưu tiên training_goals và training_frequency
                 final Course finalRecommendedCourse = c45DecisionTree.traverseDecisionTree(decisionTreeRoot, userData);
                 recommendedCourse = finalRecommendedCourse;
                 
                 if (recommendedCourse != null) {
                     recommendationSource = "c45_decision_tree";
-                    logger.info("🎯 C4.5 Decision Tree SUCCESS: Recommended course {} - {}", 
-                        recommendedCourse.getCourseId(), recommendedCourse.getCourseName());
+                    logger.info("🎯 C4.5 Decision Tree SUCCESS: Recommended course {} - {} for goals='{}' frequency='{}'", 
+                        recommendedCourse.getCourseId(), recommendedCourse.getCourseName(),
+                        userDataDTO.getTraining_goals(), userDataDTO.getTraining_frequency());
                 } else {
                     logger.warn("⚠️ C4.5 Decision Tree traversal returned null");
                 }
@@ -749,14 +752,15 @@ public class TrackDataAiController {
             
             // Fallback logic nếu C4.5 không trả về kết quả
             if (recommendedCourse == null) {
-                logger.info("🔄 Using intelligent fallback system...");
+                logger.info("🔄 Using intelligent fallback system with training_goals priority...");
                 final Course fallbackCourse = getDefaultCourseByTrainingGoals(userDataDTO, allCourses);
                 recommendedCourse = fallbackCourse;
-                recommendationSource = "intelligent_fallback";
+                recommendationSource = "training_goals_priority_fallback";
                 
                 if (recommendedCourse != null) {
-                    logger.info("🎯 Intelligent Fallback SUCCESS: Recommended course {} - {}", 
-                        recommendedCourse.getCourseId(), recommendedCourse.getCourseName());
+                    logger.info("🎯 Training Goals Priority Fallback SUCCESS: Recommended course {} - {} for goals='{}' frequency='{}'", 
+                        recommendedCourse.getCourseId(), recommendedCourse.getCourseName(),
+                        userDataDTO.getTraining_goals(), userDataDTO.getTraining_frequency());
                 } else {
                     logger.error("❌ All recommendation methods failed!");
                     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -801,7 +805,7 @@ public class TrackDataAiController {
                             
                             UserDataAi savedData = userDataAiService.saveUserDataAi(userDataAi);
                             userDataId = savedData.getUser_data_id();
-                            logger.info("Created new UserDataAi record: {}", userDataId);
+                            logger.info("Created new UserDataAi record: {} for course: {}", userDataId, recommendedCourse.getCourseId());
                         }
                         
                         response = new RecommendationDTO(recommendedCourse, message, userDataId);
@@ -816,7 +820,14 @@ public class TrackDataAiController {
                 // Không fail request nếu không save được data
             }
             
-            logger.info("🎉 Recommendation completed successfully using: {}", recommendationSource);
+            // Validate khóa học được đề xuất
+            if (recommendedCourse != null) {
+                logger.info("✅ Final recommendation validation: Course {} - {} (Source: {})", 
+                    recommendedCourse.getCourseId(), recommendedCourse.getCourseName(), recommendationSource);
+            }
+            
+            logger.info("🎉 Recommendation completed successfully using: {} -> Course ID: {}", 
+                recommendationSource, recommendedCourse.getCourseId());
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {
@@ -4364,4 +4375,114 @@ public class TrackDataAiController {
         
         return result;
     }
+
+    /**
+     * Lấy phân tích ảnh đã lưu cho customer
+     */
+    @GetMapping("/get-analysis-result/{customerId}")
+    public ResponseEntity<?> getSavedAnalysis(@PathVariable Integer customerId) {
+        try {
+            logger.info("=== GETTING SAVED ANALYSIS FOR CUSTOMER {} ===", customerId);
+            
+            // Check if customer exists
+            Customer customer = customerService.findById(customerId);
+            if (customer == null) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("hasAnalysis", false);
+                response.put("message", "Customer not found");
+                return ResponseEntity.ok(response);
+            }
+            
+            // Check if draft exists for this customer
+            FormWizardDraftDTO draft = draftStorage.get(customerId);
+            if (draft == null) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("hasAnalysis", false);
+                response.put("message", "No saved analysis found");
+                return ResponseEntity.ok(response);
+            }
+            
+            // Check if analysis data exists
+            if (draft.getImageAnalysis() == null || draft.getImageBase64() == null) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("hasAnalysis", false);
+                response.put("message", "No analysis data found");
+                return ResponseEntity.ok(response);
+            }
+            
+            // Return saved analysis data
+            Map<String, Object> response = new HashMap<>();
+            response.put("hasAnalysis", true);
+            response.put("customerId", customerId);
+            
+            // Create analysis data object
+            Map<String, Object> analysisData = new HashMap<>();
+            analysisData.put("bodyType", draft.getBody_type());
+            analysisData.put("analysis", draft.getImageAnalysis());
+            analysisData.put("recommendations", draft.getImageRecommendations());
+            analysisData.put("imageBase64", draft.getImageBase64());
+            analysisData.put("waist_circumference", draft.getWaist_circumference());
+            analysisData.put("chest_circumference", draft.getChest_circumference());
+            analysisData.put("timestamp", System.currentTimeMillis());
+            
+            response.put("analysisData", analysisData);
+            
+            logger.info("✅ Successfully retrieved saved analysis for customer {}", customerId);
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("Error getting saved analysis for customer {}: {}", customerId, e.getMessage(), e);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("hasAnalysis", false);
+            errorResponse.put("error", "Error retrieving analysis: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+    /**
+     * Xóa phân tích ảnh đã lưu cho customer
+     */
+    @PostMapping("/clear-analysis/{customerId}")
+    public ResponseEntity<?> clearSavedAnalysis(@PathVariable Integer customerId) {
+        try {
+            logger.info("=== CLEARING SAVED ANALYSIS FOR CUSTOMER {} ===", customerId);
+            
+            // Check if customer exists
+            Customer customer = customerService.findById(customerId);
+            if (customer == null) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Customer not found");
+                return ResponseEntity.ok(response);
+            }
+            
+            // Clear draft data for this customer
+            FormWizardDraftDTO draft = draftStorage.get(customerId);
+            if (draft != null) {
+                // Clear only image analysis related data
+                draft.setBody_type(null);
+                draft.setImageAnalysis(null);
+                draft.setImageRecommendations(null);
+                draft.setImageBase64(null);
+                
+                draftStorage.put(customerId, draft);
+                logger.info("✅ Cleared image analysis data for customer {}", customerId);
+            }
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Analysis data cleared successfully");
+            response.put("customerId", customerId);
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("Error clearing analysis for customer {}: {}", customerId, e.getMessage(), e);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("error", "Error clearing analysis: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
 }

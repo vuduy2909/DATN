@@ -39,20 +39,49 @@ public class C45DecisionTree {
         "weight"            // Cân nặng
     );
     
-    // Mapping training goals với các khóa học phù hợp
+    // Enhanced mapping training goals với các khóa học phù hợp - CẢI THIỆN LOGIC
     private static final Map<String, List<Integer>> TRAINING_GOALS_MAPPING = new HashMap<String, List<Integer>>() {{
+        // Strength Training - Tập trung vào tăng sức mạnh và phát triển cơ bắp
         put("1, Strength Training", Arrays.asList(1, 2, 3, 4, 5, 6, 7, 8, 15, 16, 17, 18, 25, 26, 27, 28));
+        put("STRENGTH_TRAINING", Arrays.asList(1, 2, 3, 4, 5, 6, 7, 8, 15, 16, 17, 18, 25, 26, 27, 28));
+        
+        // Cardiovascular Training - Tập trung vào tim mạch và sức bền
         put("2, Cardiovascular Training", Arrays.asList(9, 10, 11, 12, 13, 14, 19, 20, 21, 22, 29, 30, 31, 32));
+        put("CARDIOVASCULAR_TRAINING", Arrays.asList(9, 10, 11, 12, 13, 14, 19, 20, 21, 22, 29, 30, 31, 32));
+        
+        // Flexibility and Balance - Tập trung vào linh hoạt và thăng bằng
         put("3, Flexibility and Balance", Arrays.asList(33, 34, 35, 36, 37, 38, 39, 40, 47, 48, 49, 50));
+        put("FLEXIBILITY_AND_BALANCE", Arrays.asList(33, 34, 35, 36, 37, 38, 39, 40, 47, 48, 49, 50));
+        
+        // Train strength and endurance - Kết hợp sức mạnh và sức bền
         put("4, Train strength and endurance", Arrays.asList(23, 24, 25, 26, 27, 28, 41, 42, 43, 44, 51, 52));
+        put("TRAIN_STRENGTH_AND_ENDURANCE", Arrays.asList(23, 24, 25, 26, 27, 28, 41, 42, 43, 44, 51, 52));
+        
+        // Mind-Body Wellness - Tập trung vào sức khỏe tinh thần
         put("5, Mind-Body Wellness", Arrays.asList(45, 46, 47, 48, 49, 50, 57, 58, 59, 60));
+        put("MIND_BODY_WELLNESS", Arrays.asList(45, 46, 47, 48, 49, 50, 57, 58, 59, 60));
+        
+        // Functional Training - Tập luyện chức năng
         put("6, Functional Training", Arrays.asList(53, 54, 55, 56, 61, 62, 63, 64, 65, 66));
+        put("FUNCTIONAL_TRAINING", Arrays.asList(53, 54, 55, 56, 61, 62, 63, 64, 65, 66));
+        
+        // Weight Loss - Giảm cân (mở rộng với nhiều khóa học hơn)
         put("7, Weight Loss", Arrays.asList(67, 68, 69, 70, 71, 72, 73, 29, 30, 31, 32, 9, 10, 11, 12));
+        put("WEIGHT_LOSS", Arrays.asList(67, 68, 69, 70, 71, 72, 73, 29, 30, 31, 32, 9, 10, 11, 12));
     }};
     
-    // Threshold minimum cho entropy để tạo leaf node
-    private static final double MIN_ENTROPY_THRESHOLD = 0.1;
-    private static final int MIN_SAMPLES_FOR_SPLIT = 10;
+    // Mapping training frequency với độ khó khóa học
+    private static final Map<String, List<String>> TRAINING_FREQUENCY_MAPPING = new HashMap<String, List<String>>() {{
+        put("Never", Arrays.asList("beginner", "basic", "intro")); // Người mới bắt đầu
+        put("Occasionally", Arrays.asList("beginner", "basic", "easy")); // Thỉnh thoảng
+        put("Moderate", Arrays.asList("intermediate", "moderate", "standard")); // Vừa phải
+        put("Regularly", Arrays.asList("intermediate", "advanced", "regular")); // Thường xuyên
+        put("Advanced", Arrays.asList("advanced", "expert", "professional")); // Nâng cao
+    }};
+    
+    // Threshold minimum cho entropy để tạo leaf node - Điều chỉnh để ưu tiên training_goals
+    private static final double MIN_ENTROPY_THRESHOLD = 0.15; // Tăng để tạo cây nhỏ hơn, tập trung vào thuộc tính quan trọng
+    private static final int MIN_SAMPLES_FOR_SPLIT = 8; // Giảm để có thể phân chia tốt hơn
     
     public C45DecisionTree() {}
     
@@ -69,7 +98,7 @@ public class C45DecisionTree {
     }
     
     /**
-     * Xây dựng cây quyết định C4.5 được cải thiện
+     * Xây dựng cây quyết định C4.5 được cải thiện với ưu tiên training_goals
      */
     public TreeNode buildDecisionTree() {
         if (trainingData == null || trainingData.isEmpty()) {
@@ -736,29 +765,58 @@ public class C45DecisionTree {
     
     /**
      * Lấy khóa học mặc định dựa trên training goals với logic thông minh
+     * Ưu tiên training_goals và training_frequency
      */
     private Course getDefaultCourseByTrainingGoals(Map<String, Object> userData) {
         Object trainingGoals = userData.get("training_goals");
+        String trainingFrequency = (String) userData.get("training_frequency");
+        
+        logger.info("🎯 Getting default course for goals: '{}', frequency: '{}'", trainingGoals, trainingFrequency);
         
         if (trainingGoals != null) {
             String goals = trainingGoals.toString();
+            
+            // Thử tìm với key trực tiếp trước
             List<Integer> suggestedCourseIds = TRAINING_GOALS_MAPPING.get(goals);
             
+            // Nếu không tìm thấy, thử các key alternative
+            if (suggestedCourseIds == null || suggestedCourseIds.isEmpty()) {
+                String normalizedGoals = normalizeTrainingGoals(goals);
+                suggestedCourseIds = TRAINING_GOALS_MAPPING.get(normalizedGoals);
+                logger.debug("Normalized goals '{}' -> '{}', found {} courses", 
+                    goals, normalizedGoals, suggestedCourseIds != null ? suggestedCourseIds.size() : 0);
+            }
+            
             if (suggestedCourseIds != null && !suggestedCourseIds.isEmpty()) {
-                // Tìm khóa học phù hợp dựa trên body_type và experience level
+                logger.info("🎯 Found {} courses for training goals: {}", suggestedCourseIds.size(), goals);
+                
+                // Tìm khóa học phù hợp dựa trên tất cả thuộc tính, ưu tiên training_frequency
                 Course selectedCourse = selectBestCourseFromSuggestions(suggestedCourseIds, userData);
                 if (selectedCourse != null) {
-                    logger.info("🎯 Selected smart default course: {} - {} based on training goals and profile", 
-                        selectedCourse.getCourseId(), selectedCourse.getCourseName());
+                    logger.info("🎯 Selected smart course: {} - {} (goals: {}, frequency: {})", 
+                        selectedCourse.getCourseId(), selectedCourse.getCourseName(), goals, trainingFrequency);
                     return selectedCourse;
                 }
+            } else {
+                logger.warn("⚠️ No courses found for training goals: {}", goals);
+            }
+        }
+        
+        // Fallback logic với training_frequency nếu không có training_goals
+        if (trainingFrequency != null) {
+            logger.info("🔄 Using training_frequency fallback: {}", trainingFrequency);
+                         Course frequencyBasedCourse = getCourseBasedOnFrequency(trainingFrequency, userData);
+            if (frequencyBasedCourse != null) {
+                logger.info("🎯 Selected frequency-based course: {} - {}", 
+                    frequencyBasedCourse.getCourseId(), frequencyBasedCourse.getCourseName());
+                return frequencyBasedCourse;
             }
         }
         
         // Fallback cuối cùng - course ID 1 với thông báo rõ ràng
         Course defaultCourse = findCourseById(1);
         if (defaultCourse != null) {
-            logger.warn("⚠️  Using ultimate fallback default course (ID=1): {} - This should rarely happen!", 
+            logger.warn("⚠️ Using ultimate fallback course (ID=1): {} - This should rarely happen!", 
                 defaultCourse.getCourseName());
             return defaultCourse;
         }
@@ -768,27 +826,114 @@ public class C45DecisionTree {
     }
     
     /**
+     * Chuẩn hóa training goals để mapping chính xác
+     */
+    private String normalizeTrainingGoals(String trainingGoals) {
+        if (trainingGoals == null) return "";
+        
+        String goals = trainingGoals.trim();
+        String lowerGoals = goals.toLowerCase();
+        
+        // Thử mapping trực tiếp trước
+        if (TRAINING_GOALS_MAPPING.containsKey(goals)) {
+            return goals;
+        }
+        
+        // Map từ các format khác nhau
+        if (lowerGoals.contains("strength") || lowerGoals.contains("1")) {
+            return "1, Strength Training";
+        } else if (lowerGoals.contains("cardiovascular") || lowerGoals.contains("cardio") || lowerGoals.contains("2")) {
+            return "2, Cardiovascular Training";
+        } else if (lowerGoals.contains("flexibility") || lowerGoals.contains("balance") || lowerGoals.contains("3")) {
+            return "3, Flexibility and Balance";
+        } else if (lowerGoals.contains("endurance") || lowerGoals.contains("4")) {
+            return "4, Train strength and endurance";
+        } else if (lowerGoals.contains("mind") || lowerGoals.contains("wellness") || lowerGoals.contains("5")) {
+            return "5, Mind-Body Wellness";
+        } else if (lowerGoals.contains("functional") || lowerGoals.contains("6")) {
+            return "6, Functional Training";
+        } else if (lowerGoals.contains("weight") || lowerGoals.contains("loss") || lowerGoals.contains("7")) {
+            return "7, Weight Loss";
+        }
+        
+        // Default fallback to Weight Loss cho safe
+        logger.warn("Cannot normalize training goals '{}', using Weight Loss as fallback", trainingGoals);
+        return "7, Weight Loss";
+    }
+    
+    /**
+     * Lấy course dựa trên training_frequency khi không có training_goals
+     */
+    private Course getCourseBasedOnFrequency(String trainingFrequency, Map<String, Object> userData) {
+        List<Integer> frequencyBasedCourses = new ArrayList<>();
+        
+        switch (trainingFrequency) {
+            case "Never":
+            case "Occasionally":
+                // Người mới: đề xuất các khóa học cơ bản, weight loss
+                frequencyBasedCourses.addAll(Arrays.asList(1, 9, 17, 67, 68, 69)); // Beginner + Weight Loss
+                break;
+            case "Moderate":
+                // Vừa phải: đề xuất mix các loại
+                frequencyBasedCourses.addAll(Arrays.asList(18, 26, 34, 42, 50, 70)); // Intermediate mix
+                break;
+            case "Regularly":
+            case "Advanced":
+                // Nâng cao: đề xuất các khóa học thách thức
+                frequencyBasedCourses.addAll(Arrays.asList(27, 35, 43, 51, 59, 71)); // Advanced courses
+                break;
+        }
+        
+        return selectBestCourseFromSuggestions(frequencyBasedCourses, userData);
+    }
+    
+    /**
      * Chọn khóa học tốt nhất từ danh sách gợi ý dựa trên profile người dùng
+     * Ưu tiên training_frequency như thuộc tính quan trọng thứ 2
      */
     private Course selectBestCourseFromSuggestions(List<Integer> courseIds, Map<String, Object> userData) {
-        // Ưu tiên dựa trên kinh nghiệm tập luyện
         String trainingHistory = (String) userData.get("training_history");
+        String trainingFrequency = (String) userData.get("training_frequency");
         String bodyType = (String) userData.get("body_type");
+        String trainingGoals = (String) userData.get("training_goals");
         
-        for (Integer courseId : courseIds) {
+        logger.debug("🎯 Selecting course from {} options based on profile: frequency={}, history={}, bodyType={}", 
+            courseIds.size(), trainingFrequency, trainingHistory, bodyType);
+        
+        // BƯỚC 1: Lọc courses dựa trên training_frequency (thuộc tính quan trọng thứ 2)
+        List<Integer> filteredByFrequency = filterCoursesByTrainingFrequency(courseIds, trainingFrequency);
+        
+        // BƯỚC 2: Từ danh sách đã lọc, chọn course phù hợp nhất với profile
+        List<Integer> targetCourseIds = filteredByFrequency.isEmpty() ? courseIds : filteredByFrequency;
+        
+        for (Integer courseId : targetCourseIds) {
             Course course = findCourseById(courseId);
             if (course != null) {
-                // Logic chọn course dựa trên profile
-                if (isCourseSuitableForProfile(course, trainingHistory, bodyType)) {
+                // Logic chọn course dựa trên profile tổng hợp
+                if (isCourseSuitableForProfile(course, trainingHistory, bodyType, trainingFrequency)) {
+                    logger.info("🎯 Selected course {} - {} based on comprehensive profile matching", 
+                        course.getCourseId(), course.getCourseName());
                     return course;
                 }
             }
         }
         
-        // Nếu không tìm thấy course phù hợp, trả về course đầu tiên có sẵn
+        // Nếu không tìm thấy course phù hợp hoàn toàn, ưu tiên courses phù hợp với frequency
+        if (!filteredByFrequency.isEmpty()) {
+            Course course = findCourseById(filteredByFrequency.get(0));
+            if (course != null) {
+                logger.info("🎯 Selected course {} - {} based on training frequency priority", 
+                    course.getCourseId(), course.getCourseName());
+                return course;
+            }
+        }
+        
+        // Fallback: Trả về course đầu tiên có sẵn
         for (Integer courseId : courseIds) {
             Course course = findCourseById(courseId);
             if (course != null) {
+                logger.warn("⚠️ Using fallback course {} - {} (no perfect profile match)", 
+                    course.getCourseId(), course.getCourseName());
                 return course;
             }
         }
@@ -797,20 +942,139 @@ public class C45DecisionTree {
     }
     
     /**
-     * Kiểm tra xem khóa học có phù hợp với profile người dùng không
+     * Lọc courses dựa trên training_frequency (thuộc tính quan trọng thứ 2)
      */
-    private boolean isCourseSuitableForProfile(Course course, String trainingHistory, String bodyType) {
-        // Logic đơn giản để đánh giá tính phù hợp
-        // Có thể mở rộng thêm logic phức tạp hơn
-        
-        if ("Never".equals(trainingHistory)) {
-            // Người mới bắt đầu nên chọn khóa học cơ bản (ID thấp hơn)
-            return course.getCourseId() <= 20;
-        } else if ("Advanced".equals(trainingHistory) || "Regularly".equals(trainingHistory)) {
-            // Người có kinh nghiệm có thể chọn khóa học nâng cao
-            return course.getCourseId() > 20;
+    private List<Integer> filterCoursesByTrainingFrequency(List<Integer> courseIds, String trainingFrequency) {
+        if (trainingFrequency == null) {
+            return courseIds;
         }
         
-        return true; // Chấp nhận tất cả nếu không có tiêu chí cụ thể
+        List<Integer> filtered = new ArrayList<>();
+        
+        // Mapping frequency với độ khó khóa học
+        switch (trainingFrequency) {
+            case "Never":
+            case "Occasionally":
+                // Người mới hoặc ít tập: chọn courses cơ bản (ID thấp hơn hoặc specific beginner courses)
+                filtered = courseIds.stream()
+                    .filter(id -> id <= 25 || isBeginnerCourse(id))
+                    .collect(Collectors.toList());
+                break;
+                
+            case "Moderate":
+                // Tập vừa phải: chọn courses trung bình
+                filtered = courseIds.stream()
+                    .filter(id -> (id > 15 && id <= 50) || isIntermediateCourse(id))
+                    .collect(Collectors.toList());
+                break;
+                
+            case "Regularly":
+            case "Advanced":
+                // Tập thường xuyên/nâng cao: chọn courses khó hơn
+                filtered = courseIds.stream()
+                    .filter(id -> id > 30 || isAdvancedCourse(id))
+                    .collect(Collectors.toList());
+                break;
+        }
+        
+        if (!filtered.isEmpty()) {
+            logger.debug("🎯 Filtered {} courses to {} based on training frequency: {}", 
+                courseIds.size(), filtered.size(), trainingFrequency);
+        }
+        
+        return filtered.isEmpty() ? courseIds : filtered;
+    }
+    
+    /**
+     * Kiểm tra course có phù hợp cho người mới không
+     */
+    private boolean isBeginnerCourse(Integer courseId) {
+        // Courses ID thấp hoặc trong danh sách beginner courses
+        return courseId <= 20 || Arrays.asList(1, 9, 17, 25, 33, 41, 49, 57).contains(courseId);
+    }
+    
+    /**
+     * Kiểm tra course có phù hợp cho intermediate không  
+     */
+    private boolean isIntermediateCourse(Integer courseId) {
+        return (courseId > 15 && courseId <= 45) || Arrays.asList(18, 26, 34, 42, 50, 58).contains(courseId);
+    }
+    
+    /**
+     * Kiểm tra course có phù hợp cho advanced không
+     */
+    private boolean isAdvancedCourse(Integer courseId) {
+        return courseId > 35 || Arrays.asList(19, 27, 35, 43, 51, 59).contains(courseId);
+    }
+    
+    /**
+     * Kiểm tra xem khóa học có phù hợp với profile người dùng không
+     * Tích hợp training_frequency như thuộc tính quan trọng thứ 2
+     */
+    private boolean isCourseSuitableForProfile(Course course, String trainingHistory, String bodyType, String trainingFrequency) {
+        if (course == null) return false;
+        
+        Integer courseId = course.getCourseId();
+        
+        // LOGIC 1: Kiểm tra theo training_frequency (thuộc tính quan trọng thứ 2)
+        if (trainingFrequency != null) {
+            switch (trainingFrequency) {
+                case "Never":
+                case "Occasionally":
+                    // Người mới/ít tập nên chọn courses cơ bản
+                    if (courseId > 30 && !isBeginnerCourse(courseId)) {
+                        logger.debug("Course {} too advanced for frequency: {}", courseId, trainingFrequency);
+                        return false;
+                    }
+                    break;
+                case "Advanced":
+                    // Người advanced có thể cần courses thách thức hơn
+                    if (courseId <= 15 && !isAdvancedCourse(courseId)) {
+                        logger.debug("Course {} too basic for frequency: {}", courseId, trainingFrequency);
+                        return false;
+                    }
+                    break;
+            }
+        }
+        
+        // LOGIC 2: Kiểm tra theo training_history
+        if (trainingHistory != null) {
+            switch (trainingHistory) {
+                case "Never":
+                    // Người chưa bao giờ tập cần khóa học rất cơ bản
+                    if (courseId > 25) {
+                        logger.debug("Course {} too advanced for training history: Never", courseId);
+                        return false;
+                    }
+                    break;
+                case "Advanced":
+                case "Regularly":
+                    // Người có kinh nghiệm có thể handle courses khó hơn
+                    // Không giới hạn quá nghiêm ngặt
+                    break;
+            }
+        }
+        
+        // LOGIC 3: Kiểm tra theo body_type
+        if (bodyType != null) {
+            switch (bodyType) {
+                case "Thin":
+                    // Người gầy nên tập trung vào strength training và tăng cơ
+                    String courseName = course.getCourseName();
+                    if (courseName != null && courseName.toLowerCase().contains("weight loss")) {
+                        logger.debug("Weight loss course {} not suitable for Thin body type", courseId);
+                        return false;
+                    }
+                    break;
+                case "Overweight":
+                    // Người thừa cân ưu tiên cardio và weight loss
+                    // Cho phép tất cả courses nhưng ưu tiên trong logic trước đó
+                    break;
+            }
+        }
+        
+        logger.debug("✅ Course {} suitable for profile: frequency={}, history={}, bodyType={}", 
+            courseId, trainingFrequency, trainingHistory, bodyType);
+        return true;
     }
 } 

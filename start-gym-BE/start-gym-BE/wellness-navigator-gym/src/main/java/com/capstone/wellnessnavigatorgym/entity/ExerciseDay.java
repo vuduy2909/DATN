@@ -7,6 +7,7 @@ import lombok.Setter;
 import javax.persistence.*;
 
 @Entity
+@Table(name = "exercise_day")
 @Setter
 @Getter
 @RequiredArgsConstructor

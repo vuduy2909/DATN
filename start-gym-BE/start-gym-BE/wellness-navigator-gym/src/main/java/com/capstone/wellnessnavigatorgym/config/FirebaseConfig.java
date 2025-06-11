@@ -20,7 +20,7 @@ public class FirebaseConfig {
     
     private static final Logger logger = LoggerFactory.getLogger(FirebaseConfig.class);
     private static final String SERVICE_ACCOUNT_KEY_PATH = "config/capstone-project-firebase-key.json";
-    private static final String BUCKET_NAME = "capstone-project-2909.appspot.com";
+    private static final String BUCKET_NAME = "capstone-project-2909.firebasestorage.app";
     private static final String PROJECT_ID = "capstone-project-2909";
     
     @PostConstruct
