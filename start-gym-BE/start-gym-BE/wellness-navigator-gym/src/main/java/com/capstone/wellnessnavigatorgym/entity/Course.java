@@ -52,6 +52,16 @@ public class Course {
     @Column(name = "average_rating", precision = 3, scale = 2)
     private Double averageRating = 0.0;
     
+    // Additional fields for course details
+    @Column(name = "weekly_sessions")
+    private String weeklySessions;
+    
+    @Column(name = "recommended_for")
+    private String recommendedFor;
+    
+    @Column(name = "difficulty_level")
+    private String difficultyLevel;
+    
     @Column(name = "created_date")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdDate = LocalDateTime.now();

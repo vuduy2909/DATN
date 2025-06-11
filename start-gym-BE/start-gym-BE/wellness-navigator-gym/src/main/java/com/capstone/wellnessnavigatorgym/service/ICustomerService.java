@@ -36,4 +36,10 @@ public interface ICustomerService {
     void updatePassword(String username, String encodedPassword);
     
     void updateCustomerProfile(String username, Map<String, String> profileData);
+
+    Customer findByCustomerEmail(String email);
+    
+    Customer findActiveCustomerByAccountUserName(String username);
+    
+    void saveCustomer(Customer customer);
 }

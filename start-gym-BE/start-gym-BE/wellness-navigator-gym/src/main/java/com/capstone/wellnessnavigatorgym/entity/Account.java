@@ -35,4 +35,13 @@ public class Account {
             joinColumns = @JoinColumn(name = "account_id"),
             inverseJoinColumns = @JoinColumn(name = "role_id"))
     private Set<Role> roles = new LinkedHashSet<>();
+    
+    // Convenience methods for password field
+    public String getPassword() {
+        return this.encryptPassword;
+    }
+    
+    public void setPassword(String password) {
+        this.encryptPassword = password;
+    }
 }

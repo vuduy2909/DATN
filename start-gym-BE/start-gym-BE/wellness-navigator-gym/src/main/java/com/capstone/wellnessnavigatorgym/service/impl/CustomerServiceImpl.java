@@ -172,4 +172,19 @@ public class CustomerServiceImpl implements ICustomerService {
             customerRepository.save(customer);
         }
     }
+
+    @Override
+    public Customer findByCustomerEmail(String email) {
+        return customerRepository.findByCustomerEmail(email);
+    }
+    
+    @Override
+    public Customer findActiveCustomerByAccountUserName(String username) {
+        return customerRepository.findActiveCustomerByAccountUserName(username);
+    }
+    
+    @Override
+    public void saveCustomer(Customer customer) {
+        customerRepository.save(customer);
+    }
 } 

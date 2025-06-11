@@ -119,6 +119,10 @@ public interface ICustomerRepository extends JpaRepository<Customer, Integer> {
             "WHERE a.user_name = :username AND c.is_enable = true", nativeQuery = true)
     Customer findActiveCustomerByAccountUserName(@Param("username") String username);
 
+    @Query(value = "SELECT c.* FROM customer c " +
+            "WHERE c.customer_email = :email AND c.is_enable = true", nativeQuery = true)
+    Customer findByCustomerEmail(@Param("email") String email);
+
     @Query(value = "SELECT a.customer_id, a.customer_name, a.customer_phone, a.customer_gender, a.customer_date_of_birth, " +
             "a.customer_address, a.is_delete, a.is_enable, u.user_id, a.create_time, " +
             "a.email, u.user_data_id, u.age, u.bmi, u.gender, u.training_goals, u.training_history, " +

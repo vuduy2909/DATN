@@ -362,66 +362,83 @@ public class CustomerController {
             String newPassword = request.get("newPassword");
             String confirmPassword = request.get("confirmPassword");
             
-            // Validate inputs
+            // Validate required fields
             if (currentPassword == null || currentPassword.trim().isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Current password is required"));
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Current password is required");
+                return ResponseEntity.badRequest().body(errorResponse);
             }
-            
             if (newPassword == null || newPassword.trim().isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "New password is required"));
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("error", "New password is required");
+                return ResponseEntity.badRequest().body(errorResponse);
+            }
+            if (!newPassword.equals(confirmPassword)) {
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Password confirmation does not match");
+                return ResponseEntity.badRequest().body(errorResponse);
             }
             
-            if (confirmPassword == null || !confirmPassword.equals(newPassword)) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Password confirmation does not match"));
-            }
-            
-            // Password strength validation
+            // Validate password strength
             if (newPassword.length() < 8) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Password must be at least 8 characters long"));
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Password must be at least 8 characters long");
+                return ResponseEntity.badRequest().body(errorResponse);
             }
-            
             if (!newPassword.matches(".*[A-Z].*")) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Password must contain at least one uppercase letter"));
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Password must contain at least one uppercase letter");
+                return ResponseEntity.badRequest().body(errorResponse);
             }
-            
             if (!newPassword.matches(".*[a-z].*")) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Password must contain at least one lowercase letter"));
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Password must contain at least one lowercase letter");
+                return ResponseEntity.badRequest().body(errorResponse);
             }
-            
-            if (!newPassword.matches(".*[0-9].*")) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Password must contain at least one number"));
+            if (!newPassword.matches(".*\\d.*")) {
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Password must contain at least one number");
+                return ResponseEntity.badRequest().body(errorResponse);
             }
-            
             if (!newPassword.matches(".*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?].*")) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Password must contain at least one special character"));
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Password must contain at least one special character");
+                return ResponseEntity.badRequest().body(errorResponse);
             }
-            
-            // Get customer and account
+
             Customer customer = customerService.findActiveCustomerByAccountUserName(username);
-            if (customer == null || customer.getAccount() == null) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Customer account not found"));
+            if (customer == null) {
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Customer account not found");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
             }
-            
+
             // Verify current password
             if (!passwordEncoder.matches(currentPassword, customer.getAccount().getPassword())) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Current password is incorrect"));
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Current password is incorrect");
+                return ResponseEntity.badRequest().body(errorResponse);
             }
-            
-            // Check if new password is different from current
+
+            // Verify new password is different from current
             if (passwordEncoder.matches(newPassword, customer.getAccount().getPassword())) {
-                return ResponseEntity.badRequest().body(Map.of("error", "New password must be different from current password"));
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("error", "New password must be different from current password");
+                return ResponseEntity.badRequest().body(errorResponse);
             }
-            
+
             // Update password
             customer.getAccount().setPassword(passwordEncoder.encode(newPassword));
-            customerService.save(customer);
-            
-            return ResponseEntity.ok(Map.of("message", "Password reset successfully"));
-            
+            customerService.saveCustomer(customer);
+
+            Map<String, String> successResponse = new HashMap<>();
+            successResponse.put("message", "Password reset successfully");
+            return ResponseEntity.ok(successResponse);
+
         } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Failed to reset password: " + e.getMessage()));
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Failed to reset password: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
 }

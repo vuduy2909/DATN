@@ -17,6 +17,7 @@ import com.capstone.wellnessnavigatorgym.repository.ICourseTypeRepository;
 import com.capstone.wellnessnavigatorgym.repository.IExerciseRepository;
 import com.capstone.wellnessnavigatorgym.repository.IAccountRepository;
 import com.capstone.wellnessnavigatorgym.service.PaymentStatusService;
+import com.capstone.wellnessnavigatorgym.service.FirebaseStorageService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,6 +31,7 @@ import org.slf4j.LoggerFactory;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import javax.persistence.Tuple;
+import javax.persistence.Query;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.LocalDateTime;
@@ -43,6 +45,8 @@ import java.util.stream.Collectors;
 @PreAuthorize("hasRole('ROLE_ADMIN')")
 public class AdminController {
 
+    private static final Logger logger = LoggerFactory.getLogger(AdminController.class);
+    
     @Autowired
     private PaymentStatusService paymentStatusService;
     
@@ -69,6 +73,9 @@ public class AdminController {
 
     @Autowired
     private IAccountRepository accountRepository;
+
+    @Autowired
+    private FirebaseStorageService firebaseStorageService;
 
     @PersistenceContext
     private EntityManager entityManager;
