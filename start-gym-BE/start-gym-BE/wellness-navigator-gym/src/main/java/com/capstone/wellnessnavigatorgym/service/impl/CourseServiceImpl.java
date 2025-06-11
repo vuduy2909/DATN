@@ -24,7 +24,47 @@ public class CourseServiceImpl implements ICourseService {
 
     @Override
     public List<Course> findAll() {
-        return courseRepository.findAllWithCourseType();
+        List<Course> allCourses = courseRepository.findAllWithCourseType();
+        
+        // Filter out hidden courses and courses inappropriate for young users (18-35)
+        return allCourses.stream()
+            .filter(course -> {
+                // Only show active courses
+                if (course.getStatus() == null || !course.getStatus()) {
+                    return false;
+                }
+                
+                // Filter out courses designed for elderly users (40+)
+                String courseName = course.getCourseName();
+                if (courseName != null) {
+                    String lowerName = courseName.toLowerCase();
+                    // Exclude courses specifically for older adults
+                    if (lowerName.contains("senior") || 
+                        lowerName.contains("over 50") || 
+                        lowerName.contains("chair cardio") ||
+                        lowerName.contains("elderly") ||
+                        lowerName.contains("mature adult")) {
+                        return false;
+                    }
+                }
+                
+                // Check description for age-specific content
+                String description = course.getDescription();
+                if (description != null) {
+                    String lowerDesc = description.toLowerCase();
+                    if (lowerDesc.contains("older adult") || 
+                        lowerDesc.contains("senior") ||
+                        lowerDesc.contains("over 50") ||
+                        lowerDesc.contains("elderly") ||
+                        lowerDesc.contains("chair-based") ||
+                        lowerDesc.contains("seated exercise")) {
+                        return false;
+                    }
+                }
+                
+                return true;
+            })
+            .collect(Collectors.toList());
     }
 
     @SneakyThrows
@@ -59,8 +99,9 @@ public class CourseServiceImpl implements ICourseService {
     }
 
     @Override
-    public void updateCourseStatus(Integer courseId) {
+    public Boolean updateCourseStatus(Integer courseId) {
         courseRepository.updateStatus(courseId);
+        return courseRepository.getCourseStatus(courseId);
     }
 
     public CourseDetailsOfExerciseDto tupleToCourseDetailsOfExerciseDto(Tuple tuple) {

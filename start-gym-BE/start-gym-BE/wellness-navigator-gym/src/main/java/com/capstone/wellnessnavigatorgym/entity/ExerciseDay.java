@@ -13,8 +13,13 @@ import javax.persistence.*;
 public class ExerciseDay {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "exercise_day_id")
     private Integer exerciseDayId;
+    
+    @Column(name = "is_completed")
     private Boolean isCompleted;
+    
+    @Column(name = "status")
     private Boolean status;
 
     @ManyToOne(cascade = CascadeType.ALL)

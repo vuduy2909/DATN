@@ -47,6 +47,10 @@ dependencies {
     // For logging
     implementation 'org.slf4j:slf4j-api'
     implementation 'ch.qos.logback:logback-classic'
+    
+    // Firebase dependencies
+    implementation 'com.google.firebase:firebase-admin:9.2.0'
+    implementation 'com.google.cloud:google-cloud-storage:2.23.0'
 }
 
 tasks.named('test') {

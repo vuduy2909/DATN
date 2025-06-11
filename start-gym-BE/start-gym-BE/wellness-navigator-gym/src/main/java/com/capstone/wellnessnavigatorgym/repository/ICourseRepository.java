@@ -45,8 +45,12 @@ public interface ICourseRepository extends JpaRepository<Course, Integer> {
     List<Tuple> getCourseDetailsByDayAndCourseOfComment(@Param("courseId") Integer courseId, @Param("dayId") Integer dayId);
 
     @Modifying
-    @Query(value = "UPDATE course SET status = true WHERE course_id = :courseId", nativeQuery = true)
+    @Query(value = "UPDATE course SET status = CASE WHEN status = true THEN false ELSE true END WHERE course_id = :courseId", nativeQuery = true)
     void updateStatus(@Param("courseId") Integer courseId);
+
+    // Get current status of a course
+    @Query("SELECT c.status FROM Course c WHERE c.courseId = :courseId")
+    Boolean getCourseStatus(@Param("courseId") Integer courseId);
 
     // Dashboard-specific queries
     @Query(value = "SELECT COUNT(*) FROM course WHERE status = true", nativeQuery = true)

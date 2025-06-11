@@ -1,20 +1,25 @@
 import React, { useState, useEffect } from 'react';
-
 import {
     Box,
+    Button,
     Container,
     Paper,
     Typography,
-    Button,
     Stepper,
     Step,
     StepLabel,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
+    Grid,
+    Divider,
+    Alert,
+    CircularProgress,
     Chip,
     Avatar,
     Card,
-    CardContent,
-    Divider,
-    CircularProgress
+    CardContent
 } from '@mui/material';
 import {
     CameraAlt,
@@ -22,7 +27,6 @@ import {
     CheckCircle,
     SmartToy
 } from '@mui/icons-material';
-
 import BodyImageAnalyzer from '../BodyImageAnalyzer';
 import UserFormService from '../../services/UserFormService';
 
@@ -31,13 +35,13 @@ const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
     const [analysisTimestamp, setAnalysisTimestamp] = useState(Date.now()); // Force re-render when analysis updates
 
     const steps = [
-        'Thông tin tập luyện',
-        'Thông tin cơ bản', 
-        'Mục tiêu tập luyện',
-        'Tần suất mong muốn',
-        'Thông tin nghề nghiệp',
-        'Số đo cơ thể',
-        'Kết quả phân tích'
+        '1',
+        '2', 
+        '3',
+        '4',
+        '5',
+        '6',
+        '7'
     ];
     
     // Load saved bodyType from analysis when component mounts
@@ -205,6 +209,12 @@ const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
                 customerId: formData.customerId
             };
             
+            // Ensure that any direct trainingFrequency properties are not included
+            // The backend is only expecting training_history and training_frequency
+            if (apiFormData.hasOwnProperty('trainingFrequency')) {
+                delete apiFormData.trainingFrequency;
+            }
+            
             console.log('=== STEP6: API DATA PREPARATION ===');
             console.log('FormData.bodyType from form:', formData.bodyType);
             console.log('Body type in API data:', apiFormData.body_type);
@@ -223,9 +233,34 @@ const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
             console.log('Database enum values must match exactly what is defined in the schema');
             console.log('Check for: 1. Exact case matching 2. No whitespace 3. No special characters');
             
+            // Log complete API request data with all fields
+            console.log('=== FINAL API REQUEST DATA ===');
+            console.log('API endpoint: /track-data-ai/recommend-course');
+            console.log('Request method: POST');
+            console.log('Complete request data:', JSON.stringify(apiFormData));
+            console.log('Expected backend fields only:', Object.keys(apiFormData).join(', '));
+            console.log('=== END API REQUEST DATA ===');
+            
             // Call API directly from here
             const result = await UserFormService.submitFormData(apiFormData);
             console.log('Step6: API response received:', result);
+            
+            // Make sure the result has the necessary properties for step 7
+            if (result && result.recommendedCourses) {
+                // Ensure recommendedCourseId is explicitly set in both formData and at top level
+                if (!result.formData) {
+                    result.formData = { ...apiFormData };
+                }
+                
+                if (result.recommendedCourses.courseId) {
+                    // Add recommendedCourseId to formData object
+                    result.formData.recommendedCourseId = result.recommendedCourses.courseId;
+                    // Also add it at the top level for consistent access
+                    result.recommendedCourseId = result.recommendedCourses.courseId;
+                    
+                    console.log('Step6: Added recommendedCourseId to result:', result.recommendedCourses.courseId);
+                }
+            }
             
             // IMMEDIATELY navigate to next step
             console.log('Step6: Immediately navigating to next step');

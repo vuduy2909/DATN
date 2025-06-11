@@ -15,14 +15,20 @@ import javax.validation.constraints.NotNull;
 public class CartDetail {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "cart_detail_id")
     private Integer cartDetailId;
+    
     @NotNull
     @Min(1)
+    @Column(name = "quantity")
     private int quantity;
+    
     @NotNull
+    @Column(name = "status")
     private boolean status;
 
     @NotNull
+    @Column(name = "cart_id")
     private Integer cartId;
 
     @OneToOne(cascade = CascadeType.ALL)

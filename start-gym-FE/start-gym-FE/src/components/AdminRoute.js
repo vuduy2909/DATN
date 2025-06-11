@@ -3,14 +3,14 @@ import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "../AuthContext";
 import { axiosInstance } from '../utils/axiosInstance';
 
-const AdminRoute = ({ redirectPath = "/", children }) => {
+const AdminRoute = ({ redirectPath = "/404", children }) => {
   const { user } = useAuth();
   const [isAdmin, setIsAdmin] = useState(null); // null = đang kiểm tra, true/false = kết quả
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const checkAdminStatus = async () => {
-      // Nếu không có user/token, không phải admin
+      // Nếu không có user/token, không phải admin - redirect to 404
       if (!user || user === 'null' || user === 'undefined') {
         setIsAdmin(false);
         setIsLoading(false);
@@ -29,11 +29,11 @@ const AdminRoute = ({ redirectPath = "/", children }) => {
         setIsAdmin(isAdminUser);
         
         if (!isAdminUser) {
-          console.log("AdminRoute - User is not admin, redirecting to home");
+          console.log("AdminRoute - User is not admin, redirecting to 404 to hide admin endpoints");
         }
       } catch (error) {
         console.error('AdminRoute - Error checking admin status:', error);
-        // Nếu có lỗi API (như 401), coi như không phải admin
+        // Nếu có lỗi API (như 401), coi như không phải admin và redirect to 404
         setIsAdmin(false);
         localStorage.setItem('isAdmin', 'false');
         
@@ -66,10 +66,10 @@ const AdminRoute = ({ redirectPath = "/", children }) => {
     );
   }
 
-  // Nếu không phải admin, chuyển hướng về trang chủ
+  // Nếu không phải admin, chuyển hướng về trang 404 để ẩn endpoint admin
   if (!isAdmin) {
-    console.log("AdminRoute - Access denied, redirecting to:", redirectPath);
-    return <Navigate to={redirectPath} replace />;
+    console.log("AdminRoute - Access denied, redirecting to 404 to hide admin endpoints");
+    return <Navigate to="/404" replace />;
   }
 
   // Nếu là admin, cho phép truy cập

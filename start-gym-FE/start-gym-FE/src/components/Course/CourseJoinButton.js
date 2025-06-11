@@ -14,7 +14,7 @@ import {
 } from '@mui/material';
 import './CourseJoinButton.css';
 
-const CourseJoinButton = ({ courseId, courseName, onJoinSuccess }) => {
+const CourseJoinButton = ({ courseId, courseName, onJoinSuccess, buttonText = null, buttonStyle = "default" }) => {
   const [isJoining, setIsJoining] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [snackbar, setSnackbar] = useState({
@@ -85,24 +85,49 @@ const CourseJoinButton = ({ courseId, courseName, onJoinSuccess }) => {
     setShowConfirmDialog(false);
   };
 
+  // Get button class and content based on style
+  const getButtonClass = () => {
+    if (buttonStyle === "vip-rejoin") {
+      return "join-course-btn vip-rejoin-btn";
+    }
+    return "join-course-btn";
+  };
+
+  const getButtonContent = () => {
+    if (isJoining) {
+      return (
+        <div className="loading-spinner">
+          <CircularProgress size={16} color="inherit" />
+          Đang tham gia...
+        </div>
+      );
+    }
+
+    if (buttonText) {
+      return (
+        <>
+          <span className="join-icon">🔄</span>
+          <span>{buttonText}</span>
+        </>
+      );
+    }
+
+    return (
+      <>
+        <span className="join-icon">➕</span>
+        <span>Tham gia<br/>khóa học</span>
+      </>
+    );
+  };
+
   return (
     <div className="course-join-container">
       <button 
-        className="join-course-btn"
+        className={getButtonClass()}
         onClick={handleJoinClick}
         disabled={isJoining}
       >
-        {isJoining ? (
-          <div className="loading-spinner">
-            <CircularProgress size={16} color="inherit" />
-            Đang tham gia...
-          </div>
-        ) : (
-          <>
-            <span className="join-icon">➕</span>
-            <span>Tham gia<br/>khóa học</span>
-          </>
-        )}
+        {getButtonContent()}
       </button>
 
       {/* Confirmation Dialog */}

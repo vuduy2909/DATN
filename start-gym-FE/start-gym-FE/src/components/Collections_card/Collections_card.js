@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import styles from "./Collections_card.module.css";
 import Card from "react-bootstrap/Card";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -17,12 +17,13 @@ import {
   Typography,
   Box,
   Chip,
-  Divider
+  Divider,
+  DialogContentText
 } from "@mui/material";
 import CourseJoinButton from "../Course/CourseJoinButton";
 import { useAuth } from '../../AuthContext';
 import { request } from '../../utils/axiosInstance';
-import { getCsrfToken } from '../../utils/axiosInstance';
+import { getCsrfToken, getImageUrl } from '../../utils/axiosInstance';
 import { Tooltip } from '@mui/material';
 
 const CollectionCard = ({ 
@@ -188,7 +189,8 @@ const CollectionCard = ({
             if (onDeleteCourse) {
                 onDeleteCourse(id);
             }
-            showSnackbar(`Đã xoá khóa học "${title}" thành công! 🗑️`, 'success');
+            const courseType = isPurchasedVip ? 'VIP' : '';
+            showSnackbar(`Đã xoá khóa học ${courseType} "${title}" thành công! Tất cả dữ liệu điểm danh đã được xoá. 🗑️`, 'success');
         } else {
             // Response không có success flag hoặc message
             throw new Error('Không nhận được xác nhận từ server');
@@ -224,7 +226,16 @@ const CollectionCard = ({
   return (
     <Card key={id} className={styles.collection_card}>
       <div className={styles.card_header}>
-        <Card.Img variant="top" src={image || 'https://via.placeholder.com/300x180?text=Course+Image'} className={styles.img} />
+        <Card.Img 
+          variant="top" 
+          src={getImageUrl(image)} 
+          className={styles.img}
+          onError={(e) => {
+            // Simple single fallback with no external dependencies
+            e.target.src = 'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22286%22%20height%3D%22180%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20286%20180%22%20preserveAspectRatio%3D%22none%22%3E%3Cdefs%3E%3Cstyle%20type%3D%22text%2Fcss%22%3E%23holder_18c66a8c7b3%20text%20%7B%20fill%3A%23999%3Bfont-weight%3Anormal%3Bfont-family%3AArial%2C%20Helvetica%2C%20Open%20Sans%2C%20sans-serif%2C%20monospace%3Bfont-size%3A14pt%20%7D%20%3C%2Fstyle%3E%3C%2Fdefs%3E%3Cg%20id%3D%22holder_18c66a8c7b3%22%3E%3Crect%20width%3D%22286%22%20height%3D%22180%22%20fill%3D%22%23373940%22%3E%3C%2Frect%3E%3Cg%3E%3Ctext%20x%3D%22107.1875%22%20y%3D%2296.3%22%3EImage%20not%20available%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E';
+            e.target.onerror = null;
+          }}
+        />
         {isUserCourse && joinType && (
           <div className={styles.course_badge}>
             <span className={`${styles.badge} ${isRecommended ? styles.recommended : styles.self_enrolled}`}>
@@ -264,7 +275,7 @@ const CollectionCard = ({
           <path d="M0 1H413.5" stroke="#6A6B6C" strokeWidth="0.5" />
         </svg>
         
-        <p className={styles.collection_duration}>Duration: {duration || 'Unknown'}</p>
+          <p className={styles.collection_duration}>Duration: {duration || 'Unknown'}</p>
         
         {isVipCourse && !isPurchasedVip && courseData.price && (
           <p className={styles.vip_price}>
@@ -274,7 +285,7 @@ const CollectionCard = ({
           </p>
         )}
         
-        <div className={styles.course_actions}>
+          <div className={styles.course_actions}>
           {isVipCourse && !isPurchasedVip ? (
             // VIP Course not purchased yet - show purchase buttons
             <>
@@ -375,7 +386,7 @@ const CollectionCard = ({
           ) : (
             // Regular course or purchased VIP course - show study/join buttons
             <>
-              <Link to={`/collections/${id}/days/1`} className={styles.link}>
+              <Link to={`/collections/${id}/days/1`} className={styles.link} style={isPurchasedVip ? { width: '100%' } : {}}>
                 <button className={isPurchasedVip ? styles.detail_btn_center : styles.detail_btn}>
                 {isUserCourse || isPurchasedVip ? 'Tiếp tục học' : (
                   <>
@@ -390,8 +401,17 @@ const CollectionCard = ({
                 courseName={title}
                 onJoinSuccess={onJoinSuccess}
               />
+            ) : isPurchasedVip && !isUserCourse ? (
+              // VIP course already purchased but not enrolled - show rejoin button
+              <CourseJoinButton 
+                courseId={id}
+                courseName={title}
+                onJoinSuccess={onJoinSuccess}
+                buttonText="Tham gia lại"
+                buttonStyle="vip-rejoin"
+              />
             ) : (
-                // Only show delete button for non-VIP courses
+                // Show delete button only for non-VIP courses (regular courses and recommended courses)
                 !isPurchasedVip && (
               <button 
                 className={styles.delete_btn}
@@ -421,9 +441,13 @@ const CollectionCard = ({
         <DialogContent>
           <Box sx={{ mb: 2 }}>
             <img 
-              src={image || 'https://via.placeholder.com/400x200?text=Course+Image'} 
+              src={getImageUrl(image)} 
               alt={title}
               style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: '8px' }}
+              onError={(e) => {
+                e.target.src = 'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22286%22%20height%3D%22180%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20286%20180%22%20preserveAspectRatio%3D%22none%22%3E%3Cdefs%3E%3Cstyle%20type%3D%22text%2Fcss%22%3E%23holder_18c66a8c7b3%20text%20%7B%20fill%3A%23999%3Bfont-weight%3Anormal%3Bfont-family%3AArial%2C%20Helvetica%2C%20Open%20Sans%2C%20sans-serif%2C%20monospace%3Bfont-size%3A14pt%20%7D%20%3C%2Fstyle%3E%3C%2Fdefs%3E%3Cg%20id%3D%22holder_18c66a8c7b3%22%3E%3Crect%20width%3D%22286%22%20height%3D%22180%22%20fill%3D%22%23373940%22%3E%3C%2Frect%3E%3Cg%3E%3Ctext%20x%3D%22107.1875%22%20y%3D%2296.3%22%3EImage%20not%20available%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E';
+                e.target.onerror = null;
+              }}
             />
           </Box>
           
@@ -625,33 +649,60 @@ const CollectionCard = ({
         </DialogActions>
       </Dialog>
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteModal && (
-        <div className={styles.modal_overlay}>
-          <div className={styles.modal_content}>
-            <h3>Xác nhận xoá khóa học</h3>
-            <p>
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={showDeleteModal}
+        onClose={handleCancelDelete}
+        aria-labelledby="alert-dialog-title"
+        aria-describedby="alert-dialog-description"
+        sx={{ zIndex: 1500 }}
+      >
+        <DialogTitle id="alert-dialog-title" sx={{ textAlign: 'center' }}>
+          Xác nhận xoá khóa học
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText id="alert-dialog-description">
               Bạn có chắc chắn muốn xoá khóa học <strong>"{title}"</strong> khỏi danh sách của mình không?
               <br />
+              {isPurchasedVip && (
+                <>
+                  <span style={{ color: '#ff6b6b', fontWeight: 'bold' }}>
+                    ⚠️ Đây là khóa học VIP đã thanh toán. 
+                  </span>
+                  <br />
+                  <span style={{ color: '#666' }}>
+                    Bạn có thể tham gia lại khóa học này bất cứ lúc nào mà không cần thanh toán thêm.
+                  </span>
+                  <br />
+                </>
+              )}
+              <strong>Tất cả dữ liệu điểm danh và tiến độ học tập sẽ bị xóa vĩnh viễn.</strong>
+              <br />
               Hành động này không thể hoàn tác.
-            </p>
-            <div className={styles.modal_actions}>
-              <button 
-                className={styles.confirm_delete_btn}
-                onClick={handleConfirmDelete}
-              >
-                Có, xoá khóa học
-              </button>
-              <button 
-                className={styles.cancel_btn}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center', pb: 3, gap: 2 }}>
+          <Button
                 onClick={handleCancelDelete}
+            color="inherit"
+            variant="outlined"
+            sx={{ minWidth: 100 }}
               >
                 Hủy
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          </Button>
+          <Button
+            onClick={handleConfirmDelete}
+            color="error"
+            variant="contained"
+            autoFocus
+            disabled={isDeleting}
+            startIcon={isDeleting ? <CircularProgress size={20} color="inherit" /> : null}
+            sx={{ minWidth: 120 }}
+          >
+            {isDeleting ? 'Đang xóa...' : 'Có, xoá khóa học'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Snackbar for notifications */}
       <Snackbar 
@@ -673,13 +724,15 @@ const CollectionCard = ({
   );
 };
 
-const Collections_card = ({ selectedCategory, recommendedCourses, loading, onCourseJoinSuccess }) => {
-  const { user } = useAuth();
+const Collections_card = ({ selectedCategory, recommendedCourses, loading, onCourseJoinSuccess, searchTerm = '' }) => {
   const [dataCourse, setDataCourse] = useState([]);
-  const [loadingCourses, setLoadingCourses] = useState(true);
-  const [error, setError] = useState(null);
   const [filteredCards, setFilteredCards] = useState([]);
-  const [userCourses, setUserCourses] = useState(recommendedCourses || []);
+  const [userCourses, setUserCourses] = useState([]);
+  const [loading2, setLoading2] = useState(false);
+  const [error, setError] = useState(null);
+  const [loadingCourses, setLoadingCourses] = useState(true);
+  const navigate = useNavigate();
+  const { user } = useAuth();
 
   // Debug log for recommended courses
   console.log('Collections_card received recommendedCourses:', recommendedCourses);
@@ -840,6 +893,87 @@ const Collections_card = ({ selectedCategory, recommendedCourses, loading, onCou
     setFilteredCards(filtered || []);
   }, [selectedCategory, dataCourse, userCourses]);
 
+  // Apply search term filter
+  const searchFilteredCards = React.useMemo(() => {
+    if (!searchTerm.trim()) {
+      return filteredCards;
+    }
+    
+    const normalizedSearchTerm = searchTerm.toLowerCase().trim();
+    
+    return filteredCards.filter(course => 
+      course.courseName.toLowerCase().includes(normalizedSearchTerm) ||
+      (course.description && course.description.toLowerCase().includes(normalizedSearchTerm))
+    );
+  }, [filteredCards, searchTerm]);
+
+  const handleRecommendClick = () => {
+    if (!user) {
+      // If user is not logged in, show confirmation dialog
+      if (window.confirm('Bạn cần đăng nhập để sử dụng tính năng nhận gợi ý khóa học. Bạn có muốn đăng nhập không?')) {
+        navigate('/login', { state: { returnUrl: '/recommend' } });
+      }
+    } else {
+      // If logged in, go directly to recommend page
+      navigate('/recommend');
+    }
+  };
+
+  // Add Course card component with plus sign
+  const AddCourseCard = () => {
+    return (
+      <Card className={styles.collection_card}>
+        <div className={styles.card_header} style={{ 
+          height: '180px', 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center',
+          background: 'linear-gradient(135deg, #f5f7fa 0%, #e4e8eb 100%)'
+        }}>
+          <Box sx={{ 
+            width: 80, 
+            height: 80, 
+            borderRadius: '50%', 
+            bgcolor: '#CF4044',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            boxShadow: '0 4px 8px rgba(0,0,0,0.2)'
+          }}>
+            <Typography variant="h3" sx={{ color: 'white', fontWeight: 'bold', mt: '-5px' }}>+</Typography>
+          </Box>
+        </div>
+        <Card.Body className={styles.card_body}>
+          <Card.Title>Thêm khóa học</Card.Title>
+          <Typography variant="body2" sx={{ color: '#666', mb: 2 }}>
+            Nhận thêm khóa học được đề xuất phù hợp với bạn
+          </Typography>
+          
+          <svg
+            className={styles.line}
+            xmlns="http://www.w3.org/2000/svg"
+            width="414"
+            height="2"
+            viewBox="0 0 414 2"
+            fill="none"
+          >
+            <path d="M0 1H413.5" stroke="#6A6B6C" strokeWidth="0.5" />
+          </svg>
+          
+          <div className={styles.course_actions}>
+            <button 
+              className={styles.detail_btn_center} 
+              style={{ backgroundColor: '#CF4044', width: '100%' }}
+              onClick={handleRecommendClick}
+            >
+              Nhận Gợi Ý
+            </button>
+          </div>
+        </Card.Body>
+      </Card>
+    );
+  };
+
   if (loading || loadingCourses) {
     return (
       <div className={styles.loading_container}>
@@ -866,11 +1000,13 @@ const Collections_card = ({ selectedCategory, recommendedCourses, loading, onCou
   }
 
   const isMyCourseWithNoData = selectedCategory === "My Course" && filteredCards.length === 0;
+  const noSearchResults = filteredCards.length > 0 && searchFilteredCards.length === 0;
 
   return (
     <div className={styles.collection}>
-      {filteredCards.length > 0 ? (
-        filteredCards.map((course) => (
+      {searchFilteredCards.length > 0 ? (
+        <>
+          {searchFilteredCards.map((course) => (
           <CollectionCard
             key={course.courseId}
             id={course.courseId}
@@ -883,10 +1019,24 @@ const Collections_card = ({ selectedCategory, recommendedCourses, loading, onCou
             isRecommended={course.isRecommended || false}
             onJoinSuccess={onCourseJoinSuccess}
             onDeleteCourse={handleDeleteCourse}
-            courseData={course}
-            isPurchasedVip={course.isPurchasedVip || false}
-          />
-        ))
+              courseData={course}
+              isPurchasedVip={course.isPurchasedVip || false}
+            />
+          ))}
+          {/* Add the plus card at the end if we're in My Course and there are courses */}
+          {selectedCategory === "My Course" && searchFilteredCards.length > 0 && <AddCourseCard />}
+        </>
+      ) : noSearchResults ? (
+        <div className={styles.bn_left}>
+          <div className={styles.bn_left_1}>
+            <p className={styles.typo}>
+              <span className={styles.typo_red}>Không tìm thấy</span> khóa học phù hợp
+            </p>
+            <p className={styles.typo_des}>
+              Không có khóa học nào phù hợp với từ khóa "{searchTerm}". Vui lòng thử tìm kiếm với từ khóa khác.
+            </p>
+          </div>
+        </div>
       ) : (
         <div className={styles.bn_left}>
           <div className={styles.bn_left_1}>
@@ -899,18 +1049,22 @@ const Collections_card = ({ selectedCategory, recommendedCourses, loading, onCou
               {isMyCourseWithNoData ? (
                 <>
                   <span>Bạn chưa tham gia khóa học nào. Hãy khám phá các khóa học khác!</span>
-                  <Button variant="contained" className={styles.bn_left_btn}>
-                    <Link to="/recommend" style={{ color: "#fff" }}>
+                  <Button 
+                    variant="contained" 
+                    className={styles.bn_left_btn}
+                    onClick={handleRecommendClick}
+                  >
                       Nhận gợi ý
-                    </Link>
                   </Button>
                 </>
               ) : (
                 <>
-                  <Button variant="contained" className={styles.bn_left_btn}>
-                    <Link to="/recommend" style={{ color: "#fff" }}>
+                  <Button 
+                    variant="contained" 
+                    className={styles.bn_left_btn}
+                    onClick={handleRecommendClick}
+                  >
                       Start now
-                    </Link>
                   </Button>
                   <span>to receive personalized recommendations.</span>
                 </>

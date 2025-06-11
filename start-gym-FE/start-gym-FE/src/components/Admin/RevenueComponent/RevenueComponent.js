@@ -22,7 +22,9 @@ import {
     Grid,
     Card,
     CardContent,
-    Chip
+    Chip,
+    Pagination,
+    InputAdornment
 } from '@mui/material';
 import { 
     FilterList as FilterIcon,
@@ -30,7 +32,8 @@ import {
     MonetizationOn as MoneyIcon,
     Assessment as AssessmentIcon,
     TrendingUp as TrendingUpIcon,
-    Clear as ClearIcon
+    Clear as ClearIcon,
+    Search as SearchIcon
 } from '@mui/icons-material';
 import { axiosInstance } from '../../../utils/axiosInstance';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
@@ -41,6 +44,15 @@ const RevenueComponent = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [totalRevenue, setTotalRevenue] = useState(0);
     const [chartData, setChartData] = useState([]);
+
+    // Pagination state
+    const [page, setPage] = useState(1);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [totalTransactions, setTotalTransactions] = useState(0);
+
+    // Search and filter state
+    const [searchTerm, setSearchTerm] = useState('');
+    const [paginatedTransactions, setPaginatedTransactions] = useState([]);
     
     // Filter states
     const [filterType, setFilterType] = useState('all'); // all, day, month, year
@@ -82,12 +94,14 @@ const RevenueComponent = () => {
             if (response.data && Array.isArray(response.data)) {
                 setTransactions(response.data);
                 setFilteredTransactions(response.data);
+                setTotalTransactions(response.data.length);
                 calculateTotalRevenue(response.data);
                 generateChartData(response.data);
                 console.log('Revenue transactions loaded:', response.data.length);
             } else {
                 setTransactions([]);
                 setFilteredTransactions([]);
+                setTotalTransactions(0);
                 showSnackbar('No revenue data received', 'warning');
             }
         } catch (error) {
@@ -95,6 +109,7 @@ const RevenueComponent = () => {
             showSnackbar(`Error loading revenue data: ${error.message}`, 'error');
             setTransactions([]);
             setFilteredTransactions([]);
+            setTotalTransactions(0);
         } finally {
             setIsLoading(false);
         }
@@ -174,6 +189,36 @@ const RevenueComponent = () => {
         calculateTotalRevenue(transactions);
         generateChartData(transactions);
         showSnackbar('Filters cleared', 'info');
+    };
+
+    // Search and pagination logic
+    useEffect(() => {
+        let filtered = filteredTransactions;
+
+        // Search by customer name or course name
+        if (searchTerm) {
+            filtered = filtered.filter(transaction =>
+                transaction.customer?.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                transaction.course?.courseName?.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+        }
+
+        setTotalTransactions(filtered.length);
+        
+        // Apply pagination
+        const startIndex = (page - 1) * rowsPerPage;
+        const endIndex = startIndex + rowsPerPage;
+        setPaginatedTransactions(filtered.slice(startIndex, endIndex));
+
+    }, [filteredTransactions, searchTerm, page, rowsPerPage]);
+
+    const handlePageChange = (event, newPage) => {
+        setPage(newPage);
+    };
+
+    const handleRowsPerPageChange = (event) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(1);
     };
 
     useEffect(() => {
@@ -408,6 +453,42 @@ const RevenueComponent = () => {
                 </Grid>
             </Paper>
 
+            {/* Search Section */}
+            <Paper sx={{ p: 2, mb: 3 }}>
+                <Typography variant="h6" gutterBottom>Search & Pagination</Typography>
+                <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
+                    {/* Search Box */}
+                    <TextField
+                        placeholder="Search by customer or course name..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        InputProps={{
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <SearchIcon />
+                                </InputAdornment>
+                            )
+                        }}
+                        sx={{ minWidth: 300 }}
+                    />
+
+                    {/* Rows per page */}
+                    <TextField
+                        select
+                        label="Rows per page"
+                        value={rowsPerPage}
+                        onChange={handleRowsPerPageChange}
+                        sx={{ minWidth: 120 }}
+                        SelectProps={{ native: true }}
+                    >
+                        <option value={5}>5</option>
+                        <option value={10}>10</option>
+                        <option value={25}>25</option>
+                        <option value={50}>50</option>
+                    </TextField>
+                </Box>
+            </Paper>
+
             {/* Revenue Chart */}
             {chartData.length > 0 && (
                 <Paper sx={{ p: 2, mb: 3 }}>
@@ -464,7 +545,7 @@ const RevenueComponent = () => {
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            filteredTransactions
+                            paginatedTransactions
                                 .sort((a, b) => new Date(b.createdDate) - new Date(a.createdDate)) // Sort by newest first
                                 .map((transaction) => (
                                 <TableRow key={transaction.paymentId} hover>
@@ -510,6 +591,21 @@ const RevenueComponent = () => {
                     </TableBody>
                 </Table>
             </TableContainer>
+
+            {/* Pagination */}
+            <Box display="flex" justifyContent="space-between" alignItems="center" mt={3}>
+                <Typography variant="body2" color="textSecondary">
+                    Showing {((page - 1) * rowsPerPage) + 1} to {Math.min(page * rowsPerPage, totalTransactions)} of {totalTransactions} transactions
+                </Typography>
+                <Pagination
+                    count={Math.ceil(totalTransactions / rowsPerPage)}
+                    page={page}
+                    onChange={handlePageChange}
+                    color="primary"
+                    showFirstButton
+                    showLastButton
+                />
+            </Box>
 
             {/* Snackbar */}
             <Snackbar 

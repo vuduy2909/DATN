@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 
 import javax.persistence.*;
+import java.math.BigDecimal;
 import java.sql.Date;
 
 @Entity
@@ -15,26 +16,43 @@ import java.sql.Date;
 public class Customer {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "customer_id")
     private Integer customerId;
+    
+    @Column(name = "customer_code")
     private String customerCode;
+    
+    @Column(name = "customer_name")
     private String customerName;
+    
+    @Column(name = "customer_email")
     private String customerEmail;
+    
+    @Column(name = "customer_phone")
     private String customerPhone;
+    
+    @Column(name = "customer_gender")
     private String customerGender;
+    
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
+    @Column(name = "date_of_birth")
     private Date dateOfBirth;
-    private String idCard;
+
+    @Column(name = "customer_address")
     private String customerAddress;
+    
+    @Column(name = "customer_img")
     private String customerImg;
+    
+    @Column(name = "is_enable")
     private Boolean isEnable;
+
+    @Column(name = "total_vip_spent", precision = 15, scale = 2, columnDefinition = "DECIMAL(15,2) DEFAULT 0.00")
+    private BigDecimal totalVipSpent = BigDecimal.ZERO;
 
     @ManyToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "customer_type_id")
     private CustomerType customerType;
-
-    @OneToOne(cascade = CascadeType.ALL)
-    @JoinColumn(name = "cart_id")
-    private Cart cart;
 
     @OneToOne
     @JoinColumn(name = "account_id")
@@ -44,16 +62,16 @@ public class Customer {
         this.customerId = customerId;
     }
 
-    public Customer(String customerCode, String customerName, String customerEmail, String customerPhone, String customerGender, Date dateOfBirth, String idCard, String customerAddress, Boolean isEnable, Account account) {
+    public Customer(String customerCode, String customerName, String customerEmail, String customerPhone, String customerGender, Date dateOfBirth, String customerAddress, Boolean isEnable, Account account) {
         this.customerCode = customerCode;
         this.customerName = customerName;
         this.customerEmail = customerEmail;
         this.customerPhone = customerPhone;
         this.customerGender = customerGender;
         this.dateOfBirth = dateOfBirth;
-        this.idCard = idCard;
         this.customerAddress = customerAddress;
         this.isEnable = isEnable;
         this.account = account;
+        this.totalVipSpent = BigDecimal.ZERO;
     }
 }

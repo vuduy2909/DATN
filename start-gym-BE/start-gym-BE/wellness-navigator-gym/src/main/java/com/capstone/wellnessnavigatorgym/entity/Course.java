@@ -22,14 +22,23 @@ import java.time.LocalDateTime;
 public class Course {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "course_id")
     @XmlElement
     private Integer courseId;
+    
+    @Column(name = "course_name")
     private String courseName;
+    
     @Column(name = "description", length = 2000)
     private String description;
+    
+    @Column(name = "duration")
     private String duration;
+    
     @Column(name = "image", length = 2000)
     private String image;
+    
+    @Column(name = "status")
     private Boolean status = false;
 
     // New fields for VIP payment system

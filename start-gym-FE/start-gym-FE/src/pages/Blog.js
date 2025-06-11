@@ -1,15 +1,39 @@
-import React from 'react'
-import Header from '../components/Header/Header'
-import Footer from '../components/Footer/Footer'
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
+import Header from '../components/Header/Header';
+import Footer from '../components/Footer/Footer';
 
 const Blog = () => {
+    const [searchTerm, setSearchTerm] = useState('');
+    const location = useLocation();
+
+    // Extract search term from URL if present
+    useEffect(() => {
+        const searchParams = new URLSearchParams(location.search);
+        const search = searchParams.get('search');
+        if (search) {
+            setSearchTerm(search);
+        } else {
+            setSearchTerm('');
+        }
+    }, [location.search]);
+
     return (
-        <div>
+        <div style={{ backgroundColor: "#f0ece8", minHeight: "100vh" }}>
             <Header />
-            <h1>BLog</h1>
+            <div style={{ padding: '20px' }}>
+                <h1>Blog</h1>
+                {searchTerm && (
+                    <div style={{ margin: '20px 0', padding: '15px', backgroundColor: 'white', borderRadius: '8px' }}>
+                        <p>Showing blog posts for: <strong>{searchTerm}</strong></p>
+                        {/* Blog search results would go here */}
+                    </div>
+                )}
+                {/* Blog content would go here */}
+            </div>
             <Footer />
         </div>
-    )
-}
+    );
+};
 
-export default Blog
+export default Blog;

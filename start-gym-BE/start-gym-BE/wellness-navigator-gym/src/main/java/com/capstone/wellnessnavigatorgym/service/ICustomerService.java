@@ -2,7 +2,6 @@ package com.capstone.wellnessnavigatorgym.service;
 
 import com.capstone.wellnessnavigatorgym.dto.customer.CustomerInfo;
 import com.capstone.wellnessnavigatorgym.dto.customer.CustomerUserDetailDto;
-import com.capstone.wellnessnavigatorgym.entity.Cart;
 import com.capstone.wellnessnavigatorgym.entity.Customer;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -28,9 +27,8 @@ public interface ICustomerService {
 
     CustomerUserDetailDto findUserDetailByUsername(String username);
 
-    Customer findByCart(Cart cart);
+    Customer findByAccountUserName(String username);
 
-    // New methods for avatar and password
     void updateCustomerAvatar(String username, String avatarUrl);
     
     boolean verifyCurrentPassword(String username, String password);

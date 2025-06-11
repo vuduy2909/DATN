@@ -127,7 +127,7 @@ const EditCustomerType = () => {
         
         // Navigate back after a short delay to show success message
         setTimeout(() => {
-          navigate('/admin');
+          navigate('/admin/customer-types');
         }, 1500);
       }
     } catch (error) {

@@ -30,13 +30,13 @@ const Step1 = ({ formData, handleChange, handleNext }) => {
     const [selectedFrequency, setSelectedFrequency] = useState(formData.trainingFrequency || '');
 
     const steps = [
-        'Thông tin tập luyện',
-        'Thông tin cơ bản', 
-        'Mục tiêu tập luyện',
-        'Tần suất mong muốn',
-        'Thông tin nghề nghiệp',
-        'Số đo cơ thể',
-        'Kết quả phân tích'
+        '1',
+        '2', 
+        '3',
+        '4',
+        '5',
+        '6',
+        '7'
     ];
 
     const trainingFrequencies = [
@@ -73,13 +73,48 @@ const Step1 = ({ formData, handleChange, handleNext }) => {
             <Container maxWidth="md" sx={{ py: 4 }}>
                 {/* Material UI Stepper */}
                 <Paper elevation={2} sx={{ p: 3, mb: 4, borderRadius: 3 }}>
-                    <Stepper activeStep={0} alternativeLabel>
+                    <Stepper 
+                        activeStep={0} 
+                        alternativeLabel
+                        sx={{
+                            '& .MuiStep-root': {
+                                '& .MuiStepIcon-root': {
+                                    color: '#e0e0e0', // Inactive step color
+                                    '&.Mui-active': {
+                                        color: '#CF4044', // Active step color (red)
+                                    },
+                                    '&.Mui-completed': {
+                                        color: '#CF4044', // Completed step color (red)
+                                    },
+                                },
+                                '& .MuiStepConnector-line': {
+                                    borderColor: '#e0e0e0', // Connector line color
+                                },
+                                '& .Mui-active ~ .MuiStepConnector-root .MuiStepConnector-line': {
+                                    borderColor: '#CF4044', // Active connector color
+                                },
+                                '& .Mui-completed ~ .MuiStepConnector-root .MuiStepConnector-line': {
+                                    borderColor: '#CF4044', // Completed connector color
+                                },
+                            },
+                            '& .MuiStepConnector-root': {
+                                '& .MuiStepConnector-line': {
+                                    borderTopWidth: '3px',
+                                    borderRadius: '1px',
+                                },
+                            },
+                        }}
+                    >
                         {steps.map((label, index) => (
                             <Step key={label}>
-                                <StepLabel>
-                                    <Typography variant="caption" sx={{ fontSize: '0.75rem' }}>
-                                        {label}
-                                    </Typography>
+                                <StepLabel
+                                    sx={{
+                                        '& .MuiStepLabel-label': {
+                                            display: 'none', // Hide the step label text
+                                        },
+                                    }}
+                                >
+                                    {/* No label text */}
                                 </StepLabel>
                             </Step>
                         ))}

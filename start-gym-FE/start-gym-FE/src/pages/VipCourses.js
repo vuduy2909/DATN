@@ -16,7 +16,7 @@ import {
 } from '@mui/material';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCrown, faPlay, faClock } from '@fortawesome/free-solid-svg-icons';
-import { request } from '../utils/axiosInstance';
+import { request, getImageUrl } from '../utils/axiosInstance';
 
 const VipCourses = () => {
     const { user } = useAuth();
@@ -157,7 +157,7 @@ const VipCourses = () => {
                                         <CardMedia
                                             component="img"
                                             height="200"
-                                            image={course.image || '/default-course-image.jpg'}
+                                            image={getImageUrl(course.image)}
                                             alt={course.courseName}
                                         />
                                         

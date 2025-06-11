@@ -6,7 +6,7 @@ const Coaches = () => {
         <div className={styles.container}>
             <p className={styles.title_top}>
                 <svg xmlns="http://www.w3.org/2000/svg" width="46" height="3" viewBox="0 0 46 3" fill="none">
-                    <path d="M45.4324 1.5H0.5" stroke="#CF4044" stroke-width="2" />
+                    <path d="M45.4324 1.5H0.5" stroke="#CF4044" strokeWidth="2" />
                 </svg>
                 <span style={{ marginLeft: "18px" }}>
                     OUR COACHES
@@ -16,7 +16,7 @@ const Coaches = () => {
                 OUR BEST TRAINERS</p>
 
             <svg xmlns="http://www.w3.org/2000/svg" width="86" height="3" viewBox="0 0 86 3" fill="none">
-                <path d="M85.8169 1.5H0.181641" stroke="#CF4044" stroke-width="2" />
+                <path d="M85.8169 1.5H0.181641" stroke="#CF4044" strokeWidth="2" />
             </svg>
 
             <p className={styles.title_child}>Elevate your fitness journey with the guidance of our pro coaches who are committed to helping you reach new heights.</p>
@@ -25,16 +25,16 @@ const Coaches = () => {
                 <a href="#" className={`${styles.card} ${styles.education}`}>
                     <div className={styles.overlay}></div>
                     <div className={styles.circle}>
-                        <svg width="64px" height="72px" viewBox="27 21 64 72" version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink">
+                        <svg width="64px" height="72px" viewBox="27 21 64 72" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink">
                             <desc>Created with Sketch.</desc>
                             <defs>
                                 <polygon id="path-1" points="60.9784821 18.4748913 60.9784821 0.0299638385 0.538377293 0.0299638385 0.538377293 18.4748913"></polygon>
                             </defs>
-                            <g id="Group-12" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd" transform="translate(27.000000, 21.000000)">
+                            <g id="Group-12" stroke="none" strokeWidth="1" fill="none" fillRule="evenodd" transform="translate(27.000000, 21.000000)">
                                 <g id="Group-5">
                                     <g id="Group-3" transform="translate(2.262327, 21.615176)">
                                         <mask id="mask-2" fill="white">
-                                            <use xlink href="#path-1"></use>
+                                            <use xlinkHref="#path-1"></use>
                                         </mask>
                                         <g id="Clip-2"></g>
                                         <path d="M7.17774177,18.4748913 L54.3387782,18.4748913 C57.9910226,18.4748913 60.9789911,15.7266455 60.9789911,12.3681986 L60.9789911,6.13665655 C60.9789911,2.77820965 57.9910226,0.0299638385 54.3387782,0.0299638385 L7.17774177,0.0299638385 C3.52634582,0.0299638385 0.538377293,2.77820965 0.538377293,6.13665655 L0.538377293,12.3681986 C0.538377293,15.7266455 3.52634582,18.4748913 7.17774177,18.4748913" id="Fill-1" fill="#59A785" mask="url(#mask-2)"></path>
@@ -58,16 +58,16 @@ const Coaches = () => {
                 <a href="#" className={`${styles.card} ${styles.education}`}>
                     <div className={styles.overlay}></div>
                     <div className={styles.circle}>
-                        <svg width="64px" height="72px" viewBox="27 21 64 72" version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink">
+                        <svg width="64px" height="72px" viewBox="27 21 64 72" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink">
                             <desc>Created with Sketch.</desc>
                             <defs>
                                 <polygon id="path-1" points="60.9784821 18.4748913 60.9784821 0.0299638385 0.538377293 0.0299638385 0.538377293 18.4748913"></polygon>
                             </defs>
-                            <g id="Group-12" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd" transform="translate(27.000000, 21.000000)">
+                            <g id="Group-12" stroke="none" strokeWidth="1" fill="none" fillRule="evenodd" transform="translate(27.000000, 21.000000)">
                                 <g id="Group-5">
                                     <g id="Group-3" transform="translate(2.262327, 21.615176)">
                                         <mask id="mask-2" fill="white">
-                                            <use xlink href="#path-1"></use>
+                                            <use xlinkHref="#path-1"></use>
                                         </mask>
                                         <g id="Clip-2"></g>
                                         <path d="M7.17774177,18.4748913 L54.3387782,18.4748913 C57.9910226,18.4748913 60.9789911,15.7266455 60.9789911,12.3681986 L60.9789911,6.13665655 C60.9789911,2.77820965 57.9910226,0.0299638385 54.3387782,0.0299638385 L7.17774177,0.0299638385 C3.52634582,0.0299638385 0.538377293,2.77820965 0.538377293,6.13665655 L0.538377293,12.3681986 C0.538377293,15.7266455 3.52634582,18.4748913 7.17774177,18.4748913" id="Fill-1" fill="#59A785" mask="url(#mask-2)"></path>
@@ -91,16 +91,16 @@ const Coaches = () => {
                 <a href="#" className={`${styles.card} ${styles.education}`}>
                     <div className={styles.overlay}></div>
                     <div className={styles.circle}>
-                        <svg width="64px" height="72px" viewBox="27 21 64 72" version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink">
+                        <svg width="64px" height="72px" viewBox="27 21 64 72" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink">
                             <desc>Created with Sketch.</desc>
                             <defs>
                                 <polygon id="path-1" points="60.9784821 18.4748913 60.9784821 0.0299638385 0.538377293 0.0299638385 0.538377293 18.4748913"></polygon>
                             </defs>
-                            <g id="Group-12" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd" transform="translate(27.000000, 21.000000)">
+                            <g id="Group-12" stroke="none" strokeWidth="1" fill="none" fillRule="evenodd" transform="translate(27.000000, 21.000000)">
                                 <g id="Group-5">
                                     <g id="Group-3" transform="translate(2.262327, 21.615176)">
                                         <mask id="mask-2" fill="white">
-                                            <use xlink href="#path-1"></use>
+                                            <use xlinkHref="#path-1"></use>
                                         </mask>
                                         <g id="Clip-2"></g>
                                         <path d="M7.17774177,18.4748913 L54.3387782,18.4748913 C57.9910226,18.4748913 60.9789911,15.7266455 60.9789911,12.3681986 L60.9789911,6.13665655 C60.9789911,2.77820965 57.9910226,0.0299638385 54.3387782,0.0299638385 L7.17774177,0.0299638385 C3.52634582,0.0299638385 0.538377293,2.77820965 0.538377293,6.13665655 L0.538377293,12.3681986 C0.538377293,15.7266455 3.52634582,18.4748913 7.17774177,18.4748913" id="Fill-1" fill="#59A785" mask="url(#mask-2)"></path>
@@ -124,16 +124,16 @@ const Coaches = () => {
                 <a href="#" className={`${styles.card} ${styles.education}`}>
                     <div className={styles.overlay}></div>
                     <div className={styles.circle}>
-                        <svg width="64px" height="72px" viewBox="27 21 64 72" version="1.1" xmlns="http://www.w3.org/2000/svg" xlink="http://www.w3.org/1999/xlink">
+                        <svg width="64px" height="72px" viewBox="27 21 64 72" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink">
                             <desc>Created with Sketch.</desc>
                             <defs>
                                 <polygon id="path-1" points="60.9784821 18.4748913 60.9784821 0.0299638385 0.538377293 0.0299638385 0.538377293 18.4748913"></polygon>
                             </defs>
-                            <g id="Group-12" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd" transform="translate(27.000000, 21.000000)">
+                            <g id="Group-12" stroke="none" strokeWidth="1" fill="none" fillRule="evenodd" transform="translate(27.000000, 21.000000)">
                                 <g id="Group-5">
                                     <g id="Group-3" transform="translate(2.262327, 21.615176)">
                                         <mask id="mask-2" fill="white">
-                                            <use xlink href="#path-1"></use>
+                                            <use xlinkHref="#path-1"></use>
                                         </mask>
                                         <g id="Clip-2"></g>
                                         <path d="M7.17774177,18.4748913 L54.3387782,18.4748913 C57.9910226,18.4748913 60.9789911,15.7266455 60.9789911,12.3681986 L60.9789911,6.13665655 C60.9789911,2.77820965 57.9910226,0.0299638385 54.3387782,0.0299638385 L7.17774177,0.0299638385 C3.52634582,0.0299638385 0.538377293,2.77820965 0.538377293,6.13665655 L0.538377293,12.3681986 C0.538377293,15.7266455 3.52634582,18.4748913 7.17774177,18.4748913" id="Fill-1" fill="#59A785" mask="url(#mask-2)"></path>

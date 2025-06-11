@@ -16,7 +16,9 @@ import {
     CircularProgress,
     Alert,
     Avatar,
-    LinearProgress
+    LinearProgress,
+    Pagination,
+    TablePagination
 } from '@mui/material';
 import {
     People,
@@ -39,6 +41,10 @@ const DashboardComponent = () => {
     const [dashboardData, setDashboardData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    
+    // Pagination state for recent activities
+    const [recentActivitiesPage, setRecentActivitiesPage] = useState(0);
+    const [recentActivitiesSize, setRecentActivitiesSize] = useState(10);
 
     // Beautiful gradient colors
     const gradientColors = {
@@ -58,7 +64,12 @@ const DashboardComponent = () => {
                 setLoading(true);
                 setError(null);
                 
-                const response = await axiosInstance.get('/admin/dashboard-overview');
+                const response = await axiosInstance.get('/admin/dashboard-overview', {
+                    params: {
+                        recentActivitiesPage,
+                        recentActivitiesSize: recentActivitiesSize
+                    }
+                });
                 
                 if (response.data) {
                     setDashboardData(response.data);
@@ -75,7 +86,7 @@ const DashboardComponent = () => {
         };
 
         fetchDashboardData();
-    }, []);
+    }, [recentActivitiesPage, recentActivitiesSize]);
 
     // Chart data - sử dụng dữ liệu thực từ API
     const userDistributionData = [
@@ -89,7 +100,35 @@ const DashboardComponent = () => {
         { name: 'Premium', revenue: (dashboardData?.revenueStats?.premium || 0) / 1000000, color: '#fa709a' }
     ];
 
-    const StatCard = ({ title, value, icon, gradient, subtitle, trend }) => (
+    // Calculate trends - using real data from backend
+    const userTrend = dashboardData?.userTrendPercent || "0%";
+    const revenueTrend = dashboardData?.revenueTrendPercent || "0%";
+    const orderTrend = dashboardData?.ordersTrendPercent || "0%";
+
+    // Pagination handlers for recent activities
+    const handleRecentActivitiesPageChange = (event, newPage) => {
+        setRecentActivitiesPage(newPage);
+    };
+
+    const handleRecentActivitiesRowsPerPageChange = (event) => {
+        setRecentActivitiesSize(parseInt(event.target.value, 10));
+        setRecentActivitiesPage(0);
+    };
+
+    // Real data from backend API
+    const currentMonthUsers = dashboardData?.userStats?.total || 0;
+    const previousMonthUsers = dashboardData?.userStats?.previousMonth || 0;
+    
+    const currentMonthRevenue = dashboardData?.revenueStats?.total || 0;
+    const previousMonthRevenue = dashboardData?.revenueStats?.previousMonth || 0;
+    
+    const currentMonthOrders = dashboardData?.orderStats?.success || 0;
+    const previousMonthOrders = dashboardData?.orderStats?.previousMonth || 0;
+    
+    const currentMonthCourses = dashboardData?.courseStats?.active || 0;
+    const previousMonthCourses = dashboardData?.courseStats?.previousMonth || 0;
+
+    const StatCard = ({ title, value, icon, gradient, subtitle, trend, showTrend = false }) => (
         <Card 
             elevation={8} 
             sx={{ 
@@ -118,11 +157,36 @@ const DashboardComponent = () => {
                                 {subtitle}
                             </Typography>
                         )}
-                        {trend && (
-                            <Box display="flex" alignItems="center" mt={1}>
-                                <TrendingUp sx={{ fontSize: 16, mr: 0.5 }} />
-                                <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                                    +{trend}% tháng này
+                        {showTrend && trend && (
+                            <Box 
+                                display="flex" 
+                                alignItems="center" 
+                                mt={1}
+                                sx={{ 
+                                    bgcolor: trend.includes('+') || trend.includes('Mới') ? 'rgba(0, 255, 0, 0.2)' : 
+                                             trend.includes('-') ? 'rgba(255, 0, 0, 0.2)' : 'rgba(128, 128, 128, 0.2)', 
+                                    borderRadius: '16px',
+                                    px: 1.5,
+                                    py: 0.5,
+                                    display: 'inline-flex',
+                                    width: 'fit-content'
+                                }}
+                            >
+                                {(trend.includes('+') || trend.includes('Mới')) ? (
+                                    <TrendingUp sx={{ fontSize: 16, mr: 0.5 }} />
+                                ) : trend.includes('-') ? (
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px' }}>
+                                        <line x1="23" y1="18" x2="17" y2="12"></line>
+                                        <line x1="17" y1="18" x2="23" y2="12"></line>
+                                        <line x1="1" y1="6" x2="17" y2="6"></line>
+                                        <line x1="1" y1="12" x2="11" y2="12"></line>
+                                        <line x1="1" y1="18" x2="5" y2="18"></line>
+                                    </svg>
+                                ) : (
+                                    <div style={{ width: 16, height: 16, marginRight: 4 }} />
+                                )}
+                                <Typography variant="body2" sx={{ opacity: 0.9, fontWeight: 'bold' }}>
+                                    {trend} so với tháng trước
                                 </Typography>
                             </Box>
                         )}
@@ -256,7 +320,8 @@ const DashboardComponent = () => {
                         value={dashboardData.userStats?.total || 0}
                         icon={<Group />}
                         gradient={gradientColors.primary}
-                        trend="12"
+                        trend={userTrend}
+                        showTrend={true}
                     />
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
@@ -266,7 +331,8 @@ const DashboardComponent = () => {
                         subtitle="VNĐ"
                         icon={<MonetizationOn />}
                         gradient={gradientColors.success}
-                        trend="8"
+                        trend={revenueTrend}
+                        showTrend={true}
                     />
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
@@ -275,46 +341,71 @@ const DashboardComponent = () => {
                         value={dashboardData.courseStats?.active || 0}
                         icon={<LibraryBooks />}
                         gradient={gradientColors.warning}
-                        trend="5"
+                        showTrend={false}
                     />
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
                     <StatCard
-                        title="Đơn Hàng Thành Công"
+                        title="Đơn hàng Thành Công"
                         value={dashboardData.orderStats?.success || 0}
                         icon={<Assessment />}
                         gradient={gradientColors.error}
-                        trend="15"
+                        trend={orderTrend}
+                        showTrend={false}
                     />
                 </Grid>
             </Grid>
 
             {/* Secondary Stats */}
             <Grid container spacing={3} sx={{ mb: 4 }}>
-                <Grid item xs={12} sm={6} md={2.4}>
-                    <StatCard
-                        title="Regular Users"
-                        value={dashboardData.userStats?.regular || 0}
-                        icon={<People />}
-                        gradient={gradientColors.blue}
-                    />
-                </Grid>
-                <Grid item xs={12} sm={6} md={2.4}>
-                    <StatCard
-                        title="Premium Users"
-                        value={dashboardData.userStats?.premium || 0}
-                        icon={<People />}
-                        gradient={gradientColors.orange}
-                    />
-                </Grid>
-                <Grid item xs={12} sm={6} md={2.4}>
-                    <StatCard
-                        title="VIP Users"
-                        value={dashboardData.userStats?.vip || 0}
-                        icon={<People />}
-                        gradient={gradientColors.purple}
-                    />
-                </Grid>
+                {/* Dynamic Customer Type Stats */}
+                {dashboardData.userStats?.allCustomerTypes?.map((type, index) => (
+                    <Grid item xs={12} sm={6} md={2.4} key={type.id || index}>
+                        <StatCard
+                            title={`${type.name} Users`}
+                            value={type.count || 0}
+                            icon={<People />}
+                            gradient={
+                                type.name.toLowerCase().includes('regular') ? gradientColors.blue :
+                                type.name.toLowerCase().includes('premium') ? gradientColors.orange :
+                                type.name.toLowerCase().includes('vip') ? gradientColors.purple :
+                                type.name.toLowerCase().includes('super') ? gradientColors.error :
+                                gradientColors.info
+                            }
+                        />
+                    </Grid>
+                ))}
+                
+                {/* Fallback to default if no dynamic types */}
+                {(!dashboardData.userStats?.allCustomerTypes || dashboardData.userStats.allCustomerTypes.length === 0) && (
+                    <>
+                        <Grid item xs={12} sm={6} md={2.4}>
+                            <StatCard
+                                title="Regular Users"
+                                value={dashboardData.userStats?.regular || 0}
+                                icon={<People />}
+                                gradient={gradientColors.blue}
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6} md={2.4}>
+                            <StatCard
+                                title="Premium Users"
+                                value={dashboardData.userStats?.premium || 0}
+                                icon={<People />}
+                                gradient={gradientColors.orange}
+                            />
+                        </Grid>
+                        <Grid item xs={12} sm={6} md={2.4}>
+                            <StatCard
+                                title="VIP Users"
+                                value={dashboardData.userStats?.vip || 0}
+                                icon={<People />}
+                                gradient={gradientColors.purple}
+                            />
+                        </Grid>
+                    </>
+                )}
+                
                 <Grid item xs={12} sm={6} md={2.4}>
                     <StatCard
                         title="Đăng Ký Hôm Nay"
@@ -477,6 +568,22 @@ const DashboardComponent = () => {
                             </TableBody>
                         </Table>
                     </TableContainer>
+                    
+                    {/* Pagination for Recent Activities */}
+                    <TablePagination
+                        component="div"
+                        count={dashboardData?.recentActivitiesTotal || 0}
+                        page={recentActivitiesPage}
+                        onPageChange={handleRecentActivitiesPageChange}
+                        rowsPerPage={recentActivitiesSize}
+                        onRowsPerPageChange={handleRecentActivitiesRowsPerPageChange}
+                        rowsPerPageOptions={[5, 10, 25, 50]}
+                        labelRowsPerPage="Số dòng mỗi trang:"
+                        labelDisplayedRows={({ from, to, count }) => 
+                            `${from}–${to} của ${count !== -1 ? count : `hơn ${to}`}`
+                        }
+                        sx={{ mt: 2 }}
+                    />
                 </CardContent>
             </Card>
         </Box>

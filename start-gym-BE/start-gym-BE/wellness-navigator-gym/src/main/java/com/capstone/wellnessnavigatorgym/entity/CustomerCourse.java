@@ -13,8 +13,10 @@ import javax.persistence.*;
 public class CustomerCourse {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "customer_course_id")
     private Integer customerCourseId;
 
+    @Column(name = "recommended_status")
     private Boolean recommendedStatus;
 
     @ManyToOne(cascade = CascadeType.ALL)

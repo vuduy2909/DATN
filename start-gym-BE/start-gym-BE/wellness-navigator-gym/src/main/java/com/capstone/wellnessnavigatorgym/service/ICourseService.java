@@ -17,5 +17,5 @@ public interface ICourseService {
 
     void save(Course course);
 
-    void updateCourseStatus(Integer courseId);
+    Boolean updateCourseStatus(Integer courseId);
 }

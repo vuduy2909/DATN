@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../AuthContext';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import {
@@ -98,10 +98,37 @@ const Login = () => {
     const [rememberMe, setRememberMe] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const navigate = useNavigate();
+    const location = useLocation();
+
+    // Get returnUrl from location state if available
+    const returnUrl = location.state?.returnUrl || '/';
 
     const handleLogin = async (e) => {
         e.preventDefault();
         setErrorMessage('');
+        
+        // First check if this username is banned before attempting login
+        try {
+            // Check banned status using our public endpoint
+            const checkBannedResponse = await axios.get(`http://localhost:8080/api/v1/public/check-banned-status?username=${username}`);
+            console.log("Pre-login ban check response:", checkBannedResponse.data);
+            
+            // If user exists and is banned, redirect to contact page immediately
+            if (checkBannedResponse.data.exists === true && checkBannedResponse.data.isBanned === true) {
+                console.log("User is banned before login attempt - redirecting to contact page");
+                navigate('/contact', { 
+                    state: { 
+                        isBanned: true, 
+                        username: username,
+                        customerName: checkBannedResponse.data.customerName || username
+                    } 
+                });
+                return;
+            }
+        } catch (error) {
+            // If we can't check banned status, continue with normal login flow
+            console.log("Error checking banned status before login:", error);
+        }
         
         try {
             const response = await axios.post('http://localhost:8080/api/v1/public/login', {
@@ -115,7 +142,44 @@ const Login = () => {
             if (response.status === 200) {
                 const token = response.data.token;
                 localStorage.setItem('token', token);
+                localStorage.setItem('username', username);
                 setUser(token);
+                
+                // Check customer enabled status explicitly after successful login
+                try {
+                    const userInfoResponse = await axios.get('http://localhost:8080/api/v1/users/info', {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    
+                    console.log("User info response:", userInfoResponse.data);
+                    
+                    // Check if user data contains customer info with is_enable field
+                    const customerEnabled = userInfoResponse.data.is_enable !== false && 
+                                          userInfoResponse.data.isEnable !== false;
+                    
+                    // Alternative check in case customer info is nested
+                    const nestedCustomerEnabled = userInfoResponse.data.customer?.is_enable !== false && 
+                                                userInfoResponse.data.customer?.isEnable !== false;
+                    
+                    if (!customerEnabled || !nestedCustomerEnabled) {
+                        console.log("User is banned (is_enable = false), redirecting to contact page");
+                        // Clear stored token
+                        localStorage.removeItem('token');
+                        localStorage.removeItem('isAdmin');
+                        setUser(null);
+                        // Redirect to contact page with banned user info
+                        navigate('/contact', { 
+                            state: { 
+                                isBanned: true, 
+                                username: username 
+                            } 
+                        });
+                        return;
+                    }
+                } catch (error) {
+                    console.log("Error checking customer status:", error);
+                    // Continue with normal flow if we can't check the status
+                }
                 
                 // Set admin status and redirect accordingly
                 if (response.data.roles == 'ROLE_ADMIN') {
@@ -123,15 +187,78 @@ const Login = () => {
                     localStorage.setItem('isAdmin', 'true');
                     navigate('/admin', { replace: true });
                 } else {
-                    console.log("User is not admin, redirecting to home...");
+                    console.log("User is not admin, redirecting...");
                     localStorage.setItem('isAdmin', 'false');
-                    navigate('/', { replace: true });
+                    // Redirect to returnUrl if provided, otherwise to home
+                    navigate(returnUrl, { replace: true });
                 }
             } else {
                 setErrorMessage('Thông tin đăng nhập không chính xác');
             }
         } catch (error) {
             console.error('Đã xảy ra lỗi:', error);
+            console.log("Login error details:", { 
+                status: error.response?.status,
+                data: error.response?.data,
+                message: error.message
+            });
+
+            // Check if this is a banned user error
+            if (error.response && error.response.data) {
+                console.log("Login error response:", error.response.data);
+                
+                // Get the error message in whatever format it might be
+                const errorMessage = error.response.data.error || 
+                                    error.response.data.message || 
+                                    (typeof error.response.data === 'string' ? error.response.data : '');
+                
+                // When the server responds with "Bad credentials" for a banned user
+                if (error.response.status === 401 && 
+                    (errorMessage.includes("Bad credentials") || 
+                     errorMessage.includes("Customer account is banned") ||
+                     errorMessage.includes("disabled"))) {
+                    
+                    // Make a check if this user exists and is banned
+                    try {
+                        // Try to fetch public info to see if user exists
+                        const checkUserResponse = await axios.get(`http://localhost:8080/api/v1/public/check-banned-status?username=${username}`);
+                        console.log("Ban check response:", checkUserResponse.data);
+                        
+                        // If user exists and is banned
+                        if (checkUserResponse.data.exists === true && checkUserResponse.data.isBanned === true) {
+                            console.log("User exists but is banned - redirecting to contact page");
+                            navigate('/contact', { 
+                                state: { 
+                                    isBanned: true, 
+                                    username: username 
+                                } 
+                            });
+                            return;
+                        }
+                    } catch (checkError) {
+                        console.log("Error checking banned status:", checkError);
+                        // If we can't check, just show generic error
+                    }
+                }
+                
+                // Check for explicit ban messages
+                const bannedKeywords = ['banned', 'disabled', 'suspended', 'blocked', 'Customer account is banned'];
+                const isBanned = bannedKeywords.some(keyword => 
+                    errorMessage && errorMessage.toLowerCase().includes(keyword.toLowerCase())
+                );
+                
+                if (isBanned) {
+                    console.log("User is explicitly banned, redirecting to contact page");
+                    navigate('/contact', { 
+                        state: { 
+                            isBanned: true, 
+                            username: username 
+                        } 
+                    });
+                    return;
+                }
+            }
+
             setErrorMessage('Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');
         }
     };
@@ -152,6 +279,11 @@ const Login = () => {
                 localStorage.setItem('token', token);
                 setUser(token);
                 
+                // Store username from Google response if available
+                if (googleResponse.data.username || googleResponse.data.email) {
+                    localStorage.setItem('username', googleResponse.data.username || googleResponse.data.email);
+                }
+                
                 if (googleResponse.data.roles === 'ROLE_ADMIN') {
                     console.log("Google login: User is ADMIN, setting admin status and redirecting...");
                     localStorage.setItem('isAdmin', 'true');
@@ -166,6 +298,42 @@ const Login = () => {
             }
         } catch (error) {
             console.error('Error during Google login:', error);
+            
+            // Check if this is a banned user error
+            if (error.response && error.response.data) {
+                console.log("Google login error response:", error.response.data);
+                
+                // Extract email or username from response if available
+                let username = '';
+                if (error.response.data.email) {
+                    username = error.response.data.email;
+                } else if (error.response.data.username) {
+                    username = error.response.data.username;
+                }
+                
+                // Check for banned account based on various error message patterns
+                const errorMessage = error.response.data.error || 
+                                    error.response.data.message || 
+                                    (typeof error.response.data === 'string' ? error.response.data : '');
+                
+                const bannedKeywords = ['banned', 'disabled', 'suspended', 'blocked', 'Customer account is banned'];
+                
+                const isBanned = bannedKeywords.some(keyword => 
+                    errorMessage && errorMessage.toLowerCase().includes(keyword.toLowerCase())
+                );
+                
+                if (isBanned) {
+                    console.log("Google user is banned, redirecting to contact page");
+                    navigate('/contact', { 
+                        state: { 
+                            isBanned: true, 
+                            username: username 
+                        } 
+                    });
+                    return;
+                }
+            }
+            
             setErrorMessage('Đăng nhập Google thất bại');
         }
     };

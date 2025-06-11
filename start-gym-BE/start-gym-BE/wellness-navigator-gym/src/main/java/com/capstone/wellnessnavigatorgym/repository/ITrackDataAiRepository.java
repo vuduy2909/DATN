@@ -14,6 +14,9 @@ import java.util.List;
 @Transactional
 public interface ITrackDataAiRepository extends JpaRepository<TrackDataAi, Integer> {
 
+    @Query("SELECT t FROM TrackDataAi t LEFT JOIN FETCH t.course c LEFT JOIN FETCH c.courseType")
+    List<TrackDataAi> findAllWithCourse();
+
     @Query("SELECT t FROM TrackDataAi t " +
             "WHERE t.age = :#{#userDataDTO.age} AND " +
             "t.gender = :#{#userDataDTO.gender} AND " +

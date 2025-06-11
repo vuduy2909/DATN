@@ -63,8 +63,15 @@ public class CourseController {
     @PatchMapping("/{courseId}/status")
     public ResponseEntity<?> updateCourseStatus(@PathVariable Integer courseId) {
         try {
-            courseService.updateCourseStatus(courseId);
-            return new ResponseEntity<>(new MessageResponse("Edit status successful!"), HttpStatus.OK);
+            Boolean newStatus = courseService.updateCourseStatus(courseId);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("courseId", courseId);
+            response.put("newStatus", newStatus);
+            response.put("message", newStatus ? "Course is now visible" : "Course is now hidden");
+            response.put("action", newStatus ? "shown" : "hidden");
+            
+            return new ResponseEntity<>(response, HttpStatus.OK);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error updating course status: " + e.getMessage());
         }

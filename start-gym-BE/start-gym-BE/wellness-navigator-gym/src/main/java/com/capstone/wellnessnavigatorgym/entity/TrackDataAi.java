@@ -13,18 +13,43 @@ import javax.persistence.*;
 public class TrackDataAi {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "track_data_ai_id")
     private Integer trackDataAiId;
+    
+    @Column(name = "age")
     private Integer age;
+    
+    @Column(name = "gender")
     private String gender;
+    
+    @Column(name = "height")
     private Double height;
+    
+    @Column(name = "weight")
     private Double weight;
+    
+    @Column(name = "waist_circumference")
     private Double waist_circumference;
+    
+    @Column(name = "chest_circumference")
     private Double chest_circumference;
+    
+    @Column(name = "bmi")
     private Double bmi;
+    
+    @Column(name = "occupation")
     private String occupation;
+    
+    @Column(name = "work_environment")
     private String work_environment;
+    
+    @Column(name = "training_goals")
     private String training_goals;
+    
+    @Column(name = "training_history")
     private String training_history;
+    
+    @Column(name = "effective")
     private Boolean effective;
 
     @ManyToOne(cascade = CascadeType.ALL)

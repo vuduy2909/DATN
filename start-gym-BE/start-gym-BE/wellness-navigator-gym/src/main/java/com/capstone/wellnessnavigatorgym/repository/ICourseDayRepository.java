@@ -31,4 +31,10 @@ public interface ICourseDayRepository extends JpaRepository<CourseDays, Integer>
     Optional<CourseDays> findByCourseIdAndDayId(@Param("courseId") Integer courseId, @Param("dayId") Integer dayId);
 
     List<CourseDays> findByCourseCourseId(Integer courseId);
+
+    /**
+     * Đếm tổng số ngày của một course từ bảng course_days
+     */
+    @Query("SELECT COUNT(cd) FROM CourseDays cd WHERE cd.courseId = :courseId AND cd.status = true")
+    Long countByCourseId(@Param("courseId") Integer courseId);
 }

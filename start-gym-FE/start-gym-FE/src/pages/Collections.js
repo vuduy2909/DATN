@@ -12,6 +12,19 @@ const Collections = () => {
   const [selectedCategory, setSelectedCategory] = useState(() => {
     return localStorage.getItem('selectedCategory') || "All";
   });
+  const [searchTerm, setSearchTerm] = useState('');
+  const location = useLocation();
+
+  // Extract search term from URL if present
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const search = searchParams.get('search');
+    if (search) {
+      setSearchTerm(search);
+    } else {
+      setSearchTerm('');
+    }
+  }, [location.search]);
 
   const handleCategoryChange = (category) => {
     setSelectedCategory(category);
@@ -178,6 +191,7 @@ const Collections = () => {
             recommendedCourses={allUserCourses}
             loading={loading}
             onCourseJoinSuccess={handleCourseJoinSuccess}
+            searchTerm={searchTerm}
           />
         </div>
       </div>

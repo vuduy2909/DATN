@@ -12,6 +12,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -126,27 +127,85 @@ public class CustomerController {
         return new ResponseEntity<>(customerUserDetailDto, HttpStatus.OK);
     }
 
-    @PostMapping("/upload-avatar")
-    public ResponseEntity<?> uploadAvatar(@RequestParam("avatar") MultipartFile file) {
+    @GetMapping("/profile")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<Customer> getCustomerProfile(Authentication authentication) {
         try {
-            // Validate file
+            String username = authentication.getName();
+            Customer customer = customerService.findByCustomerEmail(username);
+            
+            if (customer == null) {
+                return ResponseEntity.notFound().build();
+            }
+            
+            return ResponseEntity.ok(customer);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @PutMapping("/profile")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<?> updateCustomerProfile(@RequestBody Map<String, Object> profileData, Authentication authentication) {
+        try {
+            String username = authentication.getName();
+            Customer customer = customerService.findByCustomerEmail(username);
+            
+            if (customer == null) {
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Customer not found");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+            }
+            
+            // Update fields
+            if (profileData.containsKey("customerName")) {
+                customer.setCustomerName((String) profileData.get("customerName"));
+            }
+            if (profileData.containsKey("customerPhone")) {
+                customer.setCustomerPhone((String) profileData.get("customerPhone"));
+            }
+            if (profileData.containsKey("customerAddress")) {
+                customer.setCustomerAddress((String) profileData.get("customerAddress"));
+            }
+            
+            customerService.saveCustomer(customer);
+            
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "Profile updated successfully");
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Failed to update profile");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+    @PostMapping("/upload-avatar")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<?> uploadAvatar(@RequestParam("file") MultipartFile file, Authentication authentication) {
+        try {
             if (file.isEmpty()) {
-                return ResponseEntity.badRequest().body("Please select a file to upload");
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Please select a file to upload");
+                return ResponseEntity.badRequest().body(errorResponse);
             }
             
-            // Check file size (5MB limit)
+            // File size validation (max 5MB)
             if (file.getSize() > 5 * 1024 * 1024) {
-                return ResponseEntity.badRequest().body("File size must be less than 5MB");
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("error", "File size exceeds 5MB limit");
+                return ResponseEntity.badRequest().body(errorResponse);
             }
             
-            // Check file type
+            // File type validation
             String contentType = file.getContentType();
             if (contentType == null || !contentType.startsWith("image/")) {
-                return ResponseEntity.badRequest().body("Please select an image file");
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Only image files are allowed");
+                return ResponseEntity.badRequest().body(errorResponse);
             }
             
-            // Get current user
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String username = authentication.getName();
             
             // Create upload directory if it doesn't exist
@@ -175,12 +234,10 @@ public class CustomerController {
             
             return ResponseEntity.ok(response);
             
-        } catch (IOException e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body("Failed to upload avatar: " + e.getMessage());
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body("An error occurred: " + e.getMessage());
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Failed to upload avatar: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
 
@@ -195,8 +252,25 @@ public class CustomerController {
                 return ResponseEntity.badRequest().body("Old password and new password are required");
             }
             
-            if (newPassword.length() < 6) {
-                return ResponseEntity.badRequest().body("New password must be at least 6 characters long");
+            // Enhanced password validation
+            if (newPassword.length() < 8) {
+                return ResponseEntity.badRequest().body("New password must be at least 8 characters long");
+            }
+            
+            if (!newPassword.matches(".*[a-z].*")) {
+                return ResponseEntity.badRequest().body("New password must contain at least one lowercase letter");
+            }
+            
+            if (!newPassword.matches(".*[A-Z].*")) {
+                return ResponseEntity.badRequest().body("New password must contain at least one uppercase letter");
+            }
+            
+            if (!newPassword.matches(".*\\d.*")) {
+                return ResponseEntity.badRequest().body("New password must contain at least one number");
+            }
+            
+            if (!newPassword.matches(".*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?].*")) {
+                return ResponseEntity.badRequest().body("New password must contain at least one special character");
             }
             
             // Get current user
@@ -273,6 +347,81 @@ public class CustomerController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body("Failed to update profile: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Reset password with additional security checks
+     */
+    @PostMapping("/password/reset")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> request, Authentication authentication) {
+        try {
+            String username = authentication.getName();
+            String currentPassword = request.get("currentPassword");
+            String newPassword = request.get("newPassword");
+            String confirmPassword = request.get("confirmPassword");
+            
+            // Validate inputs
+            if (currentPassword == null || currentPassword.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Current password is required"));
+            }
+            
+            if (newPassword == null || newPassword.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "New password is required"));
+            }
+            
+            if (confirmPassword == null || !confirmPassword.equals(newPassword)) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Password confirmation does not match"));
+            }
+            
+            // Password strength validation
+            if (newPassword.length() < 8) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Password must be at least 8 characters long"));
+            }
+            
+            if (!newPassword.matches(".*[A-Z].*")) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Password must contain at least one uppercase letter"));
+            }
+            
+            if (!newPassword.matches(".*[a-z].*")) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Password must contain at least one lowercase letter"));
+            }
+            
+            if (!newPassword.matches(".*[0-9].*")) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Password must contain at least one number"));
+            }
+            
+            if (!newPassword.matches(".*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?].*")) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Password must contain at least one special character"));
+            }
+            
+            // Get customer and account
+            Customer customer = customerService.findActiveCustomerByAccountUserName(username);
+            if (customer == null || customer.getAccount() == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Customer account not found"));
+            }
+            
+            // Verify current password
+            if (!passwordEncoder.matches(currentPassword, customer.getAccount().getPassword())) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Current password is incorrect"));
+            }
+            
+            // Check if new password is different from current
+            if (passwordEncoder.matches(newPassword, customer.getAccount().getPassword())) {
+                return ResponseEntity.badRequest().body(Map.of("error", "New password must be different from current password"));
+            }
+            
+            // Update password
+            customer.getAccount().setPassword(passwordEncoder.encode(newPassword));
+            customerService.save(customer);
+            
+            return ResponseEntity.ok(Map.of("message", "Password reset successfully"));
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to reset password: " + e.getMessage()));
         }
     }
 }

@@ -20,7 +20,6 @@ public class CustomerUserDetailDto {
     String customerPhone;
     String customerGender;
     Date dateOfBirth;
-    String idCard;
     String customerAddress;
     String customerImg;
     String customerEmail;
@@ -51,7 +50,6 @@ public class CustomerUserDetailDto {
                     firstTuple.get("customer_phone", String.class),
                     customerGender,
                     firstTuple.get("date_of_birth", Date.class),
-                    firstTuple.get("id_card", String.class),
                     firstTuple.get("customer_address", String.class),
                     firstTuple.get("customer_img", String.class),
                     firstTuple.get("customer_email", String.class),

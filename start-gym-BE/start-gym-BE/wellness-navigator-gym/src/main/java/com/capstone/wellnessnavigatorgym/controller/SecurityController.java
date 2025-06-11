@@ -32,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -148,71 +149,90 @@ public class SecurityController {
 
     @PostMapping("/signup")
     @Transactional
-    public ResponseEntity<?> registerUser(@RequestBody SignupRequest signupRequest) {
+    public ResponseEntity<?> registerUser(@Valid @RequestBody SignupRequest signupRequest) {
         try {
-            // Validate input
-            if (signupRequest.getUsername() == null || signupRequest.getUsername().trim().isEmpty()) {
-                return new ResponseEntity<>(new MessageResponse("Username is required!"), HttpStatus.BAD_REQUEST);
+            // Input validation
+            if (signupRequest.getName() == null || signupRequest.getName().trim().isEmpty()) {
+                return new ResponseEntity<>(new MessageResponse("Name is required"), HttpStatus.BAD_REQUEST);
             }
             
-            if (signupRequest.getEmail() == null || signupRequest.getEmail().trim().isEmpty()) {
-                return new ResponseEntity<>(new MessageResponse("Email is required!"), HttpStatus.BAD_REQUEST);
+            if (signupRequest.getUsername() == null || signupRequest.getUsername().trim().isEmpty()) {
+                return new ResponseEntity<>(new MessageResponse("Username is required"), HttpStatus.BAD_REQUEST);
             }
             
             if (signupRequest.getPassword() == null || signupRequest.getPassword().trim().isEmpty()) {
-                return new ResponseEntity<>(new MessageResponse("Password is required!"), HttpStatus.BAD_REQUEST);
+                return new ResponseEntity<>(new MessageResponse("Password is required"), HttpStatus.BAD_REQUEST);
             }
             
-            if (signupRequest.getName() == null || signupRequest.getName().trim().isEmpty()) {
-                return new ResponseEntity<>(new MessageResponse("Full name is required!"), HttpStatus.BAD_REQUEST);
+            if (signupRequest.getEmail() == null || signupRequest.getEmail().trim().isEmpty()) {
+                return new ResponseEntity<>(new MessageResponse("Email is required"), HttpStatus.BAD_REQUEST);
+            }
+
+            // Enhanced password validation
+            String password = signupRequest.getPassword();
+            if (password.length() < 8) {
+                return new ResponseEntity<>(new MessageResponse("Password must be at least 8 characters long"), HttpStatus.BAD_REQUEST);
+            }
+            
+            if (!password.matches(".*[a-z].*")) {
+                return new ResponseEntity<>(new MessageResponse("Password must contain at least one lowercase letter"), HttpStatus.BAD_REQUEST);
+            }
+            
+            if (!password.matches(".*[A-Z].*")) {
+                return new ResponseEntity<>(new MessageResponse("Password must contain at least one uppercase letter"), HttpStatus.BAD_REQUEST);
+            }
+            
+            if (!password.matches(".*\\d.*")) {
+                return new ResponseEntity<>(new MessageResponse("Password must contain at least one number"), HttpStatus.BAD_REQUEST);
+            }
+            
+            if (!password.matches(".*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?].*")) {
+                return new ResponseEntity<>(new MessageResponse("Password must contain at least one special character"), HttpStatus.BAD_REQUEST);
             }
 
             // Check if username already exists
             if (accountService.existsByUsername(signupRequest.getUsername())) {
-                return new ResponseEntity<>(new MessageResponse("The username already exists! Please try again!"), HttpStatus.BAD_REQUEST);
+                return new ResponseEntity<>(new MessageResponse("Username is already taken!"), HttpStatus.BAD_REQUEST);
             }
 
             // Check if email already exists
             if (accountService.existsByEmail(signupRequest.getEmail())) {
-                return new ResponseEntity<>(new MessageResponse("The email already exists! Please try again!"), HttpStatus.BAD_REQUEST);
+                return new ResponseEntity<>(new MessageResponse("Email is already in use!"), HttpStatus.BAD_REQUEST);
             }
 
-            // Create and save Account first
+            // Create account
             Account account = new Account();
             account.setUserName(signupRequest.getUsername());
             account.setEncryptPassword(passwordEncoder.encode(signupRequest.getPassword()));
             account.setEmail(signupRequest.getEmail());
             account.setIsEnable(true);
-            
-            // Assign default USER role
-            Role role = new Role(1, "ROLE_USER");
-            Set<Role> roles = new HashSet<>();
-            roles.add(role);
-            account.setRoles(roles);
-            
-            // Save account first and get the saved instance
+
+            // Save account first
             Account savedAccount = accountService.save(account);
-            
-            if (savedAccount == null || savedAccount.getAccountId() == null) {
-                throw new RuntimeException("Failed to create account");
-            }
+            System.out.println("Account saved successfully with ID: " + savedAccount.getAccountId());
+
+            // Assign default customer role (ID 1 is typically customer role)
+            Role customerRole = new Role(1, "ROLE_CUSTOMER");
+            Set<Role> roles = new HashSet<>();
+            roles.add(customerRole);
+            savedAccount.setRoles(roles);
+            accountService.save(savedAccount); // Save account with roles
 
             // Get default customer type
             List<CustomerType> customerTypes = customerTypeService.findAllCustomerType();
+            CustomerType defaultType;
             if (customerTypes.isEmpty()) {
                 throw new RuntimeException("No customer type available");
             }
-            CustomerType defaultType = customerTypes.get(0);
+            defaultType = customerTypes.get(0);
 
             // Generate customer code
             Customer customerLimit = customerService.customerLimit();
             String customerCode = ConverterMaxCode.generateNextId(
                 customerLimit != null ? customerLimit.getCustomerCode() : null
             );
-            
-            System.out.println("Generated customer code: " + customerCode); // Debug log
 
-            // Create Customer record with the saved account
+            // Create customer with additional details from signup
             Customer customer = new Customer();
             customer.setCustomerCode(customerCode);
             customer.setCustomerName(signupRequest.getName());
@@ -249,9 +269,60 @@ public class SecurityController {
         BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
         String newPass = encoder.encode(changePasswordDto.getConfirmPassword());
         accountService.changePassword(username, newPass);
-        return new ResponseEntity<>(new ChangePasswordDto(  
-                changePasswordDto.getUsername(),
-                "", ""), HttpStatus.OK);
+        return ResponseEntity.ok(new MessageResponse("update successful"));
+    }
+    
+    /**
+     * Check if a username exists and is banned (is_enable=false)
+     * This endpoint is public and can be accessed without authentication
+     */
+    @GetMapping("/check-banned-status")
+    public ResponseEntity<?> checkBannedStatus(@RequestParam String username) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("username", username);
+        
+        try {
+            // Check if account exists
+            Optional<Account> accountOpt = accountService.findAccountByUserName(username);
+            if (!accountOpt.isPresent()) {
+                response.put("exists", false);
+                response.put("message", "Username does not exist");
+                return ResponseEntity.ok(response);
+            }
+            
+            Account account = accountOpt.get();
+            response.put("exists", true);
+            
+            // Get the customer linked to this account
+            Customer customer = customerService.findByAccountUserName(username);
+            
+            if (customer == null) {
+                response.put("message", "No customer record found for this user");
+                response.put("accountEnabled", account.getIsEnable());
+                response.put("isBanned", !account.getIsEnable());
+                return ResponseEntity.ok(response);
+            }
+            
+            // Return banned status
+            boolean isBanned = !customer.getIsEnable();
+            
+            response.put("customerId", customer.getCustomerId());
+            response.put("customerName", customer.getCustomerName());
+            response.put("isBanned", isBanned);
+            response.put("accountEnabled", account.getIsEnable());
+            
+            if (isBanned) {
+                response.put("message", "This account is currently banned");
+            } else {
+                response.put("message", "Account is active");
+            }
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            response.put("error", "Error checking banned status: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
     }
 }
 

@@ -34,7 +34,7 @@ const BMI = () => {
                 <div>
                     <input placeholder='Weight (kg)' className={styles.input_box} value={weight} onChange={(e) => setWeight(e.target.value)}></input>
                     <input placeholder='Height (cm)' className={styles.input_box} value={height} onChange={(e) => setHeight(e.target.value)}></input>
-                    <input placeholder='BMI' className={styles.input_box} value={bmi}></input>
+                    <input placeholder='BMI' className={styles.input_box} value={bmi} readOnly></input>
                 </div>
                 <button className={styles.btn_cal} onClick={calculateBMI}>
                     CALCULATE

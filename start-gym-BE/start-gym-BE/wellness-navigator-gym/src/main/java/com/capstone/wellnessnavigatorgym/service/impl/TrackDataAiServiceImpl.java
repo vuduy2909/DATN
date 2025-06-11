@@ -19,7 +19,8 @@ public class TrackDataAiServiceImpl implements ITrackDataAiService {
     private ITrackDataAiRepository trackDataAiRepository;
 
     public List<TrackDataAi> getAllTrackDataAi() {
-        return trackDataAiRepository.findAll();
+        // Use optimized query with JOIN FETCH to prevent N+1 queries
+        return trackDataAiRepository.findAllWithCourse();
     }
 
 //    @Override
@@ -46,5 +47,19 @@ public class TrackDataAiServiceImpl implements ITrackDataAiService {
         }
         return result;
     }
-
+    
+    @Override
+    public TrackDataAi saveTrackDataAi(TrackDataAi trackDataAi) {
+        return trackDataAiRepository.save(trackDataAi);
+    }
+    
+    @Override
+    public Integer getNextTrackDataAiId() {
+        List<TrackDataAi> allRecords = trackDataAiRepository.findAll();
+        return allRecords.stream()
+            .map(TrackDataAi::getTrackDataAiId)
+            .filter(id -> id != null)
+            .max(Integer::compareTo)
+            .orElse(1000) + 1;
+    }
 }

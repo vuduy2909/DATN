@@ -23,9 +23,11 @@ public class C45DecisionTree {
     private List<TrackDataAi> trainingData;
     private List<Course> courses;
     
-    // Thứ tự ưu tiên thuộc tính: training_goals luôn được xem xét đầu tiên
+    // Thứ tự ưu tiên thuộc tính: training_goals là quan trọng nhất, training_frequency là thứ 2
+    // Loại bỏ waist_circumference và chest_circumference vì chỉ dùng để đánh giá hiệu quả sau tập
     private static final List<String> ATTRIBUTE_PRIORITY = Arrays.asList(
-        "training_goals",    // Quan trọng nhất - mục tiêu tập luyện
+        "training_goals",    // Quan trọng nhất - mục tiêu tập luyện (thuộc tính chính)
+        "training_frequency", // Quan trọng thứ 2 - tần suất tập luyện (thuộc tính phụ quan trọng)
         "body_type",         // Thể hình hiện tại
         "training_history",  // Kinh nghiệm tập luyện
         "age",              // Độ tuổi
@@ -33,11 +35,8 @@ public class C45DecisionTree {
         "gender",           // Giới tính
         "occupation",       // Nghề nghiệp
         "work_environment", // Môi trường làm việc
-        "training_frequency", // Tần suất tập (từ form)
         "height",           // Chiều cao
-        "weight",           // Cân nặng
-        "waist_circumference", // Vòng eo
-        "chest_circumference"  // Vòng ngực
+        "weight"            // Cân nặng
     );
     
     // Mapping training goals với các khóa học phù hợp
@@ -116,14 +115,19 @@ public class C45DecisionTree {
      */
     private TreeNode buildC45TreeRecursive(List<TrackDataAi> data, List<String> remainingAttributes) {
         if (data.isEmpty()) {
+            logger.warn("Empty dataset encountered in tree building");
             return null;
         }
         
         // Kiểm tra stopping conditions
         double entropy = calculateEntropyByCourse(data);
+        logger.debug("Current entropy: {} for {} samples", entropy, data.size());
+        
         if (entropy <= MIN_ENTROPY_THRESHOLD || 
             data.size() < MIN_SAMPLES_FOR_SPLIT || 
             remainingAttributes.isEmpty()) {
+            logger.debug("Stopping condition met: entropy={}, samples={}, remaining_attributes={}", 
+                entropy, data.size(), remainingAttributes.size());
             return createMajorityCourseLeafNode(data);
         }
         
@@ -134,12 +138,14 @@ public class C45DecisionTree {
             .collect(Collectors.toSet());
         
         if (uniqueCourses.size() <= 1) {
+            logger.debug("All samples have same course_id, creating leaf node");
             return createMajorityCourseLeafNode(data);
         }
         
         // Tìm thuộc tính tốt nhất để split
         String bestAttribute = findBestAttributeC45(data, remainingAttributes);
         if (bestAttribute == null) {
+            logger.warn("No valid attribute found for splitting, creating leaf node");
             return createMajorityCourseLeafNode(data);
         }
         
@@ -153,42 +159,120 @@ public class C45DecisionTree {
         Map<Object, List<TrackDataAi>> subsets = partitionDataByAttribute(data, bestAttribute);
         Map<Object, TreeNode> children = new HashMap<>();
         
+        // Kiểm tra nếu không thể phân chia dữ liệu
+        if (subsets.isEmpty() || subsets.size() == 1) {
+            logger.warn("Attribute {} cannot split data effectively, creating leaf node", bestAttribute);
+            return createMajorityCourseLeafNode(data);
+        }
+        
         // Loại bỏ thuộc tính đã sử dụng
         List<String> newRemainingAttributes = new ArrayList<>(remainingAttributes);
         newRemainingAttributes.remove(bestAttribute);
+        
+        logger.debug("Building children for attribute {} with {} subsets", bestAttribute, subsets.size());
         
         for (Map.Entry<Object, List<TrackDataAi>> entry : subsets.entrySet()) {
             Object attributeValue = entry.getKey();
             List<TrackDataAi> subset = entry.getValue();
             
             if (!subset.isEmpty()) {
+                logger.debug("Processing subset for value: {} with {} samples", attributeValue, subset.size());
                 TreeNode childNode = buildC45TreeRecursive(subset, newRemainingAttributes);
                 if (childNode != null) {
                     children.put(attributeValue, childNode);
+                } else {
+                    logger.warn("Child node creation failed for value: {}", attributeValue);
                 }
             }
         }
         
+        // Kiểm tra nếu không có children nào được tạo thành công
+        if (children.isEmpty()) {
+            logger.warn("No valid children created for attribute {}, creating leaf node", bestAttribute);
+            return createMajorityCourseLeafNode(data);
+        }
+        
         node.setChildren(children);
+        logger.debug("Successfully created node for attribute {} with {} children", bestAttribute, children.size());
         return node;
     }
     
     /**
-     * Tìm thuộc tính tốt nhất sử dụng Gain Ratio (C4.5)
+     * Tìm thuộc tính tốt nhất sử dụng Gain Ratio (C4.5) với ưu tiên training_goals và training_frequency
      */
     private String findBestAttributeC45(List<TrackDataAi> data, List<String> attributes) {
         String bestAttribute = null;
         double bestGainRatio = -1.0;
+        int validAttributeCount = 0;
         
+        // Ưu tiên training_goals và training_frequency - kiểm tra trước với bonus
+        for (String priorityAttribute : Arrays.asList("training_goals", "training_frequency")) {
+            if (attributes.contains(priorityAttribute) && TrackDataAi.isValidAttribute(priorityAttribute)) {
+                double gainRatio = calculateGainRatio(data, priorityAttribute);
+                logger.debug("Priority Attribute: {}, Gain Ratio: {}", priorityAttribute, gainRatio);
+                
+                // Nếu training_goals hoặc training_frequency có gain ratio dương, ưu tiên chọn
+                if (gainRatio > 0) {
+                    // Thêm bonus cho training_goals và training_frequency
+                    double adjustedGainRatio = gainRatio;
+                    if ("training_goals".equals(priorityAttribute)) {
+                        adjustedGainRatio = gainRatio * 1.5; // Bonus 50% cho training_goals
+                        logger.debug("Adjusted gain ratio for training_goals: {} -> {}", gainRatio, adjustedGainRatio);
+                    } else if ("training_frequency".equals(priorityAttribute)) {
+                        adjustedGainRatio = gainRatio * 1.3; // Bonus 30% cho training_frequency
+                        logger.debug("Adjusted gain ratio for training_frequency: {} -> {}", gainRatio, adjustedGainRatio);
+                    }
+                    
+                    if (adjustedGainRatio > bestGainRatio) {
+                        bestGainRatio = adjustedGainRatio;
+                        bestAttribute = priorityAttribute;
+                        logger.info("🎯 Selected priority attribute: {} with adjusted gain ratio: {}", priorityAttribute, adjustedGainRatio);
+                    }
+                }
+            }
+        }
+        
+        // Nếu đã chọn được thuộc tính ưu tiên, trả về luôn
+        if (bestAttribute != null && (bestAttribute.equals("training_goals") || bestAttribute.equals("training_frequency"))) {
+            logger.info("🚀 Using priority attribute {} for tree split", bestAttribute);
+            return bestAttribute;
+        }
+        
+        // Nếu chưa có thuộc tính ưu tiên phù hợp, tiếp tục kiểm tra các thuộc tính khác
         for (String attribute : attributes) {
-            if (TrackDataAi.isValidAttribute(attribute)) {
+            if (TrackDataAi.isValidAttribute(attribute) && 
+                !attribute.equals("training_goals") && 
+                !attribute.equals("training_frequency")) {
+                validAttributeCount++;
                 double gainRatio = calculateGainRatio(data, attribute);
                 
                 logger.debug("Attribute: {}, Gain Ratio: {}", attribute, gainRatio);
                 
-                if (gainRatio > bestGainRatio) {
+                // Only consider positive gain ratios
+                if (gainRatio > bestGainRatio && gainRatio > 0) {
                     bestGainRatio = gainRatio;
                     bestAttribute = attribute;
+                }
+            }
+        }
+        
+        if (validAttributeCount == 0) {
+            logger.warn("No valid attributes found for selection");
+            return null;
+        }
+        
+        if (bestAttribute == null) {
+            logger.warn("No attribute with positive gain ratio found. Best gain ratio was: {}", bestGainRatio);
+            
+            // If no positive gain ratio found, try to select the attribute with highest (least negative) value
+            bestGainRatio = Double.NEGATIVE_INFINITY;
+            for (String attribute : attributes) {
+                if (TrackDataAi.isValidAttribute(attribute)) {
+                    double gainRatio = calculateGainRatio(data, attribute);
+                    if (gainRatio > bestGainRatio) {
+                        bestGainRatio = gainRatio;
+                        bestAttribute = attribute;
+                    }
                 }
             }
         }
@@ -204,11 +288,23 @@ public class C45DecisionTree {
         double informationGain = calculateInformationGain(data, attribute);
         double splitInfo = calculateSplitInfo(data, attribute);
         
-        if (splitInfo == 0) {
-            return informationGain > 0 ? Double.MAX_VALUE : 0;
+        // Handle edge cases for better algorithm stability
+        if (splitInfo == 0 || Double.isNaN(splitInfo) || Double.isInfinite(splitInfo)) {
+            // If splitInfo is 0, the attribute doesn't split the data meaningfully
+            // Return a small gain ratio based on information gain only
+            return informationGain > 0 ? informationGain * 0.1 : 0.0;
         }
         
-        return informationGain / splitInfo;
+        double gainRatio = informationGain / splitInfo;
+        
+        // Sanity check for numerical stability
+        if (Double.isNaN(gainRatio) || Double.isInfinite(gainRatio)) {
+            logger.warn("Invalid gain ratio calculated for attribute {}: informationGain={}, splitInfo={}", 
+                attribute, informationGain, splitInfo);
+            return 0.0;
+        }
+        
+        return gainRatio;
     }
     
     /**
@@ -233,7 +329,7 @@ public class C45DecisionTree {
      * Tính toán entropy dựa trên phân bố course_id
      */
     private double calculateEntropyByCourse(List<TrackDataAi> data) {
-        if (data.isEmpty()) {
+        if (data == null || data.isEmpty()) {
             return 0.0;
         }
         
@@ -246,6 +342,12 @@ public class C45DecisionTree {
             ));
         
         if (courseCounts.isEmpty()) {
+            logger.debug("No courses found in data subset, entropy = 0");
+            return 0.0;
+        }
+        
+        // If all samples have the same course, entropy is 0
+        if (courseCounts.size() == 1) {
             return 0.0;
         }
         
@@ -255,9 +357,17 @@ public class C45DecisionTree {
         for (Long count : courseCounts.values()) {
             if (count > 0) {
                 double probability = count / totalCount;
-                entropy -= probability * (Math.log(probability) / Math.log(2));
+                // Add small epsilon to prevent log(0)
+                double logValue = Math.log(probability) / Math.log(2);
+                entropy -= probability * logValue;
             }
         }
+        
+        // Ensure entropy is not negative due to floating point errors
+        entropy = Math.max(0.0, entropy);
+        
+        logger.debug("Calculated entropy: {} for {} courses with distribution: {}", 
+            entropy, courseCounts.size(), courseCounts);
         
         return entropy;
     }
@@ -267,15 +377,35 @@ public class C45DecisionTree {
      */
     private double calculateSplitInfo(List<TrackDataAi> data, String attribute) {
         Map<Object, List<TrackDataAi>> subsets = partitionDataByAttribute(data, attribute);
+        
+        if (subsets.isEmpty()) {
+            logger.debug("No subsets created for attribute {}, split info = 0", attribute);
+            return 0.0;
+        }
+        
+        // If all data goes to one subset, no information is gained from splitting
+        if (subsets.size() == 1) {
+            return 0.0;
+        }
+        
         double totalSize = data.size();
         double splitInfo = 0.0;
         
         for (List<TrackDataAi> subset : subsets.values()) {
             if (!subset.isEmpty()) {
                 double proportion = subset.size() / totalSize;
-                splitInfo -= proportion * (Math.log(proportion) / Math.log(2));
+                if (proportion > 0) {
+                    double logValue = Math.log(proportion) / Math.log(2);
+                    splitInfo -= proportion * logValue;
+                }
             }
         }
+        
+        // Ensure split info is not negative
+        splitInfo = Math.max(0.0, splitInfo);
+        
+        logger.debug("Split info for attribute {}: {} (subsets: {})", 
+            attribute, splitInfo, subsets.size());
         
         return splitInfo;
     }
@@ -284,9 +414,46 @@ public class C45DecisionTree {
      * Phân chia dữ liệu theo giá trị của thuộc tính
      */
     private Map<Object, List<TrackDataAi>> partitionDataByAttribute(List<TrackDataAi> data, String attribute) {
-        return data.stream()
-            .filter(d -> d.getAttributeValue(attribute) != null)
-            .collect(Collectors.groupingBy(d -> d.getAttributeValue(attribute)));
+        if (!TrackDataAi.isValidAttribute(attribute)) {
+            logger.warn("Invalid attribute for partitioning: {}", attribute);
+            return new HashMap<>();
+        }
+        
+        Map<Object, List<TrackDataAi>> partitions = data.stream()
+            .filter(item -> item.getAttributeValue(attribute) != null)
+            .collect(Collectors.groupingBy(item -> item.getAttributeValue(attribute)));
+        
+        // Đặc biệt logging cho training_goals và training_frequency để đảm bảo phân chia hiệu quả
+        if ("training_goals".equals(attribute) || "training_frequency".equals(attribute)) {
+            logger.info("📊 Partitioning by {} created {} groups:", attribute, partitions.size());
+            for (Map.Entry<Object, List<TrackDataAi>> entry : partitions.entrySet()) {
+                Object key = entry.getKey();
+                List<TrackDataAi> subset = entry.getValue();
+                
+                // Phân tích phân bố khóa học trong từng nhóm
+                Map<Integer, Long> courseDistribution = subset.stream()
+                    .filter(d -> d.getCourse() != null)
+                    .collect(Collectors.groupingBy(
+                        d -> d.getCourse().getCourseId(), 
+                        Collectors.counting()
+                    ));
+                
+                logger.info("  {} = {} (samples: {}, courses: {})", 
+                    key, subset.size(), subset.size(), courseDistribution.size());
+                
+                // Log top courses cho từng nhóm để verify sự khác biệt
+                String topCourses = courseDistribution.entrySet().stream()
+                    .sorted(Map.Entry.<Integer, Long>comparingByValue().reversed())
+                    .limit(3)
+                    .map(e -> e.getKey() + "(" + e.getValue() + ")")
+                    .collect(Collectors.joining(", "));
+                logger.debug("    Top courses: {}", topCourses);
+            }
+        }
+        
+        logger.debug("Partitioned {} records into {} groups by attribute: {}", 
+            data.size(), partitions.size(), attribute);
+        return partitions;
     }
     
     /**
@@ -483,6 +650,16 @@ public class C45DecisionTree {
             }
         }
         
+        // Chuẩn hóa training_frequency với mapping chính xác
+        Object trainingFrequency = userData.get("training_frequency");
+        if (trainingFrequency != null) {
+            String frequency = trainingFrequency.toString().trim();
+            // Map các giá trị training_frequency về format chuẩn trong database
+            String normalizedFrequency = normalizeTrainingFrequency(frequency);
+            userData.put("training_frequency", normalizedFrequency);
+            logger.debug("🔄 Normalized training_frequency: {} -> {}", frequency, normalizedFrequency);
+        }
+        
         // Chuẩn hóa body_type
         Object bodyType = userData.get("body_type");
         if (bodyType == null || bodyType.toString().trim().isEmpty()) {
@@ -509,6 +686,36 @@ public class C45DecisionTree {
                 userData.put("bmi_category", "Obese");
             }
         }
+        
+        logger.debug("🔧 User data after normalization: training_goals={}, training_frequency={}, body_type={}", 
+            userData.get("training_goals"), userData.get("training_frequency"), userData.get("body_type"));
+    }
+    
+    /**
+     * Chuẩn hóa training_frequency về format chuẩn
+     */
+    private String normalizeTrainingFrequency(String frequency) {
+        if (frequency == null || frequency.trim().isEmpty()) {
+            return "Moderate";
+        }
+        
+        String freq = frequency.toLowerCase().trim();
+        
+        // Map các giá trị có thể về format chuẩn
+        if (freq.contains("never") || freq.equals("0") || freq.contains("không bao giờ")) {
+            return "Never";
+        } else if (freq.contains("occasionally") || freq.equals("1") || freq.contains("thỉnh thoảng")) {
+            return "Occasionally";
+        } else if (freq.contains("moderate") || freq.equals("2") || freq.contains("vừa phải")) {
+            return "Moderate";
+        } else if (freq.contains("regularly") || freq.equals("3") || freq.contains("thường xuyên")) {
+            return "Regularly";
+        } else if (freq.contains("advanced") || freq.equals("4") || freq.contains("nâng cao")) {
+            return "Advanced";
+        }
+        
+        // Default fallback
+        return "Moderate";
     }
     
     /**

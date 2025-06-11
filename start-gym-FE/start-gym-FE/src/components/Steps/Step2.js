@@ -41,13 +41,13 @@ const Step2 = ({ formData, handleChange, handleNext, handlePrevious }) => {
     const [gender, setGender] = useState(formData.gender === 'Male' ? 'Nam' : formData.gender === 'Female' ? 'Nữ' : '');
 
     const steps = [
-        'Thông tin tập luyện',
-        'Thông tin cơ bản', 
-        'Mục tiêu tập luyện',
-        'Tần suất mong muốn',
-        'Thông tin nghề nghiệp',
-        'Số đo cơ thể',
-        'Kết quả phân tích'
+        '1',
+        '2', 
+        '3',
+        '4',
+        '5',
+        '6',
+        '7'
     ];
 
     const handleHeightChange = (e) => {
@@ -153,10 +153,14 @@ const Step2 = ({ formData, handleChange, handleNext, handlePrevious }) => {
                     <Stepper activeStep={1} alternativeLabel>
                         {steps.map((label, index) => (
                             <Step key={label}>
-                                <StepLabel>
-                                    <Typography variant="caption" sx={{ fontSize: '0.75rem' }}>
-                                        {label}
-                                    </Typography>
+                                <StepLabel
+                                    sx={{
+                                        '& .MuiStepLabel-label': {
+                                            display: 'none', // Hide the step label text
+                                        },
+                                    }}
+                                >
+                                    {/* No label text */}
                                 </StepLabel>
                             </Step>
                         ))}

@@ -155,6 +155,10 @@ public class CustomerDayCompletionController {
                 completion = completionService.markDayAsCompleted(customerId, courseId, dayId);
             }
             
+            // Kiểm tra xem course có được hoàn thành sau khi toggle này không
+            boolean isCourseCompleted = completionService.isCourseFullyCompleted(customerId, courseId);
+            boolean isLastDay = completionService.isLastDayOfCourse(courseId, dayId);
+            
             // Tạo response đơn giản để tránh lỗi serialization
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
@@ -162,6 +166,17 @@ public class CustomerDayCompletionController {
             response.put("isCompleted", completion.getIsCompleted());
             response.put("completionDate", completion.getCompletionDate());
             response.put("message", "Điểm danh thành công");
+            
+            // QUAN TRỌNG: Thông báo frontend nếu course vừa được hoàn thành
+            if (completion.getIsCompleted() && isLastDay && isCourseCompleted) {
+                response.put("courseCompleted", true);
+                response.put("requiresMeasurement", true);
+                response.put("courseId", courseId);
+                response.put("message", "Chúc mừng! Bạn đã hoàn thành khóa học. Vui lòng cập nhật chỉ số cơ thể sau khi tập.");
+            } else {
+                response.put("courseCompleted", false);
+                response.put("requiresMeasurement", false);
+            }
             
             return ResponseEntity.ok(response);
             

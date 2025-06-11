@@ -39,6 +39,17 @@
   transform: none;
 }
 
+/* VIP Rejoin Button Style */
+.vip-rejoin-btn {
+  background: linear-gradient(45deg, #FFD700, #FFA500) !important;
+  color: #000 !important;
+  box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3) !important;
+}
+
+.vip-rejoin-btn:hover:not(:disabled) {
+  box-shadow: 0 6px 20px rgba(255, 215, 0, 0.4);
+}
+
 .join-icon {
   font-size: 16px;
 }

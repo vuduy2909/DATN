@@ -1,8 +1,9 @@
 package com.capstone.wellnessnavigatorgym.dto.customer;
 
 import com.capstone.wellnessnavigatorgym.entity.Account;
-import com.capstone.wellnessnavigatorgym.entity.Cart;
 import com.capstone.wellnessnavigatorgym.entity.CustomerType;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -20,6 +21,7 @@ import java.time.LocalDate;
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class CustomerInfo {
 
     private Integer customerId;
@@ -47,10 +49,7 @@ public class CustomerInfo {
     @NotNull(message = "Please enter date of birth")
     private Date dateOfBirth;
 
-    @NotBlank(message = "Passport/ID card cannot be blank")
-    @Pattern(regexp = "^(001|002|004|006|008|010|011|012|014|015|017|019|020|022|024|025|026|027|030|031|033|034|035|036|037|038|040|042|044|045|046|048|049|051|052|054|056|058|060|062|064|066|067|068|070|072|074|075|077|079|080|082|083|084|086|087|089|091|092|093|094|095|096)([0-9])(00|0[0-9]|1[0-9]|2[0-9]|3[0-9]|4[0-9]|5[0-9]|6[0-9]|7[0-9]|8[0-9]|9[0-9])([0-9]{6})$",
-            message = "Passport/ID card must have 12 numbers")
-    private String idCard;
+
 
     @NotBlank(message = "Please enter your address")
     @Length(min = 5,max = 100, message = "The address must be at least 5 and maximum 100 characters")
@@ -64,8 +63,13 @@ public class CustomerInfo {
     @NotNull(message = "Please select customer type")
     private CustomerType customerType;
 
+    private Integer customerTypeId;
+
     private Account account;
-    private Cart cart;
+
+    // Field to handle frontend sending username but ignore it during JSON parsing
+    @JsonIgnore
+    private String username;
 
     public void validate(Object target, Errors errors) {
         CustomerInfo customerInfo = (CustomerInfo) target;

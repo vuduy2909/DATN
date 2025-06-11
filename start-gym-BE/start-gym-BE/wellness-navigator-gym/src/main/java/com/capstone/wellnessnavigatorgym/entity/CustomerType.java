@@ -4,10 +4,7 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
+import javax.persistence.*;
 
 @Entity
 @Setter
@@ -15,8 +12,12 @@ import javax.persistence.Id;
 @RequiredArgsConstructor
 public class CustomerType {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "customer_type_id")
     private Integer customerTypeId;
+    
+    @Column(name = "customer_type_name", unique = true, nullable = false)
     private String customerTypeName;
+    
+    @Column(name = "price", nullable = false)
     private Double price;
 }

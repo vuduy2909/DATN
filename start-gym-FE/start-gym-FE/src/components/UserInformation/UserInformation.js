@@ -100,14 +100,27 @@ const UserInformation = () => {
                 if (dashboardResponse) {
                     setDashboardStats(dashboardResponse);
                     
-                    // Cập nhật dữ liệu biểu đồ
-                    if (dashboardResponse.activityChartData && dashboardResponse.progressChartData) {
+                    // Cập nhật dữ liệu biểu đồ từ API response
+                    if (dashboardResponse.activityChartData) {
                         setActivityChartData(dashboardResponse.activityChartData);
+                    }
+                    
+                    if (dashboardResponse.progressChartData) {
                         setProgressChartData(dashboardResponse.progressChartData);
                     }
                 }
             } catch (error) {
                 console.error("Error fetching dashboard stats:", error);
+                // Fallback to default data if API fails
+                setActivityChartData({
+                    data: [
+                        { day: 'Week 1', activity: 60 },
+                        { day: 'Week 2', activity: 75 },
+                        { day: 'Week 3', activity: 45 },
+                        { day: 'Week 4', activity: 80 }
+                    ]
+                });
+                setProgressChartData({ percentage: 0, completed: 0, total: 0 });
             }
         };
 
@@ -117,7 +130,7 @@ const UserInformation = () => {
     }, [user])
 
     // Enhanced stat card component
-    const StatCard = ({ title, value, icon, color, gradient }) => (
+    const StatCard = ({ title, value, subtitle, icon, color, gradient }) => (
         <Grow in timeout={600}>
             <Card 
                 elevation={8}
@@ -155,9 +168,16 @@ const UserInformation = () => {
                         </Box>
                     </Box>
                     
-                    <Typography variant="h3" component="div" sx={{ fontWeight: 'bold', fontSize: '2rem' }}>
-                        {value}
-                    </Typography>
+                    <Box>
+                        <Typography variant="h3" component="div" sx={{ fontWeight: 'bold', fontSize: '2rem' }}>
+                            {value}
+                        </Typography>
+                        {subtitle && (
+                            <Typography variant="body2" sx={{ opacity: 0.85, mt: 0.5 }}>
+                                {subtitle}
+                            </Typography>
+                        )}
+                    </Box>
                 </CardContent>
                 
                 {/* Decorative elements */}
@@ -296,23 +316,18 @@ const UserInformation = () => {
 
                         {/* Stats Cards */}
                         <Grid container spacing={3} sx={{ mb: 4 }}>
-                            <Grid item xs={12} sm={6} md={3}>
+                            <Grid item xs={12} sm={6} md={4}>
                                 <StatCard
                                     title="Weekly Activity"
-                                    value={dashboardStats?.weeklyActivity ? `${Math.round(dashboardStats.weeklyActivity)}%` : "35%"}
+                                    value={dashboardStats?.weeklyActivity ? `${Math.round(dashboardStats.weeklyActivity)}%` : "0%"}
+                                    subtitle={dashboardStats?.completedSessions && dashboardStats?.targetSessions 
+                                        ? `${dashboardStats.completedSessions}/${dashboardStats.targetSessions} buổi`
+                                        : "0/3 buổi"}
                                     icon={<TrendingUp />}
                                     gradient={`linear-gradient(135deg, ${redThemeColors.primary} 0%, ${redThemeColors.secondary} 100%)`}
                                 />
                             </Grid>
-                            <Grid item xs={12} sm={6} md={3}>
-                                <StatCard
-                                    title="Worked This Week"
-                                    value={dashboardStats?.workedTimeThisWeek || "40:00:05"}
-                                    icon={<Schedule />}
-                                    gradient={`linear-gradient(135deg, ${redThemeColors.warning} 0%, #e67e22 100%)`}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={6} md={3}>
+                            <Grid item xs={12} sm={6} md={4}>
                                 <StatCard
                                     title="Course In Progress"
                                     value={dashboardStats?.coursesInProgress || lengthCourse}
@@ -320,7 +335,7 @@ const UserInformation = () => {
                                     gradient={`linear-gradient(135deg, ${redThemeColors.info} 0%, #2980b9 100%)`}
                                 />
                             </Grid>
-                            <Grid item xs={12} sm={6} md={3}>
+                            <Grid item xs={12} sm={6} md={4}>
                                 <StatCard
                                     title="BMI"
                                     value={dashboardStats?.bmi ? Number(dashboardStats.bmi).toFixed(2) : recommendedCourse?.bmi ? Number(recommendedCourse.bmi).toFixed(2) : '0.00'}

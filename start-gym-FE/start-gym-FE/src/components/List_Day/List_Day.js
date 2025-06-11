@@ -42,6 +42,12 @@ const List_Day = () => {
     currentStatus: false
   });
 
+  // State to show join course dialog
+  const [joinCourseDialog, setJoinCourseDialog] = useState({
+    open: false,
+    message: ''
+  });
+
   const closeReviewPopup = () => {
     setReviewPopupOpen(false);
   };
@@ -119,12 +125,8 @@ const List_Day = () => {
       } catch (error) {
         console.log("Error fetching user information", error);
         
-        // Fallback: extract user info from JWT token or use default
-        if (user && typeof user === 'string') {
-          // If user is JWT token, try to decode or use a default customerId
-          console.log("Using fallback customerId = 1 for testing");
-          setCustomerId(1); // Default for testing
-        } else if (user && user.customerId) {
+        // Try to get customerId from user object if available
+        if (user && user.customerId) {
           setCustomerId(user.customerId);
         }
       }
@@ -155,35 +157,34 @@ const List_Day = () => {
         setDays(courseWithCompletion.days);
         console.log('Days with completion loaded successfully:', courseWithCompletion);
       } catch (err) {
-        console.log('Error loading days with completion:', err);
-        console.log('Error details:', err.response?.data, err.response?.status);
+        console.log('Error loading days:', err);
         // Fallback to old API if new one fails
         try {
           console.log('Falling back to old API...');
           const daysOfCourse = await collectionService.getDays(courseId);
           console.log('Old API response:', daysOfCourse);
           
-          // Tạo mock completion data cho testing
-          const mockCourseData = {
+          // Use the real data from the old API without mock modifications
+          const courseData = {
             courseId: parseInt(courseId),
-            courseName: daysOfCourse.courseName || 'Test Course',
+            courseName: daysOfCourse.courseName || 'Course',
             days: daysOfCourse.days || [],
             totalDays: daysOfCourse.days?.length || 0,
             completedDays: 0,
             completionPercentage: 0.0
           };
           
-          // Thêm isCompleted = false cho tất cả ngày
-          if (mockCourseData.days) {
-            mockCourseData.days = mockCourseData.days.map(day => ({
+          // Mark all days as not completed if not provided by API
+          if (courseData.days) {
+            courseData.days = courseData.days.map(day => ({
               ...day,
-              isCompleted: false
+              isCompleted: day.isCompleted || false
             }));
           }
           
-          setCourseData(mockCourseData);
-          setDays(mockCourseData.days);
-          console.log('Days loaded successfully (fallback with mock completion):', mockCourseData);
+          setCourseData(courseData);
+          setDays(courseData.days);
+          console.log('Days loaded successfully (fallback):', courseData);
         } catch (fallbackErr) {
           console.log('Error loading days (fallback):', fallbackErr);
         }
@@ -302,8 +303,30 @@ const List_Day = () => {
       // Hiển thị thông báo lỗi từ backend
       const errorMessage = error.response?.data?.message || 
                          'Không thể cập nhật trạng thái điểm danh. Vui lòng thử lại.';
-      showSnackbar(errorMessage, 'error');
+                         
+      // Check if the error is about not being enrolled in the course
+      if (errorMessage.includes("chưa tham gia khóa học")) {
+        // Show join course dialog instead of snackbar
+        setJoinCourseDialog({
+          open: true,
+          message: errorMessage
+        });
+      } else {
+        // Show regular error in snackbar
+        showSnackbar(errorMessage, 'error');
+      }
     }
+  };
+
+  const handleJoinCourse = () => {
+    // Close dialog
+    setJoinCourseDialog({
+      open: false,
+      message: ''
+    });
+    
+    // Redirect to course detail page to join
+    window.location.href = `/collections/${courseId}`;
   };
 
   useEffect(() => {
@@ -457,6 +480,45 @@ const List_Day = () => {
             sx={{ borderRadius: '8px', minWidth: '80px' }}
           >
             Điểm danh
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Join Course Dialog */}
+      <Dialog
+        open={joinCourseDialog.open}
+        onClose={() => setJoinCourseDialog({open: false, message: ''})}
+        aria-labelledby="join-course-dialog-title"
+        PaperProps={{
+          style: {
+            borderRadius: '12px',
+            padding: '8px'
+          }
+        }}
+      >
+        <DialogTitle id="join-course-dialog-title" sx={{ textAlign: 'center', paddingBottom: 1 }}>
+          🏋️‍♀️ Chưa tham gia khóa học
+        </DialogTitle>
+        <DialogContent sx={{ textAlign: 'center', paddingY: 2 }}>
+          <Typography variant="body1">
+            {joinCourseDialog.message}
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center', gap: 1, paddingBottom: 2 }}>
+          <Button 
+            onClick={() => setJoinCourseDialog({open: false, message: ''})}
+            variant="outlined"
+            sx={{ borderRadius: '8px', minWidth: '80px' }}
+          >
+            Hủy
+          </Button>
+          <Button 
+            onClick={handleJoinCourse}
+            variant="contained"
+            color="primary"
+            sx={{ borderRadius: '8px', minWidth: '120px' }}
+          >
+            Tham gia khóa học
           </Button>
         </DialogActions>
       </Dialog>

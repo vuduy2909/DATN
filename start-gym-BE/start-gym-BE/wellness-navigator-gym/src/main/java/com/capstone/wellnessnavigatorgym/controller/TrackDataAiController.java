@@ -97,27 +97,45 @@ public class TrackDataAiController {
 
     // Simple DTO classes to replace missing ones
     public static class RecommendationDTO {
-        private Course recommendedCourses;
+        private Course recommendedCourse; // Đổi tên từ recommendedCourses
+        private Course recommendedCourses; // Giữ để backward compatibility
         private String message;
         private Integer userDataId;
         private UserDataDTO formData; // Thêm field để chứa form data
+        private UserDataDTO userMetrics; // Thêm field userMetrics cho frontend
+        private Map<String, Object> actions; // Thêm actions object cho frontend
         
-        public RecommendationDTO(Course recommendedCourses, String message) {
-            this.recommendedCourses = recommendedCourses;
+        public RecommendationDTO(Course recommendedCourse, String message) {
+            this.recommendedCourse = recommendedCourse;
+            this.recommendedCourses = recommendedCourse; // Backward compatibility
             this.message = message;
         }
         
-        public RecommendationDTO(Course recommendedCourses, String message, Integer userDataId) {
-            this.recommendedCourses = recommendedCourses;
+        public RecommendationDTO(Course recommendedCourse, String message, Integer userDataId) {
+            this.recommendedCourse = recommendedCourse;
+            this.recommendedCourses = recommendedCourse; // Backward compatibility
             this.message = message;
             this.userDataId = userDataId;
         }
         
+        public Course getRecommendedCourse() { return recommendedCourse; }
         public Course getRecommendedCourses() { return recommendedCourses; }
         public String getMessage() { return message; }
         public Integer getUserDataId() { return userDataId; }
         public UserDataDTO getFormData() { return formData; }
-        public void setFormData(UserDataDTO formData) { this.formData = formData; }
+        public void setFormData(UserDataDTO formData) { 
+            this.formData = formData; 
+            this.userMetrics = formData; // Set userMetrics as well
+            
+            // Tạo actions object với recommendedCourseId
+            this.actions = new HashMap<>();
+            this.actions.put("formData", formData);
+            if (this.recommendedCourse != null) {
+                this.actions.put("recommendedCourseId", this.recommendedCourse.getCourseId());
+            }
+        }
+        public UserDataDTO getUserMetrics() { return userMetrics; }
+        public Map<String, Object> getActions() { return actions; }
     }
     
     public static class UserFormDataDTO {
@@ -560,19 +578,47 @@ public class TrackDataAiController {
         
         // Save the recommended course if available - USING FULL COURSE OBJECT
         if (dto.getRecommendedCourseId() != null) {
+            logger.info("=== ENHANCED COURSE OBJECT CREATION ===");
+            logger.info("Processing course ID: {}", dto.getRecommendedCourseId());
+            
             try {
                 // Lấy đối tượng Course đầy đủ từ database thay vì chỉ tạo Course với ID
                 Course course = courseService.findCourseById(dto.getRecommendedCourseId());
-                userDataAi.setCourse(course);
-                logger.info("Retrieved and set full course object with ID: {} and name: {}", 
-                    course.getCourseId(), course.getCourseName());
+                
+                if (course != null) {
+                    userDataAi.setCourse(course);
+                    logger.info("✅ Retrieved and set full course object with ID: {} and name: {}", 
+                        course.getCourseId(), course.getCourseName());
+                } else {
+                    logger.warn("⚠️ Course not found in database with ID: {}", dto.getRecommendedCourseId());
+                    // Fallback: Tạo Course với ID nhưng với validation
+                    Course fallbackCourse = new Course(dto.getRecommendedCourseId());
+                    userDataAi.setCourse(fallbackCourse);
+                    logger.warn("Using fallback: Set course with ID only: {}", dto.getRecommendedCourseId());
+                }
+            } catch (IllegalArgumentException e) {
+                logger.error("❌ Invalid course ID (null): {}", dto.getRecommendedCourseId());
+                throw new RuntimeException("Course ID cannot be null when creating Course object", e);
             } catch (Exception e) {
-                logger.error("Failed to retrieve course with ID: {}. Error: {}", dto.getRecommendedCourseId(), e.getMessage());
-                // Fallback: Vẫn tạo Course chỉ với ID trong trường hợp lỗi
-                Course course = new Course(dto.getRecommendedCourseId());
-                userDataAi.setCourse(course);
-                logger.warn("Using fallback: Set course with ID only: {}", dto.getRecommendedCourseId());
+                logger.error("❌ Failed to retrieve course with ID: {}. Error: {}", dto.getRecommendedCourseId(), e.getMessage());
+                
+                                 // Enhanced fallback with proper validation
+                 if (dto.getRecommendedCourseId() != null) {
+                     try {
+                         Course fallbackCourse2 = new Course(dto.getRecommendedCourseId());
+                         userDataAi.setCourse(fallbackCourse2);
+                         logger.warn("Using fallback: Set course with ID only: {}", dto.getRecommendedCourseId());
+                     } catch (IllegalArgumentException fallbackError) {
+                         logger.error("❌ Fallback also failed due to null course ID");
+                         throw new RuntimeException("Cannot create Course object with null ID", fallbackError);
+                     }
+                 } else {
+                     logger.error("❌ Cannot create Course: recommendedCourseId is null");
+                     throw new RuntimeException("Cannot create Course object: recommendedCourseId is null");
+                 }
             }
+            
+            logger.info("=== END ENHANCED COURSE OBJECT CREATION ===");
         } else {
             logger.warn("No recommendedCourseId provided in DTO - course will be null");
         }
@@ -1036,12 +1082,14 @@ public class TrackDataAiController {
         userData.put("bmi", userDataDTO.getBmi());
         userData.put("training_goals", userDataDTO.getTraining_goals());
         userData.put("training_history", userDataDTO.getTraining_history());
+        userData.put("training_frequency", userDataDTO.getTraining_frequency());
         
-        // Các trường mở rộng - đảm bảo tên trường nhất quán với BuildDecisionTree
+        // Các trường mở rộng - đảm bảo tên trường nhất quán với C45DecisionTree
         if (userDataDTO.getHeight() != null) userData.put("height", userDataDTO.getHeight());
         if (userDataDTO.getWeight() != null) userData.put("weight", userDataDTO.getWeight());
-        if (userDataDTO.getWaist_circumference() != null) userData.put("waist_circumference", userDataDTO.getWaist_circumference());
-        if (userDataDTO.getChest_circumference() != null) userData.put("chest_circumference", userDataDTO.getChest_circumference());
+        // Loại bỏ waist_circumference và chest_circumference - chỉ dùng để đánh giá hiệu quả sau tập
+        // if (userDataDTO.getWaist_circumference() != null) userData.put("waist_circumference", userDataDTO.getWaist_circumference());
+        // if (userDataDTO.getChest_circumference() != null) userData.put("chest_circumference", userDataDTO.getChest_circumference());
         if (userDataDTO.getBody_type() != null) userData.put("body_type", userDataDTO.getBody_type());
         if (userDataDTO.getOccupation() != null) userData.put("occupation", userDataDTO.getOccupation());
         if (userDataDTO.getWork_environment() != null) userData.put("work_environment", userDataDTO.getWork_environment());
@@ -1050,17 +1098,16 @@ public class TrackDataAiController {
     }
 
     private List<String> getAttributeNames() {
-        // Lấy tất cả các thuộc tính, sau đó lọc chỉ giữ lại thuộc tính hợp lệ
+        // Lấy tất cả các thuộc tính dùng cho decision tree, loại bỏ waist_circumference và chest_circumference
         return Arrays.asList(
             "age",
             "gender", 
             "bmi",
             "training_goals",
             "training_history",
+            "training_frequency",
             "height",
             "weight",
-            "waist_circumference",
-            "chest_circumference",
             "body_type",
             "occupation",
             "work_environment"
@@ -1430,7 +1477,6 @@ public class TrackDataAiController {
                 "- Đề xuất ít nhất 5 LOẠI BÀI TẬP cụ thể phù hợp với thể trạng và mục tiêu, nêu rõ số hiệp và số lần lặp lại " +
                 "- Hướng dẫn CHẾ ĐỘ DINH DƯỠNG chi tiết: tỷ lệ protein, carbs, chất béo, danh sách thực phẩm cụ thể nên ăn và nên tránh " +
                 "- Gợi ý tần suất tập luyện, thời lượng mỗi buổi và lịch nghỉ ngơi " +
-                "- Đề xuất cách theo dõi tiến độ và điều chỉnh kế hoạch " +
                 
                 "Hãy trả lời BẰNG TIẾNG VIỆT với giọng điệu THÂN THIỆN, CHUYÊN NGHIỆP và ĐẦY ĐỘNG VIÊN.";
 
@@ -1446,11 +1492,11 @@ public class TrackDataAiController {
                 "4. Phân tích điểm mạnh và điểm cần cải thiện " +
                 "5. Dự đoán tình trạng sức khỏe tổng quát dựa trên hình dáng cơ thể " +
                 
-                "🏋️ ĐỀ XUẤT CHI TIẾT (ĐỀ XUẤT PHẢI DÀI VÀ CỤ THỂ): " +
-                "1. Khóa học phù hợp nhất với hình thể này " +
-                "2. 5 bài tập cụ thể (chi tiết số hiệp, số lần) giúp cải thiện nhược điểm " +
-                "3. Chế độ dinh dưỡng chi tiết (tỷ lệ protein/carbs/chất béo, danh sách thực phẩm nên ăn và tránh) " +
-                "4. Tần suất, thời lượng tập luyện lý tưởng và lịch nghỉ ngơi hợp lý " +
+                "🏋️ ĐỀ XUẤT CHI TIẾT (ĐỀ XUẤT PHẢI DÀI VÀ CỤ THỂ - BẮT BUỘC 4 MỤC): " +
+                "1. KHÓA TẬP LUYỆN: Khóa học phù hợp nhất với hình thể này, giải thích lý do chọn " +
+                "2. BÀI TẬP CỤ THỂ: 5 bài tập cụ thể (chi tiết số hiệp, số lần, thời gian nghỉ) giúp cải thiện nhược điểm " +
+                "3. CHẾ ĐỘ DINH DƯỠNG: Chế độ dinh dưỡng chi tiết (tỷ lệ protein/carbs/chất béo, danh sách thực phẩm nên ăn và tránh) " +
+                "4. TẦN SUẤT VÀ LỊCH TẬP: Tần suất tập luyện, thời lượng mỗi buổi, lịch nghỉ ngơi hợp lý theo tuần " +
                 
                 "📱 ĐỊNH DẠNG PHẢN HỒI: " +
                 "- Vui lòng trả lời với định dạng JSON: {\"bodyType\": \"...\", \"analysis\": \"...\", \"recommendations\": \"...\"} " +
@@ -1748,7 +1794,6 @@ public class TrackDataAiController {
                 "- Đề xuất ít nhất 5 LOẠI BÀI TẬP cụ thể phù hợp với thể trạng và mục tiêu, nêu rõ số hiệp và số lần lặp lại " +
                 "- Hướng dẫn CHẾ ĐỘ DINH DƯỠNG chi tiết: tỷ lệ protein, carbs, chất béo, danh sách thực phẩm cụ thể nên ăn và nên tránh " +
                 "- Gợi ý tần suất tập luyện, thời lượng mỗi buổi và lịch nghỉ ngơi " +
-                "- Đề xuất cách theo dõi tiến độ và điều chỉnh kế hoạch " +
                 
                 "Hãy trả lời BẰNG TIẾNG VIỆT với giọng điệu THÂN THIỆN, CHUYÊN NGHIỆP và ĐẦY ĐỘNG VIÊN.";
         requestBody.put("system", systemPrompt);
@@ -1769,11 +1814,11 @@ public class TrackDataAiController {
                 "4. Phân tích điểm mạnh và điểm cần cải thiện " +
                 "5. Dự đoán tình trạng sức khỏe tổng quát dựa trên hình dáng cơ thể " +
                 
-                "🏋️ ĐỀ XUẤT CHI TIẾT (ĐỀ XUẤT PHẢI DÀI VÀ CỤ THỂ): " +
-                "1. Khóa học phù hợp nhất với hình thể này " +
-                "2. 5 bài tập cụ thể (chi tiết số hiệp, số lần) giúp cải thiện nhược điểm " +
-                "3. Chế độ dinh dưỡng chi tiết (tỷ lệ protein/carbs/chất béo, danh sách thực phẩm nên ăn và tránh) " +
-                "4. Tần suất, thời lượng tập luyện lý tưởng và lịch nghỉ ngơi hợp lý " +
+                "🏋️ ĐỀ XUẤT CHI TIẾT (ĐỀ XUẤT PHẢI DÀI VÀ CỤ THỂ - BẮT BUỘC 4 MỤC): " +
+                "1. KHÓA TẬP LUYỆN: Khóa học phù hợp nhất với hình thể này, giải thích lý do chọn " +
+                "2. BÀI TẬP CỤ THỂ: 5 bài tập cụ thể (chi tiết số hiệp, số lần, thời gian nghỉ) giúp cải thiện nhược điểm " +
+                "3. CHẾ ĐỘ DINH DƯỠNG: Chế độ dinh dưỡng chi tiết (tỷ lệ protein/carbs/chất béo, danh sách thực phẩm nên ăn và tránh) " +
+                "4. TẦN SUẤT VÀ LỊCH TẬP: Tần suất tập luyện, thời lượng mỗi buổi, lịch nghỉ ngơi hợp lý theo tuần " +
                 
                 "📱 ĐỊNH DẠNG PHẢN HỒI: " +
                 "- Vui lòng trả lời với định dạng JSON: {\"bodyType\": \"...\", \"analysis\": \"...\", \"recommendations\": \"...\"} " +
@@ -2066,6 +2111,8 @@ public class TrackDataAiController {
     @PostMapping("/confirm-recommendation")
     public ResponseEntity<?> confirmRecommendation(@RequestBody Map<String, Object> requestData) {
         try {
+            logger.info("=== ENHANCED CONFIRM RECOMMENDATION ENDPOINT ===");
+            
             // Lấy formData và recommendedCourseId từ frontend
             UserDataDTO formData = null;
             Integer recommendedCourseId = null;
@@ -2577,18 +2624,92 @@ public class TrackDataAiController {
             String trainingDataMessage = "";
             
             if (!isEffective && (previousEffective || previousEffective != isEffective)) {
-                logger.info("Course was not effective. We should create new training data.");
+                logger.info("Course was not effective. Creating new training data for future recommendations.");
                 
-                // Trong điều kiện thực tế, bạn sẽ cần thêm phương thức vào service để tạo bản ghi TrackDataAi mới
-                // Đây là mô tả những gì cần làm:
-                // 1. Lấy ID lớn nhất từ bảng track_data_ai + 1
-                // 2. Tạo bản ghi TrackDataAi mới với dữ liệu từ userDataAi (sử dụng các giá trị _after)
-                // 3. Chọn một khóa học khác (không phải khóa học hiện tại) làm đề xuất mới
-                // 4. Lưu bản ghi mới vào database
-                
-                // Do phương thức yêu cầu chưa được triển khai, chỉ log thông báo
-                trainingDataMessage = "Hệ thống đã ghi nhận kết quả không hiệu quả và sẽ điều chỉnh cho lần đề xuất tiếp theo.";
-                logger.warn("Creating new TrackDataAi record not implemented yet - requires service method updates");
+                try {
+                    // 1. Lấy ID lớn nhất từ bảng track_data_ai + 1
+                    List<TrackDataAi> allTrainingData = trackDataAiService.getAllTrackDataAi();
+                    Integer maxId = allTrainingData.stream()
+                        .mapToInt(TrackDataAi::getTrackDataAiId)
+                        .max()
+                        .orElse(0);
+                    
+                    // 2. Tạo bản ghi TrackDataAi mới với dữ liệu từ userDataAi (sử dụng các giá trị _after)
+                    TrackDataAi newTrainingRecord = new TrackDataAi();
+                    // ID sẽ được auto-generate bởi database
+                    
+                    // Copy thông tin cơ bản từ userDataAi
+                    newTrainingRecord.setAge(userDataAi.getAge());
+                    newTrainingRecord.setGender(userDataAi.getGender());
+                    newTrainingRecord.setHeight(userDataAi.getHeight());
+                    
+                    // Sử dụng dữ liệu sau khi tập (_after) hoặc dữ liệu gốc nếu không có
+                    newTrainingRecord.setWeight(userDataAi.getWeight_after() != null ? 
+                        userDataAi.getWeight_after() : userDataAi.getWeight());
+                    newTrainingRecord.setChest_circumference(userDataAi.getChest_circumference_after() != null ? 
+                        userDataAi.getChest_circumference_after() : userDataAi.getChest_circumference());
+                    newTrainingRecord.setWaist_circumference(userDataAi.getWaist_circumference_after() != null ? 
+                        userDataAi.getWaist_circumference_after() : userDataAi.getWaist_circumference());
+                    
+                    // Tính BMI mới nếu có weight_after
+                    if (userDataAi.getWeight_after() != null && userDataAi.getHeight() != null) {
+                        double heightInMeters = userDataAi.getHeight() / 100.0;
+                        double newBmi = userDataAi.getWeight_after() / (heightInMeters * heightInMeters);
+                        newTrainingRecord.setBmi(Math.round(newBmi * 100.0) / 100.0);
+                    } else {
+                        newTrainingRecord.setBmi(userDataAi.getBmi());
+                    }
+                    
+                    // Copy thông tin training - TrackDataAi sử dụng String thay vì enum
+                    newTrainingRecord.setTraining_history(userDataAi.getTraining_history());
+                    newTrainingRecord.setTraining_goals(userDataAi.getTraining_goals() != null ? 
+                        userDataAi.getTraining_goals().getDatabaseValue() : null);
+                    newTrainingRecord.setOccupation(userDataAi.getOccupation());
+                    newTrainingRecord.setWork_environment(userDataAi.getWork_environment());
+                    
+                    // 3. Chọn một khóa học khác (không phải khóa học hiện tại) làm đề xuất mới
+                    List<Course> allCourses = courseService.findAll();
+                    Course currentCourse = userDataAi.getCourse();
+                    
+                    Course newRecommendedCourse = null;
+                    if (currentCourse != null && allCourses.size() > 1) {
+                        // Chọn khóa học khác dựa trên training goals
+                        List<Course> alternativeCourses = allCourses.stream()
+                            .filter(course -> !course.getCourseId().equals(currentCourse.getCourseId()))
+                            .collect(Collectors.toList());
+                        
+                        if (!alternativeCourses.isEmpty()) {
+                            // Chọn khóa học đầu tiên phù hợp hoặc random nếu không có logic đặc biệt
+                            newRecommendedCourse = alternativeCourses.get(0);
+                        }
+                    }
+                    
+                    if (newRecommendedCourse != null) {
+                        newTrainingRecord.setCourse(newRecommendedCourse);
+                        newTrainingRecord.setEffective(true); // Khóa học mới bắt đầu với effective=true
+                        
+                        // 4. Lưu bản ghi mới vào database
+                        TrackDataAi savedRecord = trackDataAiService.saveTrackDataAi(newTrainingRecord);
+                        
+                        newTrainingDataCreated = true;
+                        trainingDataMessage = String.format(
+                            "Đã tạo dữ liệu huấn luyện mới (ID: %d) với khóa học thay thế: %s (ID: %d) để cải thiện đề xuất tương lai.",
+                            savedRecord.getTrackDataAiId(),
+                            newRecommendedCourse.getCourseName(),
+                            newRecommendedCourse.getCourseId()
+                        );
+                        
+                        logger.info("✅ Successfully created new TrackDataAi record: ID={}, Course={}", 
+                            savedRecord.getTrackDataAiId(), newRecommendedCourse.getCourseName());
+                    } else {
+                        trainingDataMessage = "Không tìm thấy khóa học thay thế phù hợp để tạo dữ liệu huấn luyện mới.";
+                        logger.warn("No alternative course found for creating new training data");
+                    }
+                    
+                } catch (Exception e) {
+                    logger.error("Failed to create new TrackDataAi record: {}", e.getMessage(), e);
+                    trainingDataMessage = "Lỗi khi tạo dữ liệu huấn luyện mới: " + e.getMessage();
+                }
             }
             
             // Kết quả đánh giá
@@ -2606,6 +2727,7 @@ public class TrackDataAiController {
             // Thêm thông tin về yêu cầu tạo dữ liệu huấn luyện mới (nếu có)
             if (!trainingDataMessage.isEmpty()) {
                 response.put("trainingDataMessage", trainingDataMessage);
+                response.put("newTrainingDataCreated", newTrainingDataCreated);
             }
             
             // Dữ liệu TRƯỚC và SAU để so sánh

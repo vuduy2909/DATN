@@ -54,10 +54,10 @@ const Account = () => {
     const [loadingUser, setLoadingUser] = useState(true);
     const [currentTab, setCurrentTab] = useState(0);
     
-    // StartGym Red Theme Colors with #CF4044
+    // StartGym Red Theme Colors with #e74c3c
     const redTheme = {
-        primary: '#CF4044',      // Main red
-        secondary: '#B8363C',    // Darker red
+        primary: '#e74c3c',      // Main red
+        secondary: '#c0392b',    // Darker red
         accent: '#f39c12',       // Orange accent
         background: '#fdf2f2',   // Very light red background
         cardBg: '#ffffff',       // White cards
@@ -66,7 +66,7 @@ const Account = () => {
         textLight: '#64748b',    // Light gray text
         success: '#27ae60',      // Green for success
         warning: '#f39c12',      // Orange for warning
-        error: '#CF4044'         // Red for errors
+        error: '#e74c3c'         // Red for errors
     };
     
     // Snackbar state for notifications
@@ -98,6 +98,13 @@ const Account = () => {
         confirmPassword: ''
     });
     const [showPasswords, setShowPasswords] = useState({
+        old: false,
+        new: false,
+        confirm: false
+    });
+    
+    // Password field focus states for helperText
+    const [passwordFieldFocus, setPasswordFieldFocus] = useState({
         old: false,
         new: false,
         confirm: false
@@ -154,89 +161,6 @@ const Account = () => {
         }
     }, [user])
 
-    // Separate function to refresh user data
-    const refreshUserData = async () => {
-        try {
-            const res = await request.get('/customer/detail');
-            setUserData(res);
-            setPreviewUrl(res.customerImg);
-            
-            // Process gender properly - handle both string and boolean values
-            let processedGender = '';
-            if (typeof res.customerGender === 'string') {
-                // If it's a string, use it directly (like "Male" or "Female")
-                processedGender = res.customerGender;
-            } else if (typeof res.customerGender === 'boolean') {
-                // If it's boolean, convert to string
-                processedGender = res.customerGender === true ? 'Male' : 'Female';
-            }
-            
-            // Update profile form data with fresh data from server
-            setProfileData({
-                customerEmail: res.customerEmail || '',
-                customerPhone: res.customerPhone || '',
-                customerAddress: res.customerAddress || '',
-                customerGender: processedGender,
-                customerDateOfBirth: res.dateOfBirth ? res.dateOfBirth.split(' ')[0] : ''
-            });
-        } catch (error) {
-            console.log("Error refreshing user information", error);
-        }
-    };
-
-    // Handle profile data change - Using useCallback to prevent re-creation
-    const handleProfileChange = useCallback((field, value) => {
-        setProfileData(prev => ({ ...prev, [field]: value }));
-    }, []);
-
-    // Handle profile update
-    const handleProfileSubmit = async (e) => {
-        e.preventDefault();
-        
-        // Validate email
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(profileData.customerEmail)) {
-            showSnackbar('Vui lòng nhập địa chỉ email hợp lệ', 'error');
-            return;
-        }
-        
-        // Validate phone
-        if (!/^\d{10,11}$/.test(profileData.customerPhone)) {
-            showSnackbar('Số điện thoại phải có 10-11 chữ số', 'error');
-            return;
-        }
-        
-        // Validate date of birth (must be >16 years old)
-        if (profileData.customerDateOfBirth) {
-            const birthDate = new Date(profileData.customerDateOfBirth);
-            const today = new Date();
-            let age = today.getFullYear() - birthDate.getFullYear();
-            const monthDiff = today.getMonth() - birthDate.getMonth();
-            
-            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-                age--;
-            }
-            
-            if (age < 16) {
-                showSnackbar('Bạn phải từ 16 tuổi trở lên', 'error');
-                return;
-            }
-        }
-
-        setLoading(true);
-        try {
-            await request.put('/customer/update-profile', profileData);
-            
-            showSnackbar('Cập nhật hồ sơ thành công! 🎉', 'success');
-            await refreshUserData();
-        } catch (error) {
-            showSnackbar('Cập nhật hồ sơ thất bại. Vui lòng thử lại.', 'error');
-            console.log("Error updating profile", error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
     // Handle avatar upload
     const handleFileSelect = (event) => {
         const file = event.target.files[0];
@@ -265,6 +189,11 @@ const Account = () => {
         setLoading(true);
         const formData = new FormData();
         formData.append('avatar', selectedFile);
+        
+        // Add old avatar URL for deletion if it exists
+        if (userData.customerImg) {
+            formData.append('oldAvatarUrl', userData.customerImg);
+        }
 
         try {
             const response = await request.post('/customer/upload-avatar', formData, {
@@ -275,13 +204,95 @@ const Account = () => {
             
             showSnackbar('Cập nhật ảnh đại diện thành công! 🎉', 'success');
             setSelectedFile(null);
+            
+            // Refresh user data and update preview
             await refreshUserData();
+            
+            // Clear preview URL object to prevent memory leaks
+            if (previewUrl && previewUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(previewUrl);
+            }
         } catch (error) {
-            showSnackbar('Cập nhật ảnh đại diện thất bại. Vui lòng thử lại.', 'error');
+            const errorMessage = error.response?.data?.message || error.response?.data || 'Upload thất bại';
+            showSnackbar(errorMessage, 'error');
             console.log("Error uploading avatar", error);
         } finally {
             setLoading(false);
         }
+    };
+
+    // Refresh user data
+    const refreshUserData = async () => {
+        try {
+            const res = await request.get('/customer/detail');
+            setUserData(res);
+            setPreviewUrl(res.customerImg);
+            
+            // Process gender properly - handle both string and boolean values
+            let processedGender = '';
+            if (typeof res.customerGender === 'string') {
+                processedGender = res.customerGender;
+            } else if (typeof res.customerGender === 'boolean') {
+                processedGender = res.customerGender === true ? 'Male' : 'Female';
+            }
+            
+            // Update profile data
+            setProfileData({
+                customerEmail: res.customerEmail || '',
+                customerPhone: res.customerPhone || '',
+                customerAddress: res.customerAddress || '',
+                customerGender: processedGender,
+                customerDateOfBirth: res.dateOfBirth ? res.dateOfBirth.split(' ')[0] : ''
+            });
+        } catch (error) {
+            console.log("Error refreshing user data", error);
+        }
+    };
+
+    // Handle profile data changes
+    const handleProfileChange = (field, value) => {
+        setProfileData(prev => ({ ...prev, [field]: value }));
+    };
+
+    // Handle profile form submission
+    const handleProfileSubmit = async (e) => {
+        e.preventDefault();
+        
+        setLoading(true);
+        try {
+            await request.put('/customer/update-profile', profileData);
+            showSnackbar('Cập nhật thông tin thành công! 🎉', 'success');
+            await refreshUserData();
+        } catch (error) {
+            const errorMessage = error.response?.data?.message || error.response?.data || 'Cập nhật thất bại';
+            showSnackbar(errorMessage, 'error');
+            console.log("Error updating profile", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Password validation function
+    const validatePassword = (password) => {
+        if (!password) {
+            return 'Mật khẩu là bắt buộc';
+        }
+        if (password.length < 8) {
+            return 'Mật khẩu phải có ít nhất 8 ký tự';
+        }
+        if (!/(?=.*[a-z])/.test(password)) {
+            return 'Mật khẩu phải có ít nhất 1 chữ thường';
+        }
+        if (!/(?=.*[A-Z])/.test(password)) {
+            return 'Mật khẩu phải có ít nhất 1 chữ hoa';
+        }
+        if (!/(?=.*\d)/.test(password)) {
+            return 'Mật khẩu phải có ít nhất 1 số';
+        }
+        if (!/(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?])/.test(password)) {
+            return 'Mật khẩu phải có ít nhất 1 ký tự đặc biệt';
+        }
+        return '';
     };
 
     // Handle password change
@@ -293,8 +304,10 @@ const Account = () => {
             return;
         }
         
-        if (passwordData.newPassword.length < 6) {
-            showSnackbar('Mật khẩu mới phải có ít nhất 6 ký tự', 'error');
+        // Validate new password strength
+        const passwordValidationError = validatePassword(passwordData.newPassword);
+        if (passwordValidationError) {
+            showSnackbar(passwordValidationError, 'error');
             return;
         }
         
@@ -305,7 +318,7 @@ const Account = () => {
 
         setLoading(true);
         try {
-            await request.put('/customer/change-password', {
+            await request.post('/customer/change-password', {
                 oldPassword: passwordData.oldPassword,
                 newPassword: passwordData.newPassword
             });
@@ -314,7 +327,8 @@ const Account = () => {
             setPasswordData({ oldPassword: '', newPassword: '', confirmPassword: '' });
             await refreshUserData();
         } catch (error) {
-            showSnackbar('Đổi mật khẩu thất bại. Vui lòng kiểm tra mật khẩu cũ.', 'error');
+            const errorMessage = error.response?.data?.message || error.response?.data || 'Đổi mật khẩu thất bại. Vui lòng kiểm tra mật khẩu cũ.';
+            showSnackbar(errorMessage, 'error');
             console.log("Error changing password", error);
         } finally {
             setLoading(false);
@@ -323,6 +337,21 @@ const Account = () => {
 
     const togglePasswordVisibility = (field) => {
         setShowPasswords(prev => ({ ...prev, [field]: !prev[field] }));
+    };
+
+    // Handle password field focus for helperText
+    const handlePasswordFocus = (field) => {
+        setPasswordFieldFocus(prev => ({ ...prev, [field]: true }));
+    };
+
+    const handlePasswordBlur = (field) => {
+        // Keep showing helperText even on blur - only hide when field is empty
+        if (field === 'new' && !passwordData.newPassword) {
+            setPasswordFieldFocus(prev => ({ ...prev, [field]: false }));
+        }
+        if (field === 'confirm' && !passwordData.confirmPassword) {
+            setPasswordFieldFocus(prev => ({ ...prev, [field]: false }));
+        }
     };
 
     if (loadingUser) {
@@ -718,7 +747,10 @@ const Account = () => {
                                                                 type={showPasswords.old ? 'text' : 'password'}
                                             value={passwordData.oldPassword}
                                                                 onChange={(e) => setPasswordData(prev => ({ ...prev, oldPassword: e.target.value }))}
+                                                                onFocus={() => handlePasswordFocus('old')}
+                                                                onBlur={() => handlePasswordBlur('old')}
                                                                 variant="outlined"
+                                                                helperText={passwordFieldFocus.old || passwordData.oldPassword ? "Nhập mật khẩu hiện tại của bạn" : ""}
                                                                 InputProps={{
                                                                     endAdornment: (
                                                                         <InputAdornment position="end">
@@ -745,7 +777,10 @@ const Account = () => {
                                                                 type={showPasswords.new ? 'text' : 'password'}
                                             value={passwordData.newPassword}
                                                                 onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                                                                onFocus={() => handlePasswordFocus('new')}
+                                                                onBlur={() => handlePasswordBlur('new')}
                                                                 variant="outlined"
+                                                                helperText={passwordFieldFocus.new || passwordData.newPassword ? "Tối thiểu 8 ký tự, có chữ hoa, chữ thường, số và ký tự đặc biệt" : ""}
                                                                 InputProps={{
                                                                     endAdornment: (
                                                                         <InputAdornment position="end">
@@ -772,7 +807,10 @@ const Account = () => {
                                                                 type={showPasswords.confirm ? 'text' : 'password'}
                                             value={passwordData.confirmPassword}
                                                                 onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                                                                onFocus={() => handlePasswordFocus('confirm')}
+                                                                onBlur={() => handlePasswordBlur('confirm')}
                                                                 variant="outlined"
+                                                                helperText={passwordFieldFocus.confirm || passwordData.confirmPassword ? "Nhập lại mật khẩu mới để xác nhận" : ""}
                                                                 InputProps={{
                                                                     endAdornment: (
                                                                         <InputAdornment position="end">

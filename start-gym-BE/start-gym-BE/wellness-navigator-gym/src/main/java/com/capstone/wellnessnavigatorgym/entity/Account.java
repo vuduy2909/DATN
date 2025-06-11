@@ -15,10 +15,19 @@ import java.util.Set;
 public class Account {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "account_id")
     private Integer accountId;
+    
+    @Column(name = "user_name")
     private String userName;
+    
+    @Column(name = "encrypt_password")
     private String encryptPassword;
+    
+    @Column(name = "email")
     private String email;
+    
+    @Column(name = "is_enable")
     private Boolean isEnable;
 
     @ManyToMany

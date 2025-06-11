@@ -22,7 +22,7 @@ public class XMLGenerator {
     
     private static final Logger logger = LoggerFactory.getLogger(XMLGenerator.class);
     
-    private static final String DEFAULT_XML_PATH = "D:/DA-CNPM-FINAL/CODE/kyo-gym-BE/kyo-gym-BE/wellness-navigator-gym/src/main/resources/static/DataTraining.xml";
+    private static final String DEFAULT_XML_PATH = "D:/DA-CNPM-FINAL/CODE/start-gym-BE/start-gym-BE/wellness-navigator-gym/src/main/resources/static/DataTraining.xml";
     
     /**
      * Tạo file XML từ dữ liệu huấn luyện

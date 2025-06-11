@@ -32,13 +32,13 @@ const Step4 = ({ formData, handleChange, handleNext, handlePrevious }) => {
     const [selectedFrequency, setSelectedFrequency] = useState(formData.desiredFrequency || '');
 
     const steps = [
-        'Thông tin tập luyện',
-        'Thông tin cơ bản', 
-        'Mục tiêu tập luyện',
-        'Tần suất mong muốn',
-        'Thông tin nghề nghiệp',
-        'Số đo cơ thể',
-        'Kết quả phân tích'
+        '1',
+        '2', 
+        '3',
+        '4',
+        '5',
+        '6',
+        '7'
     ];
 
     const frequencyOptions = [

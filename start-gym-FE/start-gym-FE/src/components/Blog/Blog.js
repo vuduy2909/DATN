@@ -35,7 +35,7 @@ const Blog = () => {
         <div className={styles.container}>
             <p className={styles.title_top}>
                 <svg xmlns="http://www.w3.org/2000/svg" width="46" height="3" viewBox="0 0 46 3" fill="none">
-                    <path d="M45.4324 1.5H0.5" stroke="#CF4044" stroke-width="2" />
+                    <path d="M45.4324 1.5H0.5" stroke="#CF4044" strokeWidth="2" />
                 </svg>
                 <span style={{ marginLeft: "18px" }}>
                     OUR COACHES
@@ -48,7 +48,7 @@ const Blog = () => {
                     <div className={`${styles.card}
                                     ${index === 0 ? styles.card_left : index === cardData.length - 1 ? styles.card_right : styles.card_center}`
                     }
-                        key={card.index}>
+                        key={card.id}>
                         <img src={card.img} alt={`Card ${card.id}`} className={styles.card_img}></img>
                         <div className={styles.card_body}>
                             <h2 className={styles.card_title}>{card.title}</h2>

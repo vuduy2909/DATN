@@ -14,7 +14,7 @@ const Comments = ({ commentText, setCommentText, listComment, setListComment, ra
         e.preventDefault();
 
         // Chỉ cho phép submit comment khi user đã đăng nhập và có userData
-        if (!user || !user.username || !userData || !userData.customerId) {
+        if (!user || !userData || !userData.customerId) {
             console.log('User not logged in or userData not available');
             return;
         }
@@ -50,14 +50,14 @@ const Comments = ({ commentText, setCommentText, listComment, setListComment, ra
 
     return (
         <div className={styles.tab_info_cmt}>
-            {/* Chỉ hiển thị form comment khi user đã đăng nhập */}
-            {user && user.username && userData && userData.customerId ? (
+            {/* Hiển thị form comment chỉ khi user đã đăng nhập */}
+            {user ? (
                 <form onSubmit={handleCommentSubmit} Validate className={styles.summitComment}>
                     <div className={styles.ava_name}>
                         <div className={styles.avatar}>
-                            <Avatar src={userData.customerImg} />
+                            <Avatar src={userData?.customerImg} />
                         </div>
-                        <div className={styles.name}>{userData.customerName}</div>
+                        <div className={styles.name}>{userData?.customerName || 'Loading...'}</div>
                     </div>
                     <div className={styles.starRating}>
                         <div className={styles.name}>Your rating</div>
@@ -82,14 +82,22 @@ const Comments = ({ commentText, setCommentText, listComment, setListComment, ra
                         onChange={(e) => setCommentText(e.target.value)}
                         required
                     />
-                    <button type="submit" className={styles.commentSubmit} >Submit</button>
+                    <button 
+                        type="submit" 
+                        className={styles.commentSubmit} 
+                        disabled={!userData || !userData.customerId}
+                    >
+                        {!userData || !userData.customerId ? 'Loading...' : 'Submit'}
+                    </button>
                 </form>
             ) : (
+                // Hiển thị thông báo đăng nhập chỉ khi user chưa đăng nhập hoặc chưa có userData
                 <div className={styles.loginPrompt}>
                     <p>Please <a href="/login">login</a> to add comments</p>
                 </div>
             )}
             
+            {/* Luôn hiển thị danh sách comment cho tất cả user, kể cả chưa đăng nhập */}
             <div className={styles.customerReview}>
                 <ul className={styles.ulComment}>
                     {Array.isArray(listComment) &&

@@ -9,4 +9,6 @@ public interface ITrackDataAiService {
     List<TrackDataAi> getAllTrackDataAi();
     List<TrackDataAi> getFilteredTrackDataAi(UserDataDTO userDataDTO);
     TrackDataAi findTrackDataAiById(Integer id);
+    TrackDataAi saveTrackDataAi(TrackDataAi trackDataAi);
+    Integer getNextTrackDataAiId();
 }

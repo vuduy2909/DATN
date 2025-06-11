@@ -142,4 +142,24 @@ public interface ICustomerDayCompletionRepository extends JpaRepository<Customer
             @Param("customerId") Integer customerId,
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate);
+
+    /**
+     * Đếm số buổi tập hoàn thành trong tuần hiện tại (từ thứ 2 đến chủ nhật)
+     */
+    @Query("SELECT COUNT(cdc) FROM CustomerDayCompletion cdc " +
+           "WHERE cdc.customer.account.userName = :username " +
+           "AND cdc.isCompleted = true " +
+           "AND cdc.completionDate >= :weekStart " +
+           "AND cdc.completionDate < :weekEnd")
+    Integer countCompletedSessionsInCurrentWeek(
+            @Param("username") String username,
+            @Param("weekStart") LocalDateTime weekStart, 
+            @Param("weekEnd") LocalDateTime weekEnd);
+            
+    /**
+     * Đếm số buổi tập mục tiêu trong tuần (dựa trên tổng số khóa học đang tham gia)
+     */
+    @Query("SELECT COUNT(DISTINCT cd.course.courseId) FROM CustomerDayCompletion cd " +
+           "WHERE cd.customer.account.userName = :username")
+    Integer countActiveCoursesForCustomer(@Param("username") String username);
 } 

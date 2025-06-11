@@ -23,7 +23,7 @@ public class BuildDecisionTree {
     private List<Course> courses; // Danh sách này có thể được nạp từ cơ sở dữ liệu
     
     // Đường dẫn XML mặc định để đảm bảo nhất quán
-    private static final String DEFAULT_XML_PATH = "D:/DA-CNPM-FINAL/CODE/kyo-gym-BE/kyo-gym-BE/wellness-navigator-gym/src/main/resources/static/DataTraining.xml";
+    private static final String DEFAULT_XML_PATH = "D:/DA-CNPM-FINAL/CODE/start-gym-BE/start-gym-BE/wellness-navigator-gym/src/main/resources/static/DataTraining.xml";
 
     public BuildDecisionTree() {
     }
@@ -93,7 +93,7 @@ public class BuildDecisionTree {
 
     /**
      * Phương thức này trả về danh sách tất cả các thuộc tính được sử dụng để xây dựng cây quyết định
-     * Cập nhật để bao gồm các thuộc tính mới từ TrackDataAi
+     * Loại bỏ waist_circumference và chest_circumference vì chỉ dùng để đánh giá hiệu quả sau tập
      */
     private List<String> getAttributeNames() {
         return Arrays.asList(
@@ -102,10 +102,9 @@ public class BuildDecisionTree {
             "bmi",
             "training_goals",
             "training_history",
+            "training_frequency",
             "height",
             "weight",
-            "waist_circumference",
-            "chest_circumference",
             "body_type",
             "occupation",
             "work_environment"

@@ -117,7 +117,7 @@ public class CustomerCourseController {
         
         try {
             // Get customer info
-            Customer customer = customerRepository.findByAccountUserName(username);
+            Customer customer = customerRepository.findActiveCustomerByAccountUserName(username);
             if (customer == null) {
                 return ResponseEntity.badRequest().body("Customer not found for username: " + username);
             }
@@ -159,7 +159,7 @@ public class CustomerCourseController {
             // Get customer info with detailed logging
             System.out.println("=== LOOKING FOR CUSTOMER ===");
             System.out.println("Searching for customer with username: '" + username + "'");
-            Customer customer = customerRepository.findByAccountUserName(username);
+            Customer customer = customerRepository.findActiveCustomerByAccountUserName(username);
             System.out.println("Customer found: " + (customer != null ? customer.getCustomerName() : "null"));
             
             if (customer == null) {
@@ -172,7 +172,7 @@ public class CustomerCourseController {
                     for (Customer c : allCustomers) {
                         if (c.getAccount() != null) {
                             System.out.println("Customer: " + c.getCustomerName() + 
-                                " -> Account username: '" + c.getAccount().getUserName() + "'");
+                                " -> Account username: '" + c.getAccount().getUserName() + "', enabled: " + c.getIsEnable());
                         } else {
                             System.out.println("Customer: " + c.getCustomerName() + " -> No account");
                         }
@@ -235,7 +235,7 @@ public class CustomerCourseController {
         String username = authentication.getName();
         
         try {
-            Customer customer = customerRepository.findByAccountUserName(username);
+            Customer customer = customerRepository.findActiveCustomerByAccountUserName(username);
             if (customer == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body("Customer not found for username: " + username);
@@ -326,7 +326,7 @@ public class CustomerCourseController {
         String username = authentication.getName();
         
         try {
-            Customer customer = customerRepository.findByAccountUserName(username);
+            Customer customer = customerRepository.findActiveCustomerByAccountUserName(username);
             if (customer == null) {
                 Map<String, String> error = new HashMap<>();
                 error.put("error", "Customer not found");
@@ -341,6 +341,20 @@ public class CustomerCourseController {
                 error.put("error", "Course not found");
                 error.put("message", "You are not enrolled in this course");
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+            }
+            
+            // Check if this is a VIP course that has been paid for
+            List<VipPayment> successfulVipPayments = vipPaymentRepository.findByCustomer_CustomerIdAndPaymentStatusOrderByCreatedDateDesc(
+                customer.getCustomerId(), VipPayment.PaymentStatus.SUCCESS);
+            
+            boolean isVipPaidCourse = successfulVipPayments.stream()
+                .anyMatch(vip -> vip.getCourse().getCourseId().equals(courseId));
+            
+            if (isVipPaidCourse) {
+                Map<String, String> error = new HashMap<>();
+                error.put("error", "Cannot delete VIP course");
+                error.put("message", "VIP courses that have been purchased cannot be deleted. You can continue learning this course anytime.");
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
             }
             
             // Delete the course enrollment

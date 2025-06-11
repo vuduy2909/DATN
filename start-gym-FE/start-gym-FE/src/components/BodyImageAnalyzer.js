@@ -12,10 +12,12 @@ import {
   TextField,
   Grid,
   createTheme,
-  ThemeProvider
+  ThemeProvider,
+  InputAdornment
 } from '@mui/material';
 import InfoIcon from '@mui/icons-material/Info';
 import UserFormService from '../services/UserFormService';
+import { useAuth } from '../AuthContext';
 
 // Enhanced styles with more specific formatting:
 const theme = createTheme({
@@ -68,24 +70,61 @@ const theme = createTheme({
           font-size: 0.95rem;
         }
         
-        /* Section titles */
+        /* Section titles - Styled như card headers */
         .analysis-content .section-title {
           font-weight: bold;
-          font-size: 1.05rem;
-          color: #1e4a76;
+          font-size: 1.1rem;
+          color: #ffffff;
           display: block;
-          margin-top: 12px;
-          margin-bottom: 4px;
-          background-color: #f2f6fa;
-          padding: 4px 8px;
-          border-radius: 4px;
+          margin-top: 20px;
+          margin-bottom: 8px;
+          background: linear-gradient(135deg, #1e4a76 0%, #2a5885 100%);
+          padding: 12px 16px;
+          border-radius: 8px;
+          border-left: 4px solid #FF5722;
+          box-shadow: 0 2px 8px rgba(30, 74, 118, 0.2);
+          text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Section content - Styled như card body */
+        .analysis-content .section-content {
+          background-color: #fafbfc;
+          padding: 16px;
+          border-radius: 8px;
+          margin-bottom: 20px;
+          border: 1px solid #e1e5e9;
+          line-height: 1.6;
+          box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+          position: relative;
+        }
+        
+        /* Add subtle left border for section content */
+        .analysis-content .section-content::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          width: 3px;
+          background: #FF5722;
+          border-radius: 0 0 0 8px;
+        }
+        
+        /* Section breaks for clear separation */
+        .analysis-content .section-break {
+          height: 24px;
         }
         
         /* Container formatting */
         .analysis-content .recommendation-container {
           display: flex;
           flex-direction: column;
-          gap: 6px;
+          gap: 0px;
+          padding: 16px;
+          background-color: #f8f9fa;
+          border-radius: 12px;
+          border: 1px solid #e9ecef;
+          min-height: 400px; /* Minimum height to ensure content is visible */
         }
         
         /* Exercise details */
@@ -100,6 +139,35 @@ const theme = createTheme({
           content: "";
           margin-top: 4px;
         }
+        
+        /* Enhanced styling for strong elements within sections */
+        .analysis-content .section-content strong {
+          color: #1e4a76;
+          font-weight: 600;
+          background-color: rgba(30, 74, 118, 0.1);
+          padding: 2px 4px;
+          border-radius: 4px;
+        }
+        
+        /* Ensure all 4 sections are visible */
+        .analysis-content .recommendation-container {
+          min-height: 400px; /* Minimum height to ensure content is visible */
+        }
+        
+        /* Force section visibility */
+        .analysis-content .section-title,
+        .analysis-content .section-content {
+          display: block !important;
+          visibility: visible !important;
+        }
+        
+        /* Debug styling to help identify missing sections */
+        .analysis-content .recommendation-container::after {
+          content: "";
+          display: block;
+          clear: both;
+          height: 10px;
+        }
       `,
     },
   },
@@ -113,6 +181,13 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
   const [error, setError] = useState('');
   const [waistCircumference, setWaistCircumference] = useState(formData.waistSize || '');
   const [chestCircumference, setChestCircumference] = useState(formData.chestSize || '');
+  const { user } = useAuth();
+
+  // Tạo key riêng cho từng user dựa trên userId
+  const getStorageKey = () => {
+    const userId = user?.id || 'anonymous';
+    return `bodyImageAnalysisData_${userId}`;
+  };
 
   // Initialize measurements from formData when component mounts or formData changes
   useEffect(() => {
@@ -124,39 +199,125 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
     }
   }, [formData.waistSize, formData.chestSize]);
 
-  // Load saved analysis data when component mounts
-  useEffect(() => {
+  // Xử lý lỗi phân tích hình ảnh
+  const handleAnalysisError = (error) => {
+    console.error('Image analysis error:', error);
+    let errorMessage = 'Có lỗi xảy ra trong quá trình phân tích hình ảnh';
+    
+    if (error.response) {
+      // Error response from server
+      if (error.response.status === 503) {
+        errorMessage = 'Hệ thống AI đang quá tải. Vui lòng thử lại sau 1-2 phút.';
+      } else if (error.response.status === 400) {
+        errorMessage = error.response.data.analysis || 'Dữ liệu đầu vào không hợp lệ';
+      } else if (error.response.status === 401) {
+        errorMessage = 'Lỗi xác thực. Vui lòng đăng nhập lại.';
+      } else if (error.response.data && error.response.data.analysis) {
+        errorMessage = error.response.data.analysis;
+      }
+    } else if (error.request) {
+      // Network error
+      errorMessage = 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.';
+    }
+    
+    setError(errorMessage);
+  };
+
+  // Load kết quả phân tích đã lưu từ server
+  const loadSavedAnalysis = async () => {
+    if (!user?.id) {
+      console.log('No user ID available to load saved analysis');
+      return;
+    }
+    
     try {
-      const savedAnalysisData = localStorage.getItem('bodyImageAnalysisData');
-      if (savedAnalysisData) {
-        const parsedData = JSON.parse(savedAnalysisData);
-        console.log('💾 Restoring saved analysis data:', parsedData);
+      const response = await UserFormService.getSavedAnalysis(user.id);
+      
+      if (response && response.hasAnalysis && response.analysisData) {
+        console.log('✅ Loaded saved analysis from server:', response.analysisData);
+        
+        const analysisData = response.analysisData;
         
         // Restore analysis result
-        if (parsedData.analysisResult) {
-          setAnalysisResult(parsedData.analysisResult);
-          console.log('✅ Restored analysis result:', parsedData.analysisResult);
+        const savedResult = {
+          bodyType: analysisData.bodyType,
+          analysis: analysisData.analysis,
+          recommendations: analysisData.recommendations
+        };
+        
+        setAnalysisResult(savedResult);
+        
+        // Restore image if available
+        if (analysisData.imageBase64) {
+          setPreviewUrl(analysisData.imageBase64);
         }
         
-        // Restore image preview
-        if (parsedData.previewUrl) {
-          setPreviewUrl(parsedData.previewUrl);
-          console.log('✅ Restored image preview');
+        // Update form data if measurements are available
+        if (analysisData.waist_circumference && onAnalysisComplete) {
+          const waistEvent = {
+            target: { name: 'waistSize', value: analysisData.waist_circumference }
+          };
+          onAnalysisComplete(savedResult.bodyType, waistEvent);
         }
         
-        // Restore file info if available
-        if (parsedData.fileName) {
-          console.log('📄 Had saved file:', parsedData.fileName);
+        if (analysisData.chest_circumference && onAnalysisComplete) {
+          const chestEvent = {
+            target: { name: 'chestSize', value: analysisData.chest_circumference }
+          };
+          onAnalysisComplete(savedResult.bodyType, chestEvent);
         }
+        
+        // Save to localStorage as well for backup
+        saveAnalysisData(savedResult, analysisData.imageBase64);
+        
+      } else {
+        console.log('No saved analysis found on server');
       }
     } catch (error) {
-      console.error('Error loading saved analysis data:', error);
+      console.error('Error loading saved analysis from server:', error);
+      // Fallback to localStorage if server fails
+      console.log('Falling back to localStorage...');
     }
-  }, []);
+  };
+
+  // Load saved analysis data khi component mount (ưu tiên server, fallback localStorage)
+  useEffect(() => {
+    const loadAnalysisData = async () => {
+      try {
+        // Thử load từ server trước
+        await loadSavedAnalysis();
+        
+        // Nếu không có từ server, fallback đến localStorage
+        const storageKey = getStorageKey();
+        const savedAnalysisData = localStorage.getItem(storageKey);
+        if (savedAnalysisData && !analysisResult) {
+          const parsedData = JSON.parse(savedAnalysisData);
+          console.log('💾 Restoring from localStorage as fallback for user:', user?.id);
+          
+          if (parsedData.analysisResult) {
+            setAnalysisResult(parsedData.analysisResult);
+            console.log('✅ Restored analysis result from localStorage:', parsedData.analysisResult);
+          }
+          
+          if (parsedData.previewUrl) {
+            setPreviewUrl(parsedData.previewUrl);
+            console.log('✅ Restored image preview from localStorage');
+          }
+        }
+      } catch (error) {
+        console.error('Error loading analysis data:', error);
+      }
+    };
+    
+    if (user?.id) {
+      loadAnalysisData();
+    }
+  }, [user?.id]);
 
   // Save analysis data to localStorage whenever it changes
   const saveAnalysisData = (newAnalysisResult = null, newPreviewUrl = null, fileName = null) => {
     try {
+      const storageKey = getStorageKey();
       const dataToSave = {
         analysisResult: newAnalysisResult || analysisResult,
         previewUrl: newPreviewUrl || previewUrl,
@@ -164,8 +325,8 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
         timestamp: Date.now()
       };
       
-      localStorage.setItem('bodyImageAnalysisData', JSON.stringify(dataToSave));
-      console.log('💾 Saved analysis data to localStorage');
+      localStorage.setItem(storageKey, JSON.stringify(dataToSave));
+      console.log('💾 Saved analysis data to localStorage for user:', user?.id);
     } catch (error) {
       console.error('Error saving analysis data:', error);
     }
@@ -174,12 +335,26 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
   // Clear analysis data
   const clearAnalysisData = () => {
     try {
-      localStorage.removeItem('bodyImageAnalysisData');
+      const storageKey = getStorageKey();
+      localStorage.removeItem(storageKey);
+      
+      // Clean up preview URL to prevent memory leaks
+      if (previewUrl && previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(previewUrl);
+      }
+      
       setAnalysisResult(null);
       setPreviewUrl('');
       setSelectedFile(null);
       setError('');
-      console.log('🗑️ Cleared analysis data');
+      
+      // Reset file input element to allow re-uploading same image
+      const fileInput = document.querySelector('#body-image-input');
+      if (fileInput) {
+        fileInput.value = '';
+      }
+      
+      console.log('🗑️ Cleared analysis data and reset file input for user:', user?.id);
     } catch (error) {
       console.error('Error clearing analysis data:', error);
     }
@@ -189,6 +364,11 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
   const handleFileChange = (event) => {
     const file = event.target.files[0];
     if (file) {
+      // Clear previous preview URL to prevent memory leaks
+      if (previewUrl && previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(previewUrl);
+      }
+      
       setSelectedFile(file);
       setError('');
       // Clear previous analysis when new image is selected
@@ -202,8 +382,13 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
         
         // Save image preview to localStorage (clear previous analysis)
         saveAnalysisData(null, newPreviewUrl, file.name);
+        console.log('📷 New image loaded and preview set:', file.name);
       };
       reader.readAsDataURL(file);
+    } else {
+      // If no file selected, clear preview
+      setPreviewUrl('');
+      setSelectedFile(null);
     }
   };
 
@@ -291,29 +476,14 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
         chest_circumference: chestCircumference
       });
       
-      // Create FormData with all parameters
-      const formDataToSend = new FormData();
-      formDataToSend.append('image', selectedFile);
-      formDataToSend.append('height', height);
-      formDataToSend.append('weight', weight);
-      formDataToSend.append('gender', gender);
-      
-      // Add new measurements if provided
-      if (waistCircumference) {
-        formDataToSend.append('waist_circumference', waistCircumference);
-      }
-      
-      if (chestCircumference) {
-        formDataToSend.append('chest_circumference', chestCircumference);
-      }
-      
       const result = await UserFormService.analyzeBodyImage(
         selectedFile, 
         height, 
         weight, 
         gender,
         waistCircumference,
-        chestCircumference
+        chestCircumference,
+        user?.id // Pass customerId
       );
       console.log('Received analysis result:', result);
       
@@ -369,9 +539,20 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
       console.log('=== END BODY IMAGE ANALYZER: CLAUDE RESULT ===');
     } catch (err) {
       console.error('Failed to analyze image:', err);
+      console.error('Error details:', {
+        message: err.message,
+        response: err.response,
+        status: err.response?.status,
+        data: err.response?.data,
+        headers: err.response?.headers,
+        config: err.config
+      });
       
       if (err.response) {
         // Lỗi HTTP có phản hồi từ máy chủ
+        console.log('Response status:', err.response.status);
+        console.log('Response data:', err.response.data);
+        
         if (err.response.status === 401) {
           setError('Lỗi xác thực: Bạn cần đăng nhập để sử dụng tính năng này.');
         } else if (err.response.status === 403) {
@@ -394,21 +575,20 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
         } else {
           setError(`Lỗi không xác định (${err.response.status}): Vui lòng thử lại sau.`);
         }
-      } else if (err.request) {
-        // Yêu cầu đã được gửi nhưng không nhận được phản hồi
-        setError('Không thể kết nối tới máy chủ. Vui lòng kiểm tra kết nối mạng.');
       } else {
-        // Lỗi khác
-        setError(err.message || 'Không thể phân tích ảnh. Vui lòng thử lại sau.');
+        // Sử dụng handleAnalysisError để xử lý tất cả loại lỗi khác
+        handleAnalysisError(err);
       }
     } finally {
       setLoading(false);
     }
   };
 
-  // Format recommendations to have clear numbered sections
+  // Format recommendations to have clear numbered sections with proper paragraph breaks
   const formatRecommendations = (htmlContent) => {
     if (!htmlContent) return '';
+    
+    console.log('🔍 Raw AI content:', htmlContent);
     
     // Clean up any extra spacing or unnecessary line breaks
     let cleanedContent = htmlContent
@@ -416,72 +596,89 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
       .replace(/\s+/g, " ") // Replace multiple spaces with single space
       .trim();
     
-    // Regular expressions to match various forms of section titles
+    console.log('🧹 Cleaned content:', cleanedContent);
+    
+    // Regular expressions to match various forms of section titles - cập nhật để match chính xác
     const sectionPatterns = [
       // KHÓA TẬP LUYỆN patterns
       { 
-        pattern: /(?:1\.?\s*)?KHÓA\s*TẬP\s*LUYỆN:?|(?:1\.?\s*)?Khóa\s*tập\s*luyện:?/gi, 
-        replacement: '<span class="section-title">1. KHÓA TẬP LUYỆN:</span>' 
+        pattern: /(?:1\.?\s*)?(?:KHÓA\s*TẬP\s*LUYỆN|Khóa\s*học\s*phù\s*hợp):?/gi, 
+        replacement: '<div class="section-break"></div><div class="section-title">1. KHÓA TẬP LUYỆN:</div><div class="section-content">' 
       },
-      // BÀI TẬP CHÍNH patterns
+      // BÀI TẬP patterns - mở rộng để match nhiều variant
       { 
-        pattern: /(?:2\.?\s*)?(?:5\s*)?BÀI\s*TẬP\s*CHÍNH:?|(?:2\.?\s*)?(?:5\s*)?Bài\s*tập\s*chính:?/gi, 
-        replacement: '<span class="section-title">2. 5 BÀI TẬP CHÍNH:</span>' 
+        pattern: /(?:2\.?\s*)?(?:(?:5\s*)?BÀI\s*TẬP\s*(?:CHÍNH|CỤ\s*THỂ|CƠ\s*BẢN|CHỦ\s*YẾU)|5\s*bài\s*tập\s*cụ\s*thể):?/gi, 
+        replacement: '</div><div class="section-break"></div><div class="section-title">2. 5 BÀI TẬP CHỦ YẾU:</div><div class="section-content">' 
       },
       // CHẾ ĐỘ DINH DƯỠNG patterns
       { 
-        pattern: /(?:3\.?\s*)?CHẾ\s*ĐỘ\s*DINH\s*DƯỠNG:?|(?:3\.?\s*)?Chế\s*độ\s*dinh\s*dưỡng:?/gi, 
-        replacement: '<span class="section-title">3. CHẾ ĐỘ DINH DƯỠNG:</span>' 
+        pattern: /(?:3\.?\s*)?(?:CHẾ\s*ĐỘ\s*DINH\s*DƯỠNG|Chế\s*độ\s*dinh\s*dưỡng):?/gi, 
+        replacement: '</div><div class="section-break"></div><div class="section-title">3. CHẾ ĐỘ DINH DƯỠNG:</div><div class="section-content">' 
       },
-      // LỊCH TẬP VÀ NGHỈ NGƠI patterns - combined into one title
+      // TẦN SUẤT VÀ LỊCH TẬP patterns - simplified và multiple variants
       { 
-        pattern: /(?:4\.?\s*)?LỊCH\s*TẬP:?(?:\s*VÀ\s*NGHỈ\s*NGƠI:?)?|(?:4\.?\s*)?Lịch\s*tập:?(?:\s*và\s*nghỉ\s*ngơi:?)?|(?:4\.?\s*)?TẦN\s*SUẤT\s*TẬP:?/gi, 
-        replacement: '<span class="section-title">4. LỊCH TẬP VÀ NGHỈ NGƠI:</span>' 
+        pattern: /(?:4\.?\s*)?(?:TẦN\s*SUẤT.*?LỊCH\s*TẬP|LỊCH\s*TẬP.*?TẦN\s*SUẤT|TẦN\s*SUẤT.*?tập|LỊCH\s*TẬP):?/gi, 
+        replacement: '</div><div class="section-break"></div><div class="section-title">4. TẦN SUẤT VÀ LỊCH TẬP:</div><div class="section-content">' 
       }
     ];
     
-    // Also remove any references to THEO DÕI TIẾN ĐỘ that might appear in the text
-    cleanedContent = cleanedContent.replace(/(?:5\.?\s*)?THEO\s*DÕI\s*TIẾN\s*ĐỘ:?.*?(?=(?:<span class="section-title">|$))/gi, "");
-    
-    // Apply all section pattern replacements
-    let formattedContent = cleanedContent;
-    sectionPatterns.forEach(({ pattern, replacement }) => {
-      formattedContent = formattedContent.replace(pattern, replacement);
+    // Check how many sections we can find
+    let sectionsFound = 0;
+    sectionPatterns.forEach(({ pattern, replacement }, index) => {
+      if (cleanedContent.match(pattern)) {
+        sectionsFound++;
+        console.log(`✅ Found section ${index + 1}: ${pattern}`);
+      } else {
+        console.log(`❌ Missing section ${index + 1}: ${pattern}`);
+      }
     });
     
-    // Clean up any separate "VÀ NGHỈ NGƠI:" text that might appear after LỊCH TẬP section title
-    formattedContent = formattedContent.replace(/(<span class="section-title">4\. LỊCH TẬP VÀ NGHỈ NGƠI:<\/span><br\/>)(?:\s*VÀ\s*NGHỈ\s*NGƠI:?)/gi, '$1');
+    console.log(`📊 Total sections found: ${sectionsFound}/4`);
     
-    // Improve formatting for bench press, pull-ups, etc.
-    formattedContent = formattedContent
-      // Format exercise specifications
-      .replace(/(Bench\s*Press:)/gi, '<strong>$1</strong>')
-      .replace(/(Pull-ups:)/gi, '<strong>$1</strong>')
-      .replace(/(Shoulder\s*Press:)/gi, '<strong>$1</strong>')
-      .replace(/(Squat:)/gi, '<strong>$1</strong>')
-      .replace(/(Dead-?lift:)/gi, '<strong>$1</strong>')
-      // Highlight reps and sets
-      .replace(/(\d+\s*hiệp\s*x\s*\d+(?:-\d+)?\s*lần)/gi, '<strong>$1</strong>')
-      // Format protein and nutrient percentages
-      .replace(/(Protein:\s*\d+g)/gi, '<strong>$1</strong>')
+    // Xử lý đặc biệt - nếu không tìm thấy pattern tiêu chuẩn, thử tìm theo số thứ tự
+    if (!cleanedContent.match(/(?:1\.?\s*)?(?:KHÓA\s*TẬP\s*LUYỆN|Khóa\s*học)/gi)) {
+      console.log('🔄 Using fallback patterns for section detection');
+      // Fallback patterns - tìm theo số thứ tự đơn giản (chỉ 4 phần)
+      const fallbackPatterns = [
+        { pattern: /1\.\s*/gi, replacement: '<div class="section-break"></div><div class="section-title">1. KHÓA TẬP LUYỆN:</div><div class="section-content">' },
+        { pattern: /2\.\s*/gi, replacement: '</div><div class="section-break"></div><div class="section-title">2. BÀI TẬP CHỦ YẾU:</div><div class="section-content">' },
+        { pattern: /3\.\s*/gi, replacement: '</div><div class="section-break"></div><div class="section-title">3. CHẾ ĐỘ DINH DƯỠNG:</div><div class="section-content">' },
+        { pattern: /4\.\s*/gi, replacement: '</div><div class="section-break"></div><div class="section-title">4. TẦN SUẤT VÀ LỊCH TẬP:</div><div class="section-content">' }
+      ];
+      
+      fallbackPatterns.forEach(({ pattern, replacement }) => {
+        cleanedContent = cleanedContent.replace(pattern, replacement);
+      });
+    } else {
+      // Apply main section pattern replacements
+      sectionPatterns.forEach(({ pattern, replacement }) => {
+        cleanedContent = cleanedContent.replace(pattern, replacement);
+      });
+    }
+    
+    // Remove any references to tracking progress (section 5) that might appear in the text
+    cleanedContent = cleanedContent.replace(/(?:5\.?\s*)?(?:THEO\s*DÕI\s*TIẾN\s*ĐỘ|theo\s*dõi.*?tiến\s*độ|điều\s*chỉnh.*?kế\s*hoạch):?.*?(?=(?:<div class="section-title">|$))/gi, "");
+    
+    // Improve formatting for exercise specifications
+    let formattedContent = cleanedContent
+      // Format exercise names
+      .replace(/(Squat|Deadlift|Bench\s*Press|Pull-ups?|Push-ups?|Plank|Cable\s*Row):?\s*/gi, '<strong>$1:</strong> ')
+      .replace(/(\d+\s*hiệp\s*x\s*\d+(?:-\d+)?\s*(?:lần|giây))/gi, '<strong>$1</strong>')
+      // Format nutrition percentages
+      .replace(/(Protein|Carbs|Chất\s*béo):?\s*(\d+%)/gi, '<strong>$1: $2</strong>')
       .replace(/(\d+g\/kg)/gi, '<strong>$1</strong>')
-      .replace(/(\d+-\d+%\s*tổng\s*calories)/gi, '<strong>$1</strong>')
-      // Add line breaks after sections to ensure proper spacing
-      .replace(/<\/span>/g, '</span><br/>')
-      // Add line breaks after bullet points for better spacing
-      .replace(/<\/li>/g, '</li><br/>');
+      // Add breaks for better readability
+      .replace(/(-\s*)(?=[A-Z])/g, '$1<br/>');
     
-    // Improve formatting for exercise details and create more structured content
-    formattedContent = formattedContent
-      // Add spacing and structure to exercise details
-      .replace(/(<strong>.*?<\/strong>)/g, '<span class="exercise-detail">$1</span>')
-      // Remove excessive line breaks
-      .replace(/<br\/><br\/>/g, '<br/>')
-      // Ensure proper spacing between sections
-      .replace(/<span class="section-title">/g, '</div><div class="recommendation-section"><span class="section-title">');
+    // Ensure we close the last section
+    if (!formattedContent.endsWith('</div>')) {
+      formattedContent += '</div>';
+    }
     
-    // Wrap the entire content in a container for styling and close any open divs
-    return `<div class="recommendation-container"><div class="recommendation-section">${formattedContent}</div></div>`;
+    console.log('🎨 Final formatted content:', formattedContent);
+    
+    // Wrap the entire content in a container for styling
+    return `<div class="recommendation-container">${formattedContent}</div>`;
   };
 
   return (

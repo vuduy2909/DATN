@@ -30,7 +30,8 @@ public class Cart {
     @Pattern(regexp = "^0\\d{9}$")
     private String receiverPhone;
 
-    @JsonBackReference
-    @OneToOne(mappedBy = "cart", cascade = CascadeType.ALL)
-    private Customer customer;
+    // Removed customer mapping due to cart_id removal from customer table
+    // @JsonBackReference
+    // @OneToOne(mappedBy = "cart", cascade = CascadeType.ALL)
+    // private Customer customer;
 }

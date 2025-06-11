@@ -7,11 +7,15 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.HashMap;
 
 @Service
 @RequiredArgsConstructor
@@ -25,8 +29,24 @@ public class CustomerDayCompletionService {
     private final IDayRepository dayRepository;
     private final ICourseDayRepository courseDayRepository;
 
+    @Autowired
+    private IUserDataAiService userDataAiService;
+    
+    @Autowired 
+    private ITrackDataAiService trackDataAiService;
+
+    @Autowired
+    private ICustomerCourseService customerCourseService;
+
     private static final LocalTime ATTENDANCE_START_TIME = LocalTime.of(7, 0); // 7:00 AM
     private static final LocalTime ATTENDANCE_END_TIME = LocalTime.of(22, 0); // 10:00 PM
+    
+    /**
+     * Getter for completionRepository to allow access from controllers
+     */
+    public ICustomerDayCompletionRepository getCompletionRepository() {
+        return completionRepository;
+    }
     
     /**
      * Kiểm tra xem có thể điểm danh không
@@ -34,6 +54,12 @@ public class CustomerDayCompletionService {
     private void validateAttendance(Integer customerId, Integer courseId, Integer dayId) {
         LocalDateTime now = LocalDateTime.now();
         LocalTime currentTime = now.toLocalTime();
+
+        // Kiểm tra xem user đã tham gia khóa học chưa
+        boolean isEnrolled = customerCourseService.isCustomerEnrolledInCourse(customerId, courseId);
+        if (!isEnrolled) {
+            throw new AttendanceException("Bạn chưa tham gia khóa học này. Vui lòng tham gia khóa học trước khi điểm danh.");
+        }
 
         // Tạm thời comment phần kiểm tra thời gian để test
         /* 
@@ -43,59 +69,48 @@ public class CustomerDayCompletionService {
         }
         */
 
-        // Kiểm tra xem ngày này đã được điểm danh chưa
-        if (isDayCompleted(customerId, courseId, dayId)) {
-            throw new AttendanceException("Ngày này đã được điểm danh rồi");
+        // QUAN TRỌNG: Chỉ kiểm tra điểm danh cho cụ thể (customer_id, course_id, day_id)
+        // Không giới hạn điểm danh across courses - user có thể điểm danh cùng day_id ở nhiều course khác nhau
+        Optional<CustomerDayCompletion> existingCompletion = completionRepository.findByCustomerAndCourseAndDay(customerId, courseId, dayId);
+        
+        if (existingCompletion.isPresent() && existingCompletion.get().getIsCompleted()) {
+            throw new AttendanceException("Bạn đã điểm danh Day " + dayId + " của khóa học này rồi!");
         }
 
-        // QUAN TRỌNG: Kiểm tra xem đã điểm danh BẤT KỲ NGÀY NÀO trong hôm nay chưa
-        LocalDateTime startOfToday = now.toLocalDate().atStartOfDay(); // 00:00:00 hôm nay
-        LocalDateTime endOfToday = now.toLocalDate().plusDays(1).atStartOfDay(); // 00:00:00 ngày mai
+        // QUAN TRỌNG: Kiểm tra one-day-one-attendance per course per calendar day
+        // User chỉ được điểm danh 1 lần cho mỗi khóa học trong 1 ngày
+        LocalDateTime startOfToday = now.toLocalDate().atStartOfDay();
+        LocalDateTime endOfToday = now.toLocalDate().plusDays(1).atStartOfDay();
         
-        log.info("=== DEBUGGING ATTENDANCE VALIDATION ===");
-        log.info("Current time: {}", now);
-        log.info("Start of today: {}", startOfToday);
-        log.info("End of today: {}", endOfToday);
-        log.info("Checking for existing completions for customer {} between {} and {}", customerId, startOfToday, endOfToday);
+        // Kiểm tra xem đã điểm danh bất kỳ ngày nào của course này trong hôm nay chưa
+        List<CustomerDayCompletion> todayCompletions = completionRepository.findCompletedDaysByCustomerAndDateRange(
+                customerId, startOfToday, endOfToday);
         
-        // Kiểm tra bằng cách lấy TẤT CẢ completion records đã completed và check completion date
-        List<CustomerDayCompletion> allCompletions = completionRepository.findByCustomer(customerId);
-        log.info("Total completions for customer {}: {}", customerId, allCompletions.size());
+        // Lọc các completion của course hiện tại
+        boolean hasAttendanceInCourseToday = todayCompletions.stream()
+                .anyMatch(completion -> completion.getCourse().getCourseId().equals(courseId));
         
-        for (CustomerDayCompletion completion : allCompletions) {
-            if (completion.getIsCompleted() && completion.getCompletionDate() != null) {
-                LocalDateTime completionDate = completion.getCompletionDate();
-                log.info("Checking completion: Day {}, completion date: {}", 
-                        completion.getDay().getDayId(), completionDate);
-                
-                // Kiểm tra completion date có trong hôm nay không
-                if (completionDate.isAfter(startOfToday.minusSeconds(1)) && 
-                    completionDate.isBefore(endOfToday)) {
-                    log.info("Found completion today! Day {}, completion date: {}", 
-                            completion.getDay().getDayId(), completionDate);
-                    throw new AttendanceException("Bạn đã điểm danh Day " + completion.getDay().getDayId() + 
-                                                " trong hôm nay rồi. Mỗi ngày chỉ được điểm danh 1 day duy nhất!");
-                }
-            }
+        if (hasAttendanceInCourseToday) {
+            throw new AttendanceException("Bạn đã điểm danh khóa học này trong hôm nay rồi! Mỗi ngày chỉ được điểm danh 1 lần cho mỗi khóa học.");
         }
-        
-        log.info("No completions found today, proceeding with attendance validation...");
 
-        // Kiểm tra điểm danh liên tiếp
+        // Kiểm tra điểm danh liên tiếp TRONG CÙNG KHÓA HỌC
         Integer lastCompletedDay = completionRepository.findLastCompletedDayNumber(customerId, courseId);
         log.info("Last completed day for customer {} in course {}: {}", customerId, courseId, lastCompletedDay);
         
         if (lastCompletedDay == null) {
-            // Chưa điểm danh ngày nào, chỉ được điểm danh day 1
+            // Chưa điểm danh ngày nào trong course này, chỉ được điểm danh day 1
             if (dayId != 1) {
-                throw new AttendanceException("Bạn phải bắt đầu điểm danh từ ngày 1");
+                throw new AttendanceException("Bạn phải bắt đầu điểm danh từ ngày 1 trong khóa học này");
             }
         } else {
-            // Đã có điểm danh trước đó, kiểm tra tính liên tiếp
+            // Đã có điểm danh trước đó trong course này, kiểm tra tính liên tiếp
             if (dayId != lastCompletedDay + 1) {
-                throw new AttendanceException("Bạn phải điểm danh các ngày liên tiếp (ngày tiếp theo phải là ngày " + (lastCompletedDay + 1) + ")");
+                throw new AttendanceException("Bạn phải điểm danh các ngày liên tiếp trong khóa học này (ngày tiếp theo phải là ngày " + (lastCompletedDay + 1) + ")");
             }
         }
+        
+        log.info("Attendance validation passed for customer {} in course {}, day {}", customerId, courseId, dayId);
     }
     
     /**
@@ -113,7 +128,16 @@ public class CustomerDayCompletionService {
         // Đánh dấu hoàn thành
         completion.markAsCompleted();
         
-        return completionRepository.save(completion);
+        CustomerDayCompletion savedCompletion = completionRepository.save(completion);
+        
+        // QUAN TRỌNG: Kiểm tra xem có phải ngày cuối của course không
+        if (isLastDayOfCourse(courseId, dayId)) {
+            log.info("Customer {} completed the last day of course {}! Triggering post-course measurement.", customerId, courseId);
+            // Course đã hoàn thành - cần prompt user để nhập measurements mới
+            // Việc này sẽ được xử lý ở frontend thông qua API response
+        }
+        
+        return savedCompletion;
     }
     
     /**
@@ -145,23 +169,42 @@ public class CustomerDayCompletionService {
      * Lấy tiến độ hoàn thành của customer trong một course
      */
     public CourseProgressDTO getCourseProgress(Integer customerId, Integer courseId) {
+        // Đếm số ngày đã hoàn thành từ bảng customer_day_completion
         Long completedDays = completionRepository.countCompletedDaysByCustomerAndCourse(customerId, courseId);
-        Long totalDays = completionRepository.countTotalDaysByCustomerAndCourse(customerId, courseId);
         
-        // Nếu chưa có completion records, tạo chúng
+        // QUAN TRỌNG: Đếm tổng số ngày từ bảng course_days, không phải từ completion records
+        Long totalDays = courseDayRepository.countByCourseId(courseId);
+        
+        // Nếu course không có ngày nào trong course_days, khởi tạo completion records
         if (totalDays == 0) {
+            log.warn("Course {} has no days in course_days table, initializing...", courseId);
             initializeCompletionRecords(customerId, courseId);
-            totalDays = completionRepository.countTotalDaysByCustomerAndCourse(customerId, courseId);
+            totalDays = courseDayRepository.countByCourseId(courseId);
         }
         
-        Boolean isCompleted = completionRepository.isCourseCompletedByCustomer(customerId, courseId);
+        // Nếu chưa có completion records cho customer này, tạo chúng
+        Long existingCompletionRecords = completionRepository.countTotalDaysByCustomerAndCourse(customerId, courseId);
+        if (existingCompletionRecords == 0 && totalDays > 0) {
+            log.info("No completion records found for customer {} in course {}, initializing...", customerId, courseId);
+            initializeCompletionRecords(customerId, courseId);
+            // Đếm lại số ngày đã hoàn thành sau khi khởi tạo
+            completedDays = completionRepository.countCompletedDaysByCustomerAndCourse(customerId, courseId);
+        }
+        
+        Boolean isCompleted = false;
+        if (totalDays > 0) {
+            isCompleted = completedDays.equals(totalDays);
+        }
+        
+        log.info("Course progress for customer {} in course {}: {}/{} days completed", 
+                customerId, courseId, completedDays, totalDays);
         
         return new CourseProgressDTO(
                 customerId,
                 courseId,
                 completedDays.intValue(),
                 totalDays.intValue(),
-                isCompleted != null ? isCompleted : false
+                isCompleted
         );
     }
     
@@ -194,6 +237,30 @@ public class CustomerDayCompletionService {
         
         // Lấy tất cả course days của course
         List<CourseDays> courseDays = courseDayRepository.findByCourseIdOrderByDayId(courseId);
+        
+        if (courseDays.isEmpty()) {
+            log.warn("No days found for course {}, creating default completion records", courseId);
+            // Nếu không có ngày nào, thêm ít nhất một ngày mặc định để đảm bảo có tiến độ
+            Day defaultDay = dayRepository.findById(1)
+                .orElseGet(() -> {
+                    Day newDay = new Day();
+                    newDay.setDayName("Day 1");
+                    return dayRepository.save(newDay);
+                });
+                
+            // Tạo một CourseDays liên kết
+            CourseDays defaultCourseDay = new CourseDays();
+            defaultCourseDay.setCourse(course);
+            defaultCourseDay.setDay(defaultDay);
+            defaultCourseDay.setStatus(true);
+            courseDayRepository.save(defaultCourseDay);
+            
+            // Thêm defaultCourseDay vào danh sách courseDays
+            courseDays = new ArrayList<>();
+            courseDays.add(defaultCourseDay);
+            
+            log.info("Created default day for course {}", courseId);
+        }
         
         // Tạo completion record cho mỗi day
         for (CourseDays courseDay : courseDays) {
@@ -273,5 +340,84 @@ public class CustomerDayCompletionService {
         public Integer getTotalDays() { return totalDays; }
         public Boolean getIsCompleted() { return isCompleted; }
         public Double getProgressPercentage() { return progressPercentage; }
+    }
+    
+    /**
+     * Kiểm tra xem course đã được hoàn thành chưa (tất cả days đều completed)
+     */
+    public boolean isCourseFullyCompleted(Integer customerId, Integer courseId) {
+        Long totalDays = courseDayRepository.countByCourseId(courseId);
+        Long completedDays = completionRepository.countCompletedDaysByCustomerAndCourse(customerId, courseId);
+        
+        return totalDays > 0 && totalDays.equals(completedDays);
+    }
+    
+    /**
+     * Kiểm tra xem day vừa complete có phải là ngày cuối của course không
+     */
+    public boolean isLastDayOfCourse(Integer courseId, Integer dayId) {
+        List<CourseDays> courseDays = courseDayRepository.findByCourseIdOrderByDayId(courseId);
+        if (courseDays.isEmpty()) {
+            return false;
+        }
+        
+        // Lấy ngày cuối cùng của course
+        CourseDays lastDay = courseDays.get(courseDays.size() - 1);
+        return lastDay.getDay().getDayId().equals(dayId);
+    }
+
+    /**
+     * Tính toán Weekly Activity dựa trên số buổi hoàn thành / mục tiêu trong tuần
+     */
+    public Map<String, Object> calculateWeeklyActivity(String username) {
+        // Tính thời gian bắt đầu tuần (thứ Hai) và kết thúc tuần (Chủ nhật)
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime weekStart = now.toLocalDate().with(java.time.DayOfWeek.MONDAY).atStartOfDay();
+        LocalDateTime weekEnd = weekStart.plusDays(7); // Đến 00:00 thứ Hai tuần sau
+        
+        log.info("Calculating weekly activity for user {} from {} to {}", username, weekStart, weekEnd);
+        
+        // Đếm số buổi đã hoàn thành trong tuần
+        Integer completedSessions = completionRepository.countCompletedSessionsInCurrentWeek(
+                username, weekStart, weekEnd);
+        
+        // Đếm số khóa học đang tham gia (mỗi khóa học là 3 buổi/tuần)
+        Integer activeCourses = completionRepository.countActiveCoursesForCustomer(username);
+        
+        // Mỗi khóa học yêu cầu 3 buổi/tuần
+        final int sessionsPerCoursePerWeek = 3;
+        
+        // Tính tổng số buổi mục tiêu dựa trên số khóa học
+        Integer targetSessions = activeCourses * sessionsPerCoursePerWeek;
+        
+        // Đặt minimum target là 3 buổi/tuần
+        if (targetSessions < 3) {
+            targetSessions = 3;
+        }
+        
+        // Tính phần trăm hoàn thành
+        double weeklyActivityPercentage;
+        if (targetSessions > 0) {
+            weeklyActivityPercentage = ((double) completedSessions / targetSessions) * 100;
+            // Giới hạn tối đa 100%
+            if (weeklyActivityPercentage > 100) {
+                weeklyActivityPercentage = 100;
+            }
+        } else {
+            weeklyActivityPercentage = 0;
+        }
+        
+        log.info("Weekly activity for user {}: {}/{} sessions ({}%)", 
+                username, completedSessions, targetSessions, weeklyActivityPercentage);
+        
+        // Trả về map chứa kết quả
+        Map<String, Object> result = new HashMap<>();
+        result.put("weeklyActivity", weeklyActivityPercentage);
+        result.put("completedSessions", completedSessions);
+        result.put("targetSessions", targetSessions);
+        result.put("weekStart", weekStart);
+        result.put("weekEnd", weekEnd);
+        
+        return result;
     }
 } 

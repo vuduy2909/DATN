@@ -25,7 +25,8 @@ public class CartServiceImpl implements ICartService {
 
     @Override
     public Cart findByUsername(String username) {
-        return cartRepository.findCartByUsername(username).orElse(null);
+        // return cartRepository.findCartByUsername(username).orElse(null);
+        return null; // Temporarily disabled due to cart_id removal from customer table
     }
 
     @Override

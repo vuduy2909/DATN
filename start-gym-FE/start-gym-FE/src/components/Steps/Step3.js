@@ -27,13 +27,13 @@ const Step3 = ({ formData, handleChange, handleNext, handlePrevious }) => {
     const [selectedGoal, setSelectedGoal] = useState(formData.trainingGoal || '');
 
     const steps = [
-        'Thông tin tập luyện',
-        'Thông tin cơ bản', 
-        'Mục tiêu tập luyện',
-        'Tần suất mong muốn',
-        'Thông tin nghề nghiệp',
-        'Số đo cơ thể',
-        'Kết quả phân tích'
+        '1',
+        '2', 
+        '3',
+        '4',
+        '5',
+        '6',
+        '7'
     ];
 
     const trainingGoals = [
@@ -110,10 +110,14 @@ const Step3 = ({ formData, handleChange, handleNext, handlePrevious }) => {
                     <Stepper activeStep={2} alternativeLabel>
                         {steps.map((label, index) => (
                             <Step key={label}>
-                                <StepLabel>
-                                    <Typography variant="caption" sx={{ fontSize: '0.75rem' }}>
-                                        {label}
-                                    </Typography>
+                                <StepLabel
+                                    sx={{
+                                        '& .MuiStepLabel-label': {
+                                            display: 'none', // Hide the step label text
+                                        },
+                                    }}
+                                >
+                                    {/* No label text */}
                                 </StepLabel>
                             </Step>
                         ))}

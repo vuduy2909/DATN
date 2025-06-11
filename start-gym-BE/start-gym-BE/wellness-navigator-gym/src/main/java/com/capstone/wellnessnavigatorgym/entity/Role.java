@@ -16,7 +16,10 @@ import java.util.Set;
 public class Role {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "role_id")
     private Integer roleId;
+    
+    @Column(name = "role_name")
     private String roleName;
     @JsonBackReference
     @ManyToMany(mappedBy = "roles")

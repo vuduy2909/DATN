@@ -2,11 +2,9 @@ package com.capstone.wellnessnavigatorgym.service.impl;
 
 import com.capstone.wellnessnavigatorgym.dto.customer.CustomerInfo;
 import com.capstone.wellnessnavigatorgym.dto.customer.CustomerUserDetailDto;
-import com.capstone.wellnessnavigatorgym.entity.Cart;
 import com.capstone.wellnessnavigatorgym.entity.Customer;
 import com.capstone.wellnessnavigatorgym.entity.Account;
 import com.capstone.wellnessnavigatorgym.error.NotFoundById;
-import com.capstone.wellnessnavigatorgym.repository.ICartRepository;
 import com.capstone.wellnessnavigatorgym.repository.ICustomerRepository;
 import com.capstone.wellnessnavigatorgym.repository.IAccountRepository;
 import com.capstone.wellnessnavigatorgym.service.ICustomerService;
@@ -26,7 +24,6 @@ import java.util.Optional;
 public class CustomerServiceImpl implements ICustomerService {
 
     private final ICustomerRepository customerRepository;
-    private final ICartRepository cartRepository;
 
     @Autowired
     private IAccountRepository accountRepository;
@@ -35,9 +32,8 @@ public class CustomerServiceImpl implements ICustomerService {
     private PasswordEncoder passwordEncoder;
 
     @Autowired
-    public CustomerServiceImpl(ICustomerRepository customerRepository, ICartRepository cartRepository) {
+    public CustomerServiceImpl(ICustomerRepository customerRepository) {
         this.customerRepository = customerRepository;
-        this.cartRepository = cartRepository;
     }
 
     @Override
@@ -62,14 +58,10 @@ public class CustomerServiceImpl implements ICustomerService {
 
     @Override
     public void saveCustomer(CustomerInfo customerInfo) {
-        cartRepository.insertCart(customerInfo.getCustomerName(), customerInfo.getCustomerAddress(), customerInfo.getCustomerPhone(), customerInfo.getCustomerEmail());
-        Cart cart = cartRepository.findLastCart().orElse(null);
-        if (cart != null) {
-            customerRepository.insertCustomer(customerInfo.getCustomerCode(), customerInfo.getCustomerName(),
-                    customerInfo.getCustomerEmail(), customerInfo.getCustomerPhone(), customerInfo.getCustomerGender(),
-                    customerInfo.getDateOfBirth(), customerInfo.getIdCard(), customerInfo.getCustomerAddress(),
-                    customerInfo.getCustomerImg(), true, customerInfo.getCustomerType(), cart.getCartId());
-        }
+        customerRepository.insertCustomer(customerInfo.getCustomerCode(), customerInfo.getCustomerName(),
+                customerInfo.getCustomerEmail(), customerInfo.getCustomerPhone(), customerInfo.getCustomerGender(),
+                customerInfo.getDateOfBirth(), customerInfo.getCustomerAddress(),
+                customerInfo.getCustomerImg(), true, customerInfo.getCustomerType());
     }
 
     @SneakyThrows
@@ -86,9 +78,8 @@ public class CustomerServiceImpl implements ICustomerService {
     public void updateCustomer(CustomerInfo customerInfo, Integer id) {
         customerRepository.updateCustomer(id, customerInfo.getCustomerCode(), customerInfo.getCustomerName(),
                 customerInfo.getCustomerEmail(), customerInfo.getCustomerPhone(), customerInfo.getCustomerGender(),
-                customerInfo.getDateOfBirth(), customerInfo.getIdCard(), customerInfo.getCustomerAddress(),
-                customerInfo.getCustomerImg(), true, customerInfo.getCustomerType(), customerInfo.getAccount(),
-                customerInfo.getCart());
+                customerInfo.getDateOfBirth(), customerInfo.getCustomerAddress(),
+                customerInfo.getCustomerImg(), true, customerInfo.getCustomerType(), customerInfo.getAccount());
     }
 
     @Override
@@ -103,13 +94,13 @@ public class CustomerServiceImpl implements ICustomerService {
     }
 
     @Override
-    public Customer findByCart(Cart cart) {
-        return customerRepository.findByCart(cart);
+    public Customer findByAccountUserName(String username) {
+        return customerRepository.findByAccountUserName(username);
     }
 
     @Override
     public void updateCustomerAvatar(String username, String avatarUrl) {
-        Customer customer = customerRepository.findByAccountUserName(username);
+        Customer customer = customerRepository.findActiveCustomerByAccountUserName(username);
         if (customer != null) {
             customer.setCustomerImg(avatarUrl);
             customerRepository.save(customer);
@@ -181,4 +172,4 @@ public class CustomerServiceImpl implements ICustomerService {
             customerRepository.save(customer);
         }
     }
-}
+} 

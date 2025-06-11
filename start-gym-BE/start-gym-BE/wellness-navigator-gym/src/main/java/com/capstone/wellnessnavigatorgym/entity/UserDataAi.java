@@ -22,15 +22,34 @@ public class UserDataAi {
     @Column(name = "track_data_ai_id", nullable = false)
     private Integer track_data_ai_id;
     
+    @Column(name = "age")
     private Integer age;
+    
+    @Column(name = "gender")
     private String gender;
+    
+    @Column(name = "height")
     private Double height;     // Chiều cao (cm)
+    
+    @Column(name = "weight")
     private Double weight;     // Cân nặng (kg)
+    
+    @Column(name = "weight_after")
     private Double weight_after; // Cân nặng sau khi tập
+    
+    @Column(name = "waist_circumference")
     private Double waist_circumference;
+    
+    @Column(name = "chest_circumference")
     private Double chest_circumference;
+    
+    @Column(name = "waist_circumference_after")
     private Double waist_circumference_after; // Vòng eo sau khi tập
+    
+    @Column(name = "chest_circumference_after")
     private Double chest_circumference_after; // Vòng ngực sau khi tập
+    
+    @Column(name = "bmi")
     private Double bmi;
     
     // Thêm trường để track thời gian
@@ -63,6 +82,7 @@ public class UserDataAi {
     @Convert(converter = BodyTypeConverter.class)
     private BodyType body_type;   // Use BodyType enum
     
+    @Column(name = "effective")
     private Boolean effective;
     
     // This is VARCHAR in user_data_ai table, not enum

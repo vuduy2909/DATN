@@ -79,7 +79,7 @@ const NewCustomerType = () => {
         
         // Navigate back after a short delay to show success message
         setTimeout(() => {
-          navigate('/admin');
+          navigate('/admin/customer-types');
         }, 1500);
       }
     } catch (error) {
@@ -173,7 +173,7 @@ const NewCustomerType = () => {
                     variant="outlined"
                     size="large"
                     startIcon={<CancelIcon />}
-                    onClick={() => navigate('/admin')}
+                    onClick={() => navigate('/admin/customer-types')}
                     disabled={loading}
                     sx={{ borderRadius: 2, minWidth: 120 }}
                   >

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { request } from '../../utils/axiosInstance';
 import { useAuth } from '../../AuthContext'
 import styles from './Header.module.css';
-import { styled } from '@mui/material/styles';
+import { styled, alpha } from '@mui/material/styles';
 import AppBar from '@mui/material/AppBar';
 import InputBase from '@mui/material/InputBase';
 import Box from '@mui/material/Box';
@@ -21,20 +21,87 @@ import logo from '../../images/logo_start_gym.png'
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import SearchIcon from '@mui/icons-material/Search';
+// Import new icons for menu items
+import PersonIcon from '@mui/icons-material/Person';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import LogoutIcon from '@mui/icons-material/Logout';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import LoginIcon from '@mui/icons-material/Login';
+import Divider from '@mui/material/Divider';
+
+const Search = styled('div')(({ theme }) => ({
+  position: 'relative',
+  borderRadius: theme.shape.borderRadius,
+  backgroundColor: alpha(theme.palette.common.white, 0.15),
+  '&:hover': {
+    backgroundColor: alpha(theme.palette.common.white, 0.25),
+  },
+  marginRight: theme.spacing(2),
+  marginLeft: 0,
+  width: '100%',
+  [theme.breakpoints.up('sm')]: {
+    marginLeft: theme.spacing(3),
+    width: 'auto',
+  },
+}));
+
+const SearchIconWrapper = styled('div')(({ theme }) => ({
+  padding: theme.spacing(0, 2),
+  height: '100%',
+  position: 'absolute',
+  pointerEvents: 'none',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+}));
+
+const StyledInputBase = styled(InputBase)(({ theme }) => ({
+  color: 'inherit',
+  '& .MuiInputBase-input': {
+    padding: theme.spacing(1, 1, 1, 0),
+    // vertical padding + font size from searchIcon
+    paddingLeft: `calc(1em + ${theme.spacing(4)})`,
+    transition: theme.transitions.create('width'),
+    width: '100%',
+    [theme.breakpoints.up('md')]: {
+      width: '40ch',
+    },
+  },
+}));
 
 const Header = () => {
 
-    const StyledInputBase = styled(InputBase)(({ theme }) => ({
-        color: 'inherit',
-        '& .MuiInputBase-input': {
-            padding: theme.spacing(1, 1, 1, 0),
-            // vertical padding + font size from searchIcon
-            paddingLeft: `calc(1em + ${theme.spacing(4)})`,
-            transition: theme.transitions.create('width'),
-            width: '100%',
-            [theme.breakpoints.up('md')]: {
-                width: '20ch',
+    // Custom styled Menu component with enhanced styling
+    const StyledMenu = styled(Menu)(({ theme }) => ({
+        '& .MuiPaper-root': {
+            borderRadius: 8,
+            marginTop: theme.spacing(1),
+            minWidth: 200,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+            '& .MuiMenu-list': {
+                padding: '8px 0',
             },
+            '& .MuiMenuItem-root': {
+                padding: '10px 16px',
+                '&:hover': {
+                    backgroundColor: 'rgba(207, 64, 68, 0.08)',
+                },
+                '& .MuiSvgIcon-root': {
+                    fontSize: 20,
+                    marginRight: theme.spacing(2),
+                    color: '#CF4044',
+                },
+            },
+        },
+    }));
+
+    // Custom styled MenuItem for visual feedback
+    const StyledMenuItem = styled(MenuItem)(({ theme }) => ({
+        transition: 'all 0.2s ease',
+        '&:hover': {
+            transform: 'translateX(5px)',
+            backgroundColor: 'rgba(207, 64, 68, 0.08)',
         },
     }));
 
@@ -45,6 +112,7 @@ const Header = () => {
 
     const [anchorElNav, setAnchorElNav] = React.useState(null);
     const [anchorElUser, setAnchorElUser] = React.useState(null);
+    const [searchInput, setSearchInput] = React.useState('');
 
     const handleOpenNavMenu = (event) => {
         setAnchorElNav(event.currentTarget);
@@ -85,6 +153,7 @@ const Header = () => {
 
     const navigate = useNavigate();
     const location = useLocation();
+    const currentPath = location.pathname.toLowerCase();
 
     const handleLogout = () => {
         // Xóa token khỏi Local Storage khi đăng xuất
@@ -92,19 +161,45 @@ const Header = () => {
         navigate('/login');
     };
 
+    const handleSearchKeyDown = (event) => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            performSearch();
+        }
+    };
+
+    const performSearch = () => {
+        if (!searchInput.trim()) return;
+        
+        // Determine which page to search on based on current route
+        if (currentPath.includes('collection')) {
+            navigate(`/collections?search=${encodeURIComponent(searchInput)}`);
+        } else if (currentPath.includes('recipe')) {
+            navigate(`/recipe?search=${encodeURIComponent(searchInput)}`);
+        } else if (currentPath.includes('blog')) {
+            navigate(`/blog?search=${encodeURIComponent(searchInput)}`);
+        } else {
+            // Default to collections search
+            navigate(`/collections?search=${encodeURIComponent(searchInput)}`);
+        }
+    };
+
+    // Get placeholder text based on current page
+    const getSearchPlaceholder = () => {
+        if (currentPath.includes('collection')) {
+            return "Tìm kiếm khóa học...";
+        } else if (currentPath.includes('recipe')) {
+            return "Tìm kiếm món ăn dinh dưỡng...";
+        } else if (currentPath.includes('blog')) {
+            return "Tìm kiếm bài viết...";
+        }
+        return "Tìm kiếm...";
+    };
+
     // GET USER INFO
     const { user } = useAuth();
     const [userData, setUserData] = useState([]);
     const [isAdmin, setIsAdmin] = useState(false);
-    
-    // Separate effect for checking localStorage on mount
-    useEffect(() => {
-        const isAdminFromStorage = localStorage.getItem('isAdmin') === 'true';
-        console.log("Initial isAdmin from localStorage:", isAdminFromStorage);
-        if (isAdminFromStorage) {
-            setIsAdmin(true);
-        }
-    }, []);
     
     useEffect(() => {
         const fetchUserData = async () => {
@@ -118,16 +213,26 @@ const Header = () => {
                     return;
                 }
 
-                // Gọi API để lấy thông tin user
-                const res = await request.get('/customer/detail')
-                console.log("Full API response:", res);
-                console.log("API response keys:", Object.keys(res || {}));
+                // Gọi API để lấy thông tin user với xử lý lỗi tốt hơn
+                const res = await request.get('/customer/detail', {
+                    validateStatus: function (status) {
+                        return status < 500; // Chỉ reject khi lỗi server, xử lý lỗi 401, 403 trong code
+                    }
+                });
+                
+                // Kiểm tra response có lỗi hay không
+                if (!res || res.status === 401 || res.status === 403) {
+                    console.log('User not authenticated or token expired');
+                    setUserData([]);
+                    setIsAdmin(false);
+                    localStorage.removeItem('isAdmin');
+                    return;
+                }
+                
                 setUserData(res)
                 
                 // Check if user has admin role from API
                 if (res && res.account && res.account.roles) {
-                    console.log("User roles:", res.account.roles);
-                    
                     // Kiểm tra cả roleId, roleName và nhiều cách viết khác nhau
                     const hasAdminRole = res.account.roles.some(role => {
                         // Kiểm tra theo roleId
@@ -150,167 +255,87 @@ const Header = () => {
                         return false;
                     });
                     
-                    console.log("Is admin from API:", hasAdminRole);
-                    
                     // Lưu vào localStorage và set state
                     if (hasAdminRole) {
                         localStorage.setItem('isAdmin', 'true');
                         setIsAdmin(true);
-                        console.log("Admin access granted from API - menu should show");
                     } else {
                         // Không reset nếu đã có trong localStorage, có thể API không trả về roles
                         const currentAdminStatus = localStorage.getItem('isAdmin') === 'true';
                         if (!currentAdminStatus) {
                             localStorage.setItem('isAdmin', 'false');
                             setIsAdmin(false);
-                            console.log("No admin role found in API and localStorage - removing admin access");
-                        } else {
-                            console.log("API doesn't show admin role but localStorage has it - keeping admin status");
                         }
                     }
                 } else {
-                    console.log("No roles found in response, checking localStorage...");
-                    console.log("Response structure - account:", res?.account ? Object.keys(res.account) : 'no account');
-                    
                     // Không reset admin status nếu đã có trong localStorage
-                    // Có thể API này không trả về roles nhưng user đã được xác thực admin ở nơi khác
                     const currentAdminStatus = localStorage.getItem('isAdmin') === 'true';
                     if (currentAdminStatus) {
                         setIsAdmin(true);
-                        console.log("No roles in API but localStorage has admin status - keeping it");
                     } else {
                         setIsAdmin(false);
-                        console.log("No roles in API and no admin status in localStorage");
                     }
                 }
             } catch (error) {
                 console.log("Error fetching user information", error);
-                // Reset user data nếu có lỗi
+                // Reset user data
                 setUserData([]);
                 setIsAdmin(false);
-                localStorage.setItem('isAdmin', 'false');
+                localStorage.removeItem('isAdmin');
+                
+                // If it's an authentication error, clean up tokens
+                if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+                    localStorage.removeItem('token');
+                }
             }
         }
 
-        // Kiểm tra token và gọi API nếu có token
+        // Only fetch user data when component mounts or user changes
         const token = localStorage.getItem('token');
         if (token && token !== 'null' && token !== 'undefined') {
             fetchUserData();
         } else {
-            // Reset data khi không có token
+            // Reset data when no token
             setUserData([]);
             setIsAdmin(false);
             localStorage.removeItem('isAdmin');
         }
-    }, [user]) // Dependency vẫn là user để re-run khi user thay đổi
-    
-    // Additional effect to check admin status when token changes or component mounts
-    useEffect(() => {
-        const checkAdminStatus = () => {
-            const token = localStorage.getItem('token');
-            const storedIsAdmin = localStorage.getItem('isAdmin') === 'true';
-            
-            console.log("checkAdminStatus - token exists:", !!token, "stored isAdmin:", storedIsAdmin, "current isAdmin state:", isAdmin);
-            
-            if (token && token !== 'null' && token !== 'undefined') {
-                if (storedIsAdmin && !isAdmin) {
-                    // Nếu localStorage có admin nhưng state chưa có, cập nhật state
-                    setIsAdmin(true);
-                    console.log("Admin status restored from localStorage");
-                } else if (storedIsAdmin) {
-                    console.log("Admin status already confirmed");
-                }
-                // Không làm gì nếu không có admin status trong localStorage
-            } else {
-                // Chỉ reset khi không có token
-                setIsAdmin(false);
-                localStorage.removeItem('isAdmin');
-                console.log("No token found, removing admin status");
-            }
-        };
-        
-        checkAdminStatus();
-        
-        // Also check when localStorage changes (in case of tab switching)
-        const handleStorageChange = (e) => {
-            if (e.key === 'isAdmin' || e.key === 'token') {
-                console.log("localStorage changed:", e.key, e.newValue);
-                checkAdminStatus();
-            }
-        };
-        
-        window.addEventListener('storage', handleStorageChange);
-        
-        return () => {
-            window.removeEventListener('storage', handleStorageChange);
-        };
-    }, [location, isAdmin]); // Add isAdmin to dependencies
+    }, [user]) // Dependency is user to re-run when user changes
+
+    // Function to get icon based on setting name
+    const getSettingIcon = (setting) => {
+        switch (setting) {
+            case 'Profile':
+                return <PersonIcon />;
+            case 'Account':
+                return <AccountCircleIcon />;
+            case 'Dashboard':
+                return <DashboardIcon />;
+            case 'Logout':
+                return <LogoutIcon />;
+            case 'Admin':
+                return <AdminPanelSettingsIcon />;
+            default:
+                return null;
+        }
+    };
 
     return (
         <AppBar position="static" className={styles.appBar}>
             <Container maxWidth="xl" className={styles.container}>
-                <Toolbar disableGutters>
-                    <MenuItem style={{ borderRadius: '50%', height: '135px' }}>
-                        <Link to='/'><img src={logo} alt='logo' className={styles.kyoRoundLogo1} /></Link>
+                <Toolbar disableGutters sx={{ minHeight: '80px !important', padding: '0 !important' }}>
+                    <MenuItem sx={{ 
+                        borderRadius: '50%', 
+                        height: '90px', 
+                        padding: '12px',
+                        transition: 'background-color 0.2s ease',
+                        '&:hover': {
+                            backgroundColor: 'rgba(255,255,255,0.08)'
+                        }
+                    }}>
+                        <Link to='/'><img src={logo} alt='logo' className={styles.startRoundLogo1} /></Link>
                     </MenuItem>
-                    <Box sx={{ flexGrow: 1, display: { xs: 'flex', md: 'none' } }}>
-                        <IconButton
-                            size="large"
-                            aria-label="account of current user"
-                            aria-controls="menu-appbar"
-                            aria-haspopup="true"
-                            onClick={handleOpenNavMenu}
-                            color="inherit"
-                        >
-                            <MenuIcon />
-                        </IconButton>
-                        <Menu
-                            className={styles.menu}
-                            id="menu-appbar"
-                            anchorEl={anchorElNav}
-                            anchorOrigin={{
-                                vertical: 'bottom',
-                                horizontal: 'left',
-                            }}
-                            keepMounted
-                            transformOrigin={{
-                                vertical: 'top',
-                                horizontal: 'left',
-                            }}
-                            open={Boolean(anchorElNav)}
-                            onClose={handleCloseNavMenu}
-                            sx={{
-                                display: { xs: 'block', md: 'none' },
-                                color: '#fff'
-                            }}
-                        >
-                            {pages.map((page) => (
-                                <MenuItem key={page} onClick={handleCloseNavMenu}>
-                                    <Typography textAlign="center">{page}</Typography>
-                                </MenuItem>
-                            ))}
-                        </Menu>
-                    </Box>
-                    <AdbIcon sx={{ display: { xs: 'flex', md: 'none' }, mr: 1 }} />
-                    <Typography
-                        variant="h5"
-                        noWrap
-                        component="a"
-                        href="#app-bar-with-responsive-menu"
-                        sx={{
-                            mr: 2,
-                            display: { xs: 'flex', md: 'none' },
-                            flexGrow: 1,
-                            fontFamily: 'monospace',
-                            fontWeight: 700,
-                            letterSpacing: '.3rem',
-                            color: 'inherit',
-                            textDecoration: 'none',
-                        }}
-                    >
-                        LOGO
-                    </Typography>
-
+                    
                     {/* Menu item  - Navigation */}
                     <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex' } }} className={styles.menuItem}>
                         {pages.map((page) => (
@@ -327,26 +352,43 @@ const Header = () => {
                         ))}
                     </Box>
 
-                    <div className={styles.Search}>
-                        <div className={styles.SearchIconWrapper}>
+                    {/* Search */}
+                    <Search>
+                        <SearchIconWrapper>
                             <SearchIcon />
-                        </div>
+                        </SearchIconWrapper>
                         <StyledInputBase
-                            placeholder="Search…"
+                            placeholder={getSearchPlaceholder()}
                             inputProps={{ 'aria-label': 'search' }}
+                            value={searchInput}
+                            onChange={(e) => setSearchInput(e.target.value)}
+                            onKeyDown={handleSearchKeyDown}
                         />
-                    </div>
+                    </Search>
 
                     {/* Account */}
                     <Box sx={{ flexGrow: 0 }}>
                         <Tooltip title="Open settings">
                             <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
-                                <Avatar alt="Avatar" src={userData.customerImg} />
+                                <Avatar 
+                                    alt="Avatar" 
+                                    src={userData.customerImg} 
+                                    sx={{ 
+                                        width: 40, 
+                                        height: 40, 
+                                        border: '2px solid white',
+                                        boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                                        transition: 'transform 0.2s',
+                                        '&:hover': {
+                                            transform: 'scale(1.05)'
+                                        }
+                                    }}
+                                />
                             </IconButton>
                         </Tooltip>
                         {token ? (
                             // Nếu có token, hiển thị menu settings
-                            <Menu
+                            <StyledMenu
                                 sx={{ mt: '45px' }}
                                 id="menu-appbar"
                                 anchorEl={anchorElUser}
@@ -363,30 +405,40 @@ const Header = () => {
                                 onClose={handleCloseUserMenu}
                             >
                                 {/* Show Admin menu item if user is admin */}
-                                {console.log("Menu render - isAdmin:", isAdmin, "token:", !!token, "location:", location.pathname)}
                                 {isAdmin && (
-                                    <MenuItem onClick={() => handleNavigate('Admin')}>
-                                        <Typography textAlign="center">Admin</Typography>
-                                    </MenuItem>
+                                    <StyledMenuItem onClick={() => handleNavigate('Admin')}>
+                                        <AdminPanelSettingsIcon sx={{ color: '#CF4044' }} />
+                                        <Typography textAlign="left">Admin</Typography>
+                                    </StyledMenuItem>
                                 )}
-                                {settings.map((setting) => {
-                                    if (setting === 'Logout') {
-                                        return (
-                                            <MenuItem key={setting} onClick={handleLogout}>
-                                                <Typography textAlign="center">{setting}</Typography>
-                                            </MenuItem>
-                                        );
-                                    }
-                                    return (
-                                        <MenuItem key={setting} onClick={() => handleNavigate(setting)}>
-                                            <Typography textAlign="center">{setting}</Typography>
-                                        </MenuItem>
-                                    );
-                                })}
-                            </Menu>
+                                
+                                <StyledMenuItem onClick={() => handleNavigate('Dashboard')}>
+                                    <DashboardIcon sx={{ color: '#CF4044' }} />
+                                    <Typography textAlign="left">Dashboard</Typography>
+                                </StyledMenuItem>
+                                
+                                <StyledMenuItem onClick={() => handleNavigate('Profile')}>
+                                    <PersonIcon sx={{ color: '#CF4044' }} />
+                                    <Typography textAlign="left">Profile</Typography>
+                                </StyledMenuItem>
+                                
+                                <StyledMenuItem onClick={() => handleNavigate('Account')}>
+                                    <AccountCircleIcon sx={{ color: '#CF4044' }} />
+                                    <Typography textAlign="left">Account</Typography>
+                                </StyledMenuItem>
+                                
+                                <Divider sx={{ my: 1 }} />
+                                
+                                <StyledMenuItem onClick={handleLogout}>
+                                    <LogoutIcon sx={{ color: '#CF4044' }} />
+                                    <Typography textAlign="left" sx={{ color: '#d32f2f' }}>
+                                        Logout
+                                    </Typography>
+                                </StyledMenuItem>
+                            </StyledMenu>
                         ) : (
                             // Nếu không có token, hiển thị nút Login
-                            <Menu
+                            <StyledMenu
                                 sx={{ mt: '45px' }}
                                 id="menu-appbar"
                                 anchorEl={anchorElUser}
@@ -402,14 +454,15 @@ const Header = () => {
                                 open={Boolean(anchorElUser)}
                                 onClose={handleCloseUserMenu}
                             >
-                                <MenuItem onClick={handleLogout}>
-                                    <Link to="/login" style={{ textDecoration: 'none', color: 'inherit' }}>
-                                        <Typography variant="subtitle1" onClick={handleCloseUserMenu}>
+                                <StyledMenuItem onClick={handleLogout}>
+                                    <Link to="/login" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center' }}>
+                                        <LoginIcon sx={{ color: '#CF4044', mr: 2 }} />
+                                        <Typography variant="subtitle1">
                                             Login
                                         </Typography>
                                     </Link>
-                                </MenuItem>
-                            </Menu>
+                                </StyledMenuItem>
+                            </StyledMenu>
                         )}
                     </Box>
                 </Toolbar>

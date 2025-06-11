@@ -108,12 +108,23 @@ public class DecisionTree {
         double informationGain = calculateInformationGain(attributeName);
         double splitInfo = calculateSplitInfo(attributeName);
 
-        // Avoid division by zero
-        if (splitInfo == 0) {
-            return informationGain > 0 ? Double.MAX_VALUE : 0;
+        // Handle edge cases for better algorithm stability
+        if (splitInfo == 0 || Double.isNaN(splitInfo) || Double.isInfinite(splitInfo)) {
+            // If splitInfo is 0, the attribute doesn't split the data meaningfully
+            // Return a small gain ratio based on information gain only
+            return informationGain > 0 ? informationGain * 0.1 : 0.0;
         }
 
-        return informationGain / splitInfo;
+        double gainRatio = informationGain / splitInfo;
+        
+        // Sanity check for numerical stability
+        if (Double.isNaN(gainRatio) || Double.isInfinite(gainRatio)) {
+            System.out.println("Invalid gain ratio calculated for attribute " + attributeName + 
+                ": informationGain=" + informationGain + ", splitInfo=" + splitInfo);
+            return 0.0;
+        }
+        
+        return gainRatio;
     }
 
 }

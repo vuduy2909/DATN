@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     Box,
     Container,
@@ -15,7 +16,10 @@ import {
     Alert,
     CircularProgress,
     Grid,
-    Divider
+    Divider,
+    List,
+    ListItem,
+    ListItemText
 } from '@mui/material';
 import {
     CheckCircle,
@@ -26,8 +30,11 @@ import {
     TrendingUp,
     Assignment
 } from '@mui/icons-material';
+import { useAuth } from '../../AuthContext';
 
 const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendationResult, loading, error }) => {
+    const navigate = useNavigate();
+    const { user } = useAuth();
     console.log('Step7 rendering with props:', { 
         formDataExists: !!formData,
         recommendationResult,
@@ -41,14 +48,35 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
     const [localRecommendation, setLocalRecommendation] = useState(null);
     
     const steps = [
-        'Thông tin tập luyện',
-        'Thông tin cơ bản', 
-        'Mục tiêu tập luyện',
-        'Tần suất mong muốn',
-        'Thông tin nghề nghiệp',
-        'Số đo cơ thể',
-        'Kết quả phân tích'
+        '1',
+        '2', 
+        '3',
+        '4',
+        '5',
+        '6',
+        '7'
     ];
+
+    // Tạo key riêng cho từng user dựa trên userId
+    const getStorageKey = () => {
+        const userId = user?.id || 'anonymous';
+        return `recommendationData_${userId}`;
+    };
+
+    // Load từ localStorage khi component mount
+    useEffect(() => {
+        try {
+            const storageKey = getStorageKey();
+            const savedData = localStorage.getItem(storageKey);
+            if (savedData) {
+                const parsed = JSON.parse(savedData);
+                console.log('Loaded recommendation data from localStorage for user:', user?.id);
+                setLocalRecommendation(parsed);
+            }
+        } catch (e) {
+            console.error('Error loading recommendation data from localStorage:', e);
+        }
+    }, [user]);
 
     useEffect(() => {
         console.log('Step7 useEffect triggered with recommendationResult:', recommendationResult);
@@ -98,18 +126,20 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
             
             // Save to localStorage for persistence
             try {
-                localStorage.setItem('recommendationData', JSON.stringify(enhancedResult));
-                console.log('Saved enhanced recommendation data to localStorage');
+                const storageKey = getStorageKey();
+                localStorage.setItem(storageKey, JSON.stringify(enhancedResult));
+                console.log('Saved enhanced recommendation data to localStorage for user:', user?.id);
             } catch (e) {
                 console.error('Error saving to localStorage:', e);
             }
         }
-    }, [recommendationResult, formData]);
+    }, [recommendationResult, formData, user]);
 
     // Use recommendation data from props or localStorage
     const activeRecommendation = recommendationResult || localRecommendation;
 
-    const handleConfirmRecommendation = async () => {
+        const handleConfirmRecommendation = async () => {
+        console.log('=== ENHANCED DEBUG CONFIRM RECOMMENDATION ===');
         console.log('handleConfirmRecommendation called with activeRecommendation:', activeRecommendation);
         
         // Lấy dữ liệu chính xác nhất có thể
@@ -140,10 +170,12 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
             let rawCourseId = activeRecommendation.actions.recommendedCourseId;
             
             if (rawCourseId) {
+                console.log('Raw courseId from actions:', rawCourseId, 'Type:', typeof rawCourseId);
+                
                 // Xử lý trường hợp là object có courseId hoặc id
                 if (typeof rawCourseId === 'object') {
                     if (rawCourseId.courseId) {
-                recommendedCourseId = Number(rawCourseId.courseId);
+                        recommendedCourseId = Number(rawCourseId.courseId);
                     } else if (rawCourseId.id) {
                         recommendedCourseId = Number(rawCourseId.id);
                     }
@@ -152,7 +184,7 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
                 else if (typeof rawCourseId === 'number') {
                     recommendedCourseId = rawCourseId;
                 } else if (typeof rawCourseId === 'string' && !isNaN(rawCourseId)) {
-                recommendedCourseId = Number(rawCourseId);
+                    recommendedCourseId = Number(rawCourseId);
                 }
             }
             
@@ -185,9 +217,48 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
             }
         }
         
+        // Enhanced validation with detailed logging
+        console.log('VALIDATION CHECKS:');
+        console.log('recommendedCourseId:', recommendedCourseId, 'isNaN:', isNaN(recommendedCourseId));
+        console.log('actionFormData exists:', !!actionFormData);
+        console.log('actionFormData.customerId:', actionFormData?.customerId);
+        
+        // Enhanced fallback logic for recommendedCourseId
+        if (!recommendedCourseId || isNaN(recommendedCourseId)) {
+            console.warn('Attempting fallback methods to find recommendedCourseId...');
+            
+            // Try to get from localStorage
+            try {
+                const storageKey = getStorageKey();
+                const savedData = localStorage.getItem(storageKey);
+                if (savedData) {
+                    const parsed = JSON.parse(savedData);
+                    const fallbackCourse = parsed.recommendedCourse || parsed.recommendedCourses;
+                    if (fallbackCourse && fallbackCourse.courseId) {
+                        recommendedCourseId = Number(fallbackCourse.courseId);
+                        console.log('Found courseId from localStorage:', recommendedCourseId);
+                    }
+                }
+            } catch (e) {
+                console.warn('Failed to get courseId from localStorage:', e);
+            }
+            
+            // If still no courseId, try to get from formData
+            if (!recommendedCourseId && actionFormData?.recommendedCourseId) {
+                recommendedCourseId = Number(actionFormData.recommendedCourseId);
+                console.log('Found courseId from actionFormData:', recommendedCourseId);
+            }
+            
+            // Final fallback: use default course ID
+            if (!recommendedCourseId || isNaN(recommendedCourseId)) {
+                console.warn('Using default courseId as last fallback');
+                recommendedCourseId = 1; // Default course ID
+            }
+        }
+        
         // Kiểm tra cuối cùng trước khi gửi API
         if (!recommendedCourseId || isNaN(recommendedCourseId)) {
-            console.error('Missing or invalid recommendedCourseId', recommendedCourseId);
+            console.error('Missing or invalid recommendedCourseId after all fallbacks', recommendedCourseId);
             setConfirmError('Không thể xác nhận đề xuất: Thiếu hoặc sai ID khóa học.');
             
             setTimeout(() => {
@@ -228,8 +299,8 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
         
         // Log dữ liệu sẽ gửi đi để kiểm tra
         console.log('FINAL DATA BEING SENT TO API:');
-        console.log('Form data:', actionFormData);
-        console.log('Course ID:', recommendedCourseId);
+        console.log('Form data:', JSON.stringify(actionFormData, null, 2));
+        console.log('Course ID:', recommendedCourseId, 'Type:', typeof recommendedCourseId);
         
         setConfirmLoading(true);
         setConfirmError('');
@@ -240,7 +311,7 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
             
             // Debug chi tiết requestData
             console.log('DEBUG CONFIRM REQUEST:');
-            console.log('actionFormData:', JSON.stringify(actionFormData));
+            console.log('actionFormData:', JSON.stringify(actionFormData, null, 2));
             console.log('recommendedCourseId:', recommendedCourseId);
             console.log('recommendedCourseId type:', typeof recommendedCourseId);
             
@@ -272,7 +343,7 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
                     errorMessage = error.response.data;
                 } else if (error.response.data) {
                     if (error.response.data.message) {
-                    errorMessage = error.response.data.message;
+                        errorMessage = error.response.data.message;
                     } else {
                         // Trích xuất thông tin lỗi từ các trường khác nếu có
                         errorMessage = JSON.stringify(error.response.data);
@@ -301,11 +372,31 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
     const hasApiRecommendations = !!recommendedCourse;
     const userMetrics = activeRecommendation?.userMetrics || {};
     
-    // DEBUG: Log values to help diagnose the issue
+    // DEBUG: Enhanced logging to help diagnose the issue
+    console.log('=== ENHANCED DEBUG Step7 RENDER ===');
     console.log('DEBUG Step7: activeRecommendation', activeRecommendation);
     console.log('DEBUG Step7: recommendedCourse', recommendedCourse);
     console.log('DEBUG Step7: hasApiRecommendations', hasApiRecommendations);
     console.log('DEBUG Step7: userMetrics', userMetrics);
+    console.log('DEBUG Step7: recommendationResult prop', recommendationResult);
+    console.log('DEBUG Step7: localRecommendation state', localRecommendation);
+    console.log('DEBUG Step7: formData prop', formData);
+    
+    // Check localStorage directly
+    try {
+        const storageKey = getStorageKey();
+        const savedData = localStorage.getItem(storageKey);
+        console.log('DEBUG Step7: localStorage key:', storageKey);
+        console.log('DEBUG Step7: localStorage data:', savedData);
+        if (savedData) {
+            const parsed = JSON.parse(savedData);
+            console.log('DEBUG Step7: parsed localStorage data:', parsed);
+        }
+    } catch (e) {
+        console.error('DEBUG Step7: Error checking localStorage:', e);
+    }
+    
+    console.log('=== END ENHANCED DEBUG Step7 RENDER ===');
 
     // Helper functions to map data
         const mapTrainingFrequency = (value) => {
@@ -354,6 +445,32 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
         );
     }
 
+    // Show debug info when no recommendations are available
+    if (!loading && !error && !hasApiRecommendations) {
+        return (
+            <Container maxWidth="md" sx={{ py: 4 }}>
+                <Alert severity="warning" sx={{ mb: 3 }}>
+                    <Typography variant="h6">Không tìm thấy đề xuất khóa học</Typography>
+                    <Typography variant="body2" sx={{ mt: 1 }}>
+                        DEBUG INFO: activeRecommendation = {JSON.stringify(activeRecommendation, null, 2)}
+                    </Typography>
+                    <Typography variant="body2" sx={{ mt: 1 }}>
+                        DEBUG INFO: recommendationResult = {JSON.stringify(recommendationResult, null, 2)}
+                    </Typography>
+                    <Typography variant="body2" sx={{ mt: 1 }}>
+                        DEBUG INFO: formData = {JSON.stringify(formData, null, 2)}
+                    </Typography>
+                </Alert>
+                <Button variant="outlined" onClick={handlePrevious} sx={{ mr: 2 }}>
+                    Quay lại
+                </Button>
+                <Button variant="contained" onClick={handleGoToCollections}>
+                    Tiếp tục
+                </Button>
+            </Container>
+        );
+    }
+
     return (
         <Box sx={{ 
             backgroundColor: '#ffffff', 
@@ -364,13 +481,48 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
             <Container maxWidth="md" sx={{ py: 4 }}>
                 {/* Material UI Stepper */}
                 <Paper elevation={2} sx={{ p: 3, mb: 4, borderRadius: 3 }}>
-                    <Stepper activeStep={6} alternativeLabel>
+                    <Stepper 
+                        activeStep={6} 
+                        alternativeLabel
+                        sx={{
+                            '& .MuiStep-root': {
+                                '& .MuiStepIcon-root': {
+                                    color: '#e0e0e0', // Inactive step color
+                                    '&.Mui-active': {
+                                        color: '#CF4044', // Active step color (red)
+                                    },
+                                    '&.Mui-completed': {
+                                        color: '#CF4044', // Completed step color (red)
+                                    },
+                                },
+                                '& .MuiStepConnector-line': {
+                                    borderColor: '#e0e0e0', // Connector line color
+                                },
+                                '& .Mui-active ~ .MuiStepConnector-root .MuiStepConnector-line': {
+                                    borderColor: '#CF4044', // Active connector color
+                                },
+                                '& .Mui-completed ~ .MuiStepConnector-root .MuiStepConnector-line': {
+                                    borderColor: '#CF4044', // Completed connector color
+                                },
+                            },
+                            '& .MuiStepConnector-root': {
+                                '& .MuiStepConnector-line': {
+                                    borderTopWidth: '3px',
+                                    borderRadius: '1px',
+                                },
+                            },
+                        }}
+                    >
                         {steps.map((label, index) => (
                             <Step key={label}>
-                                <StepLabel>
-                                    <Typography variant="caption" sx={{ fontSize: '0.75rem' }}>
-                                        {label}
-                                    </Typography>
+                                <StepLabel
+                                    sx={{
+                                        '& .MuiStepLabel-label': {
+                                            display: 'none', // Hide the step label text
+                                        },
+                                    }}
+                                >
+                                    {/* No label text */}
                                 </StepLabel>
                             </Step>
                         ))}

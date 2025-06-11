@@ -187,10 +187,10 @@ public class PaymentController {
                 cartDetailService.update(cartDetail);
             }
 
-            Customer customer = customerService.findByCart(cart);
-            if (customer != null) {
-                customerTypeService.upgradeCustomerType(customer);
-            }
+            // Customer customer = customerService.findByCart(cart);
+            // if (customer != null) {
+            //     customerTypeService.upgradeCustomerType(customer);
+            // }
             emailService.emailProcess(cart, totalAmount, cartDetails);
         }
         return new ResponseEntity<>(HttpStatus.OK);
@@ -206,7 +206,7 @@ public class PaymentController {
      * Tạo URL thanh toán VNPay
      */
     @PostMapping("/create")
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     public ResponseEntity<?> createPayment(@Valid @RequestBody PaymentRequest paymentRequest, 
                                          HttpServletRequest request, 
                                          Principal principal) {
@@ -351,30 +351,24 @@ public class PaymentController {
                         
                         // Tự động cập nhật customer type dựa trên tổng số tiền đã thanh toán
                         try {
-                            boolean customerTypeUpdated = paymentStatusService.updateCustomerTypeBasedOnPayments(customerId);
-                            if (customerTypeUpdated) {
-                                System.out.println("Successfully updated customer type for customer " + customerId);
-                                response.put("customerTypeUpdate", "SUCCESS");
-                                
-                                // Lấy thông tin customer type mới
-                                Customer updatedCustomer = customerRepository.findById(customerId).orElse(null);
-                                if (updatedCustomer != null && updatedCustomer.getCustomerType() != null) {
-                                    response.put("newCustomerType", updatedCustomer.getCustomerType().getCustomerTypeId());
-                                    response.put("newCustomerTypeName", updatedCustomer.getCustomerType().getCustomerTypeName());
-                                }
-                                
-                                // Lấy tổng số tiền đã thanh toán
-                                BigDecimal totalPaid = paymentStatusService.getTotalPaidAmount(customerId);
-                                response.put("totalPaidAmount", totalPaid);
+                            BigDecimal paymentAmount = payment.getAmount();
+                            
+                            // Cập nhật total_vip_spent cho customer
+                            boolean totalUpdated = paymentStatusService.updateCustomerTotalVipSpent(customerId, paymentAmount, false);
+                            
+                            if (totalUpdated) {
+                                System.out.println("Successfully updated total VIP spent for customer " + customerId + " with amount " + paymentAmount);
+                                response.put("totalVipSpentUpdated", true);
                             } else {
-                                System.out.println("Failed to update customer type for customer " + customerId);
-                                response.put("customerTypeUpdate", "FAILED");
+                                System.out.println("Failed to update total VIP spent for customer " + customerId);
+                                response.put("totalVipSpentUpdated", false);
                             }
+                            
                         } catch (Exception e) {
-                            System.err.println("Error updating customer type: " + e.getMessage());
+                            System.err.println("Error updating customer total VIP spent: " + e.getMessage());
                             e.printStackTrace();
-                            response.put("customerTypeUpdate", "ERROR");
-                            response.put("customerTypeError", e.getMessage());
+                            response.put("totalVipSpentUpdated", false);
+                            response.put("totalVipSpentError", e.getMessage());
                         }
                         
                     } else {
@@ -412,7 +406,7 @@ public class PaymentController {
      * Lấy lịch sử thanh toán của user
      */
     @GetMapping("/history")
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     public ResponseEntity<?> getPaymentHistory(Principal principal) {
         try {
             // TODO: Implement proper customer lookup
@@ -430,7 +424,7 @@ public class PaymentController {
      * Kiểm tra trạng thái thanh toán
      */
     @GetMapping("/status/{transactionRef}")
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     public ResponseEntity<?> getPaymentStatus(@PathVariable String transactionRef) {
         try {
             VipPayment payment = vipPaymentRepository.findByVnpTxnRef(transactionRef)
@@ -577,9 +571,24 @@ public class PaymentController {
                 courseInfo.put("courseId", course.getCourseId());
                 courseInfo.put("courseName", course.getCourseName());
                 courseInfo.put("description", course.getDescription());
-                courseInfo.put("price", payment.getAmount());
-                courseInfo.put("purchaseDate", payment.getCreatedDate());
+                courseInfo.put("amount", payment.getAmount());
+                courseInfo.put("paymentDate", payment.getCreatedDate());
                 courseInfo.put("paymentId", payment.getPaymentId());
+                
+                // Ensure course has an image (use a generic placeholder if missing)
+                String imageUrl = course.getImage();
+                if (imageUrl == null || imageUrl.trim().isEmpty()) {
+                    // Use a generic placeholder reference instead of hardcoded Firebase URL
+                    imageUrl = ""; // Empty string will trigger client-side fallback SVG
+                }
+                courseInfo.put("image", imageUrl);
+                courseInfo.put("courseImage", imageUrl); // Đảm bảo cả 2 field đều có
+                
+                // Thêm thông tin khóa học bổ sung
+                courseInfo.put("price", course.getPrice()); // Giá gốc của khóa học
+                courseInfo.put("isVip", course.getIsVip());
+                courseInfo.put("averageRating", course.getAverageRating());
+                courseInfo.put("difficultyLevel", course.getDifficultyLevel());
                 
                 // Kiểm tra xem đã được thêm vào customer_course chưa
                 boolean isEnrolled = customerCourseService.isCustomerEnrolledInCourse(customer.getCustomerId(), course.getCourseId());

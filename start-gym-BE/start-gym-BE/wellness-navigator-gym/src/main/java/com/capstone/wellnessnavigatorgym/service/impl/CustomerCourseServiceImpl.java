@@ -6,6 +6,7 @@ import com.capstone.wellnessnavigatorgym.entity.CustomerCourse;
 import com.capstone.wellnessnavigatorgym.repository.ICourseRepository;
 import com.capstone.wellnessnavigatorgym.repository.ICustomerCourseRepository;
 import com.capstone.wellnessnavigatorgym.repository.ICustomerRepository;
+import com.capstone.wellnessnavigatorgym.repository.ICustomerDayCompletionRepository;
 import com.capstone.wellnessnavigatorgym.service.ICustomerCourseService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,9 @@ public class CustomerCourseServiceImpl implements ICustomerCourseService {
     
     @Autowired
     private ICourseRepository courseRepository;
+
+    @Autowired
+    private ICustomerDayCompletionRepository customerDayCompletionRepository;
 
     @Override
     public void save(CustomerCourse customerCourse) {
@@ -75,7 +79,7 @@ public class CustomerCourseServiceImpl implements ICustomerCourseService {
     
     @Override
     public List<CustomerCourse> findRecommendedCoursesByUsername(String username) {
-        Customer customer = customerRepository.findByAccountUserName(username);
+        Customer customer = customerRepository.findActiveCustomerByAccountUserName(username);
         if (customer == null) {
             return new ArrayList<>();
         }
@@ -128,6 +132,9 @@ public class CustomerCourseServiceImpl implements ICustomerCourseService {
         if (!isCustomerEnrolledInCourse(customerId, courseId)) {
             throw new IllegalArgumentException("Customer is not enrolled in this course");
         }
+        
+        // IMPORTANT: Delete all day completion records first before deleting course enrollment
+        customerDayCompletionRepository.deleteByCustomerAndCourse(customerId, courseId);
         
         // Delete the customer course record
         customerCourseRepository.deleteByCustomerIdAndCourseId(customerId, courseId);

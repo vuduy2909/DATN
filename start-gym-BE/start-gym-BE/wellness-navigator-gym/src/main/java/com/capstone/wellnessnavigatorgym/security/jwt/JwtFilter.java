@@ -58,19 +58,34 @@ public class JwtFilter extends OncePerRequestFilter {
                 logger.debug("JWT Token validation result: {}", isValid);
                 
                 if (isValid && username != null) {
-                    UserDetails userDetails = userDetailService.loadUserByUsername(username);
-                    UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                            userDetails, null, userDetails.getAuthorities());
-                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    try {
+                        UserDetails userDetails = userDetailService.loadUserByUsername(username);
+                        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                                userDetails, null, userDetails.getAuthorities());
+                        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
-                    logger.debug("User authentication set successfully for: {}", username);
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                        logger.debug("User authentication set successfully for: {}", username);
+                    } catch (Exception userDetailsException) {
+                        // This catches banned customer exceptions from UserDetailService
+                        logger.warn("Authentication failed for user {}: {}", username, userDetailsException.getMessage());
+                        SecurityContextHolder.clearContext();
+                        
+                        // If this is a banned customer, return 401 immediately
+                        if (userDetailsException.getMessage().contains("banned")) {
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.setContentType("application/json");
+                            response.getWriter().write("{\"error\":\"Customer account is banned\",\"message\":\"Your account has been banned\"}");
+                            return;
+                        }
+                    }
                 } else {
                     logger.warn("JWT Token validation failed with both providers");
                 }
             }
         } catch (Exception e) {
             logger.error("Cannot set user authentication: {}", e);
+            SecurityContextHolder.clearContext();
         }
         filterChain.doFilter(request, response);
     }

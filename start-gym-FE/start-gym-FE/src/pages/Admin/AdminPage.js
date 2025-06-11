@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Drawer,
@@ -25,7 +25,7 @@ import {
   Comment as CommentIcon,
   MonetizationOn as RevenueIcon
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import ExerciseComponent from '../../components/Admin/ExerciseComponent/ExerciseComponent';
 import CustomerComponent from '../../components/Admin/CustomersComponent/CustomerComponent';
 import CustomerTypeComponent from '../../components/Admin/CustomerTypeComponent/CustomerTypeComponent';
@@ -37,9 +37,30 @@ import logo from '../../images/logo_start_gym.png';
 
 const drawerWidth = 220;
 
-const AdminPage = () => {
-  const [activeTab, setActiveTab] = useState('dashboard');
+const AdminPage = ({ defaultTab = 'dashboard' }) => {
+  const [activeTab, setActiveTab] = useState(defaultTab);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Set active tab based on URL or defaultTab prop
+  useEffect(() => {
+    setActiveTab(defaultTab);
+  }, [defaultTab]);
+
+  // Handle navigation state to switch tabs
+  useEffect(() => {
+    if (location.state?.activeTab) {
+      setActiveTab(location.state.activeTab);
+      // Clear the state to prevent unwanted tab switches
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, navigate, location.pathname]);
+
+  const handleTabChange = (newTab) => {
+    setActiveTab(newTab);
+    // Navigate to the specific admin section URL
+    navigate(`/admin/${newTab === 'dashboard' ? '' : newTab}`, { replace: true });
+  };
 
   const goToHomepage = () => {
     sessionStorage.setItem('navigatingFromAdmin', 'true');
@@ -78,7 +99,7 @@ const AdminPage = () => {
       color: '#d35255'
     },
     { 
-      key: 'customerType', 
+      key: 'customer-types', 
       label: 'Customer Types', 
       icon: <CustomerTypeIcon />,
       color: '#d35255'
@@ -105,28 +126,7 @@ const AdminPage = () => {
         return <CourseComponent />;
       case 'exercises':
         return (
-          <Box sx={{ p: 2 }}>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-              <Typography variant="h5" fontWeight="bold">
-                Exercise Management
-              </Typography>
-              <Button 
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={() => navigate('/newexercise')}
-                sx={{ 
-                  borderRadius: 2,
-                  bgcolor: '#d35255',
-                  '&:hover': {
-                    bgcolor: '#b8464a'
-                  }
-                }}
-              >
-                Add Exercise
-              </Button>
-            </Box>
-            <ExerciseComponent />
-          </Box>
+          <ExerciseComponent />
         );
       case 'customers':
         return (
@@ -245,7 +245,7 @@ const AdminPage = () => {
             <ListItem key={item.key} disablePadding sx={{ mb: 0.3 }}>
               <ListItemButton
                 selected={activeTab === item.key}
-                onClick={() => setActiveTab(item.key)}
+                onClick={() => handleTabChange(item.key)}
                 sx={{
                   borderRadius: 2,
                   py: 1,

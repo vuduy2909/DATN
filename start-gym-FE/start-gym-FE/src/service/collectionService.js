@@ -121,6 +121,25 @@ export const putReviewCourse = async (courseId, data) => {
     }
 }
 
+export const updatePostCourseMetrics = async (userDataId, measurements) => {
+    try {
+        // The correct flow is to update the user's measurements first
+        // userDataId refers to the ID from the user_data_ai table, NOT track_data_ai_id
+        const res = await request.post(`/track-data-ai/update-measurements/${userDataId}`, measurements);
+        
+        console.log('Updated post-course measurements:', res);
+        
+        if (res && res.track_data_ai_id) {
+            console.log(`Successfully updated metrics. New track_data_ai_id: ${res.track_data_ai_id}`);
+        }
+        
+        return res;
+    } catch (error) {
+        console.error('Error updating post-course measurements:', error);
+        throw error;
+    }
+}
+
 // TOGGLE DAY COMPLETION STATUS
 export const toggleDayCompletion = async (customerId, courseId, dayId) => {
     try {
@@ -135,7 +154,7 @@ export const toggleDayCompletion = async (customerId, courseId, dayId) => {
 // DELETE USER COURSE FROM customer_course TABLE
 export const deleteUserCourse = async (courseId) => {
     try {
-        const res = await request.remove(`/customer-course/${courseId}`);
+        const res = await request.delete(`/customer-course/${courseId}`);
         return res;
     } catch (error) {
         console.error('Error deleting user course:', error);

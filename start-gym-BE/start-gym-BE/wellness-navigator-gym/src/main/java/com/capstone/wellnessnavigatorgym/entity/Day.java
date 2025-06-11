@@ -14,7 +14,10 @@ import javax.persistence.*;
 public class Day {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "day_id")
     private Integer dayId;
+    
+    @Column(name = "day_name")
     private String dayName;
     
     // Add constructor with dayId

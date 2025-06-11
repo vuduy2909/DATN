@@ -8,6 +8,11 @@
 body {
   margin: 0;
   line-height: normal;
+  background-color: #fff;
+  overflow-x: hidden;
+  display: block !important;
+  max-width: 100%;
+  margin: 0 auto;
 }
 
 :root {
@@ -35,7 +40,7 @@ body {
   --font-size-11xl: 30px;
 
   /* Colors */
-  --color-yellow-white: #F1ECE8;
+  --color-yellow-white: #fff;
   --color-linen: #f1ece8;
   --color-gray-100: #fafafa;
   --color-gray-200: #909090;
@@ -95,18 +100,8 @@ body {
   background-color: #f4f4f4;
 }
 
-body {
-  overflow-x: hidden;
-}
-
 html {
-  background-color: var(--color-yellow-white);
-}
-
-body {
-  display: block !important;
-  max-width: 100%;
-  margin: 0 auto;
+  background-color: #fff;
 }
 
 a {

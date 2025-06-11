@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import styles from './Register.module.css';
@@ -17,17 +17,21 @@ import {
     MenuItem,
     Divider,
     createTheme,
-    ThemeProvider
+    ThemeProvider,
+    CircularProgress,
+    CssBaseline
 } from '@mui/material';
 import {
     PersonAdd,
     FitnessCenter,
-    LocalFireDepartment
+    LocalFireDepartment,
+    CheckCircle
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
+import { axiosInstance } from '../../utils/axiosInstance';
 
 // StartGym Theme (same as Login)
 const startGymTheme = createTheme({
@@ -86,13 +90,27 @@ const startGymTheme = createTheme({
                 },
             },
         },
+        MuiCssBaseline: {
+            styleOverrides: `
+                @keyframes pulse {
+                    0% {
+                        box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
+                    }
+                    70% {
+                        box-shadow: 0 0 0 10px rgba(76, 175, 80, 0);
+                    }
+                    100% {
+                        box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
+                    }
+                }
+            `,
+        },
     },
 });
 
 const Register = () => {
     const [customerName, setCustomerName] = useState('');
     const [customerAddress, setCustomerAddress] = useState('');
-    const [customerAge, setCustomerAge] = useState('');
     const [customerPhone, setCustomerPhone] = useState('');
     const [customerEmail, setCustomerEmail] = useState('');
     const [customerGender, setCustomerGender] = useState('');
@@ -114,6 +132,9 @@ const Register = () => {
     const [phoneFocused, setPhoneFocused] = useState(false);
     const [passwordFocused, setPasswordFocused] = useState(false);
     const [dobFocused, setDobFocused] = useState(false);
+    
+    const [countdown, setCountdown] = useState(0);
+    const [isRegistrationSuccess, setIsRegistrationSuccess] = useState(false);
     
     const navigate = useNavigate();
 
@@ -173,6 +194,10 @@ const Register = () => {
             setPasswordError('Password must contain at least one number');
             return false;
         }
+        if (!/(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?])/.test(password)) {
+            setPasswordError('Password must contain at least one special character');
+            return false;
+        }
         setPasswordError('');
         return true;
     };
@@ -192,6 +217,25 @@ const Register = () => {
         }
     };
 
+    // Đếm ngược khi đăng ký thành công
+    useEffect(() => {
+        let timer;
+        if (countdown > 0) {
+            timer = setTimeout(() => {
+                setCountdown(countdown - 1);
+                
+                // Khi đếm ngược kết thúc, chuyển trang
+                if (countdown === 1) {
+                    navigate('/login');
+                }
+            }, 1000);
+        }
+        
+        return () => {
+            if (timer) clearTimeout(timer);
+        };
+    }, [countdown, navigate]);
+
     const handleRegister = async (e) => {
         e.preventDefault();
         setErrorMessage('');
@@ -202,16 +246,20 @@ const Register = () => {
         const isPhoneValid = validatePhone(customerPhone);
         const isPasswordValid = validatePassword(password);
 
-        // Validate age from date of birth
-        if (customerDob) {
+        // Validate date of birth is provided
+        if (!customerDob) {
+            setErrorMessage('Date of birth is required');
+            return;
+        }
+
+        // Calculate age from date of birth
             const today = dayjs();
             const birthDate = dayjs(customerDob);
-            const age = today.diff(birthDate, 'year');
+        const calculatedAge = today.diff(birthDate, 'year');
             
-            if (age < 16) {
+        if (calculatedAge < 16) {
                 setErrorMessage('You must be at least 16 years old to register');
                 return;
-            }
         }
 
         if (password !== confirmPassword) {
@@ -229,37 +277,60 @@ const Register = () => {
             const registrationData = {
                 username: username,
                 password: password,
-                customer: {
-                    customer_name: customerName,
-                    customer_address: customerAddress,
-                    customer_age: parseInt(customerAge),
-                    customer_phone: customerPhone,
-                    customer_email: customerEmail,
-                    customer_gender: customerGender,
-                    customer_dob: customerDob ? customerDob.format('YYYY-MM-DD') : null
-                }
+                name: customerName,
+                address: customerAddress,
+                phone: customerPhone,
+                email: customerEmail,
+                gender: customerGender,
+                dateOfBirth: customerDob.format('YYYY-MM-DD')
             };
 
-            const response = await axios.post('http://localhost:8080/api/v1/public/register', registrationData);
+            console.log('Registration data:', registrationData);
+            
+            // Debug thông tin API gọi
+            console.log('Calling API endpoint:', axiosInstance.defaults.baseURL + '/public/signup');
 
-            if (response.status === 200) {
-                setSuccessMessage('Đăng ký thành công! Vui lòng đăng nhập.');
-                setTimeout(() => {
-                    navigate('/login');
-                }, 2000);
+            // Sửa endpoint để khớp với backend: /api/v1/public/signup
+            const response = await axiosInstance.post('/public/signup', registrationData);
+
+            console.log('API response:', response);
+
+            if (response.status === 200 || response.status === 201) {
+                setIsRegistrationSuccess(true);
+                setCountdown(3);
+                setSuccessMessage(`Đăng ký thành công! Chuyển đến trang đăng nhập sau ${countdown} giây...`);
             }
         } catch (error) {
             console.error('Đã xảy ra lỗi:', error);
-            if (error.response && error.response.data) {
-                setErrorMessage(error.response.data.message || 'Đăng ký thất bại');
+            
+            // Hiển thị chi tiết lỗi để debug
+            if (error.response) {
+                // Server trả về lỗi với mã trạng thái
+                console.error('Mã lỗi:', error.response.status);
+                console.error('Dữ liệu lỗi:', error.response.data);
+                setErrorMessage(error.response.data?.message || `Lỗi ${error.response.status}: Đăng ký thất bại`);
+            } else if (error.request) {
+                // Request đã gửi nhưng không nhận được response
+                console.error('Không nhận được phản hồi từ server:', error.request);
+                setErrorMessage('Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng.');
             } else {
-                setErrorMessage('Đăng ký thất bại. Vui lòng thử lại.');
+                // Lỗi trong quá trình thiết lập request
+                console.error('Lỗi:', error.message);
+                setErrorMessage(`Lỗi: ${error.message}`);
             }
         }
     };
 
+    // Cập nhật thông báo thành công khi countdown thay đổi
+    useEffect(() => {
+        if (countdown > 0) {
+            setSuccessMessage(`Đăng ký thành công! Chuyển đến trang đăng nhập sau ${countdown} giây...`);
+            }
+    }, [countdown]);
+
     return (
         <ThemeProvider theme={startGymTheme}>
+            <CssBaseline />
             <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <Box sx={{ 
                     background: 'linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)',
@@ -316,7 +387,29 @@ const Register = () => {
                                             </Alert>
                                         )}
                                         {successMessage && (
-                                            <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }}>
+                                            <Alert 
+                                                severity="success" 
+                                                sx={{ 
+                                                    mb: 2, 
+                                                    borderRadius: 2,
+                                                    fontSize: '1rem',
+                                                    '& .MuiAlert-icon': {
+                                                        fontSize: '1.5rem'
+                                                    },
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    animation: 'pulse 1.5s infinite'
+                                                }}
+                                                variant="filled"
+                                                icon={<CheckCircle fontSize="inherit" />}
+                                                action={
+                                                    <CircularProgress 
+                                                        size={20} 
+                                                        thickness={5}
+                                                        sx={{ color: 'white' }}
+                                                    />
+                                                }
+                                            >
                                                 {successMessage}
                                             </Alert>
                                         )}
@@ -338,20 +431,7 @@ const Register = () => {
                                                         required
                                                         variant="outlined"
                                                         size="small"
-                                                    />
-                                                </Grid>
-                                                
-                                                <Grid item xs={6}>
-                                                    <TextField
-                                                        fullWidth
-                                                        label="Age *"
-                                                        type="number"
-                                                        value={customerAge}
-                                                        onChange={(e) => setCustomerAge(e.target.value)}
-                                                        required
-                                                        variant="outlined"
-                                                        size="small"
-                                                        inputProps={{ min: 1, max: 120 }}
+                                                        disabled={isRegistrationSuccess}
                                                     />
                                                 </Grid>
                                                 
@@ -365,6 +445,7 @@ const Register = () => {
                                                         required
                                                         variant="outlined"
                                                         size="small"
+                                                        disabled={isRegistrationSuccess}
                                                     >
                                                         <MenuItem value="Male">Male</MenuItem>
                                                         <MenuItem value="Female">Female</MenuItem>
@@ -372,9 +453,9 @@ const Register = () => {
                                                     </TextField>
                                                 </Grid>
                                                 
-                                                <Grid item xs={12}>
+                                                <Grid item xs={6}>
                                                     <DatePicker
-                                                        label="Date of Birth"
+                                                        label="Date of Birth *"
                                                         value={customerDob}
                                                         onChange={handleDateChange}
                                                         slots={{
@@ -385,6 +466,7 @@ const Register = () => {
                                                                 fullWidth: true,
                                                                 variant: 'outlined',
                                                                 size: 'small',
+                                                                required: true,
                                                                 error: !!dobError,
                                                                 helperText: dobError || (dobFocused ? 'Must be at least 16 years old' : ''),
                                                                 onFocus: () => setDobFocused(true),
@@ -392,6 +474,22 @@ const Register = () => {
                                                             }
                                                         }}
                                                         maxDate={dayjs().subtract(16, 'year')}
+                                                        disabled={isRegistrationSuccess}
+                                                    />
+                                                </Grid>
+                                                
+                                                <Grid item xs={12}>
+                                                    <TextField
+                                                        fullWidth
+                                                        label="Address *"
+                                                        value={customerAddress}
+                                                        onChange={(e) => setCustomerAddress(e.target.value)}
+                                                        required
+                                                        variant="outlined"
+                                                        size="small"
+                                                        multiline
+                                                        rows={2}
+                                                        disabled={isRegistrationSuccess}
                                                     />
                                                 </Grid>
                                             </Grid>
@@ -422,6 +520,7 @@ const Register = () => {
                                                         required
                                                         variant="outlined"
                                                         size="small"
+                                                        disabled={isRegistrationSuccess}
                                                     />
                                                 </Grid>
                                                 
@@ -444,20 +543,7 @@ const Register = () => {
                                                         required
                                                         variant="outlined"
                                                         size="small"
-                                                    />
-                                                </Grid>
-                                                
-                                                <Grid item xs={12}>
-                                                    <TextField
-                                                        fullWidth
-                                                        label="Address *"
-                                                        value={customerAddress}
-                                                        onChange={(e) => setCustomerAddress(e.target.value)}
-                                                        required
-                                                        variant="outlined"
-                                                        size="small"
-                                                        multiline
-                                                        rows={1}
+                                                        disabled={isRegistrationSuccess}
                                                     />
                                                 </Grid>
                                             </Grid>
@@ -477,6 +563,7 @@ const Register = () => {
                                                         required
                                                         variant="outlined"
                                                         size="small"
+                                                        disabled={isRegistrationSuccess}
                                                     />
                                                 </Grid>
                                                 
@@ -496,10 +583,11 @@ const Register = () => {
                                                             validatePassword(password);
                                                         }}
                                                         error={!!passwordError}
-                                                        helperText={passwordError || (passwordFocused ? 'Min 8 chars, 1 uppercase, 1 lowercase, 1 number' : '')}
+                                                        helperText={passwordError || (passwordFocused ? 'Min 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special character' : '')}
                                                         required
                                                         variant="outlined"
                                                         size="small"
+                                                        disabled={isRegistrationSuccess}
                                                     />
                                                 </Grid>
                                                 
@@ -515,6 +603,7 @@ const Register = () => {
                                                         size="small"
                                                         error={!!(confirmPassword && password !== confirmPassword)}
                                                         helperText={confirmPassword && password !== confirmPassword ? 'Passwords do not match' : ''}
+                                                        disabled={isRegistrationSuccess}
                                                     />
                                                 </Grid>
                                             </Grid>
@@ -525,18 +614,19 @@ const Register = () => {
                                                 fullWidth
                                                 variant="contained"
                                                 size="medium"
+                                                disabled={isRegistrationSuccess}
                                                 sx={{ 
                                                     mb: 2,
                                                     py: 1.2,
-                                                    background: 'linear-gradient(135deg, #CF4044 0%, #B8363C 100%)',
+                                                    background: isRegistrationSuccess ? '#A6A6A6' : 'linear-gradient(135deg, #CF4044 0%, #B8363C 100%)',
                                                     boxShadow: '0 8px 16px rgba(207, 64, 68, 0.3)',
                                                     '&:hover': {
-                                                        background: 'linear-gradient(135deg, #B8363C 0%, #A62F33 100%)',
+                                                        background: isRegistrationSuccess ? '#A6A6A6' : 'linear-gradient(135deg, #B8363C 0%, #A62F33 100%)',
                                                         boxShadow: '0 12px 24px rgba(207, 64, 68, 0.4)',
                                                     }
                                                 }}
                                             >
-                                                CREATE ACCOUNT
+                                                {isRegistrationSuccess ? 'REGISTRATION COMPLETE' : 'CREATE ACCOUNT'}
                                             </Button>
 
                                             {/* Login Link */}

@@ -23,7 +23,9 @@ import {
     TextField,
     Badge,
     Tabs,
-    Tab
+    Tab,
+    Pagination,
+    InputAdornment
 } from '@mui/material';
 import { 
     Delete as DeleteIcon, 
@@ -33,17 +35,30 @@ import {
     Warning as WarningIcon,
     CheckCircle as CheckCircleIcon,
     Cancel as CancelIcon,
-    Refresh as RefreshIcon
+    Refresh as RefreshIcon,
+    Search as SearchIcon
 } from '@mui/icons-material';
 import { axiosInstance } from '../../../utils/axiosInstance';
+import { useAuth } from '../../../AuthContext';
+import { useDialogs } from '../../../components/MaterialUIDialogs';
 
 const CommentComponent = () => {
     const [comments, setComments] = useState([]);
     const [reportedComments, setReportedComments] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [loading, setLoading] = useState(true);
     const [selectedTab, setSelectedTab] = useState(0);
     const [selectedComment, setSelectedComment] = useState(null);
     const [dialogOpen, setDialogOpen] = useState(false);
+    
+    // Pagination state
+    const [page, setPage] = useState(1);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [totalComments, setTotalComments] = useState(0);
+
+    // Filter state
+    const [filterType, setFilterType] = useState('all'); // all, reported, course, exercise
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filteredComments, setFilteredComments] = useState([]);
     
     // Snackbar state
     const [snackbar, setSnackbar] = useState({
@@ -51,6 +66,8 @@ const CommentComponent = () => {
         message: '',
         severity: 'info'
     });
+
+    const { showConfirm, showAlert, DialogComponents } = useDialogs();
 
     const showSnackbar = (message, severity = 'info') => {
         setSnackbar({
@@ -69,7 +86,7 @@ const CommentComponent = () => {
 
     // Fetch all comments
     const fetchComments = async () => {
-        setIsLoading(true);
+        setLoading(true);
         
         try {
             console.log('Fetching comments...');
@@ -78,23 +95,26 @@ const CommentComponent = () => {
             
             if (response.data && Array.isArray(response.data)) {
                 setComments(response.data);
+                setTotalComments(response.data.length);
                 console.log('Comments loaded:', response.data.length);
             } else {
                 setComments([]);
+                setTotalComments(0);
                 showSnackbar('No comments data received', 'warning');
             }
         } catch (error) {
             console.error('Error fetching comments:', error);
             showSnackbar(`Error loading comments: ${error.message}`, 'error');
             setComments([]);
+            setTotalComments(0);
         } finally {
-            setIsLoading(false);
+            setLoading(false);
         }
     };
 
     // Fetch reported comments  
     const fetchReportedComments = async () => {
-        setIsLoading(true);
+        setLoading(true);
         
         try {
             console.log('Fetching reported comments...');
@@ -103,42 +123,102 @@ const CommentComponent = () => {
             
             if (response.data && Array.isArray(response.data)) {
                 setReportedComments(response.data);
+                setTotalComments(response.data.length);
                 console.log('Reported comments loaded:', response.data.length);
             } else {
                 setReportedComments([]);
+                setTotalComments(0);
                 showSnackbar('No reported comments found', 'info');
             }
         } catch (error) {
             console.error('Error fetching reported comments:', error);
             showSnackbar(`Error loading reported comments: ${error.message}`, 'error');
             setReportedComments([]);
+            setTotalComments(0);
         } finally {
-            setIsLoading(false);
+            setLoading(false);
         }
+    };
+
+    // Update Tab counts and filtering logic
+    useEffect(() => {
+        // Load both datasets on mount to get accurate counts
+        fetchComments();
+        fetchReportedComments();
+    }, []); // Run once on mount
+
+    useEffect(() => {
+        // Switch data display based on selected tab
+        if (selectedTab === 0) {
+            setFilteredComments(comments);
+        } else {
+            setFilteredComments(reportedComments);
+        }
+    }, [selectedTab, comments, reportedComments]);
+
+    // Filter and search logic - Updated to use current data properly
+    useEffect(() => {
+        const currentDataSet = selectedTab === 0 ? comments : reportedComments;
+        let filtered = currentDataSet;
+
+        // Search by comment text or customer name
+        if (searchTerm) {
+            filtered = filtered.filter(comment =>
+                comment.commentText?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                comment.customer?.customerName?.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+        }
+
+        setFilteredComments(filtered);
+        // Don't reset page to 1 here to avoid infinite loop
+    }, [comments, reportedComments, searchTerm, selectedTab]);
+
+    // Update total comments based on current filtered results
+    useEffect(() => {
+        setTotalComments(filteredComments.length);
+        setPage(1); // Reset to first page when filter changes
+    }, [filteredComments]);
+
+    // Pagination logic
+    const paginatedComments = filteredComments.slice(
+        (page - 1) * rowsPerPage,
+        page * rowsPerPage
+    );
+
+    const handlePageChange = (event, newPage) => {
+        setPage(newPage);
+    };
+
+    const handleRowsPerPageChange = (event) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(1);
     };
 
     // Delete comment
     const handleDeleteComment = async (commentId, commentText) => {
-        if (window.confirm(`Are you sure you want to delete this comment: "${commentText?.substring(0, 50)}..."?`)) {
-            try {
-                console.log('Deleting comment:', commentId);
-                await axiosInstance.delete(`/admin/comments/${commentId}`);
-                
-                showSnackbar('Comment deleted successfully! 🗑️', 'success');
-                
-                // Refresh both lists
-                if (selectedTab === 0) {
-                    fetchComments();
-                } else {
-                    fetchReportedComments();
+        showConfirm(
+            'Confirm Deletion',
+            `Are you sure you want to delete this comment: "${commentText?.substring(0, 50)}..."?`,
+            async () => {
+                try {
+                    console.log('Deleting comment:', commentId);
+                    const response = await axiosInstance.delete(`/admin/comments/${commentId}`);
+                    
+                    console.log('Delete response:', response);
+                    showSnackbar('Comment deleted successfully! 🗑️', 'success');
+                    
+                    // Refresh the list based on current tab
+                    if (selectedTab === 0) {
+                        fetchComments();
+                    } else {
+                        fetchReportedComments();
+                    }
+                } catch (error) {
+                    console.error('Error deleting comment:', error);
+                    showSnackbar(`Failed to delete comment: ${error.message}`, 'error');
                 }
-                
-            } catch (error) {
-                console.error('Error deleting comment:', error);
-                const errorMsg = error.response?.data?.message || error.message || 'Unknown error';
-                showSnackbar(`Error deleting comment: ${errorMsg}`, 'error');
             }
-        }
+        );
     };
 
     // Dismiss report (keep comment, remove from reported list)
@@ -163,14 +243,6 @@ const CommentComponent = () => {
         setDialogOpen(true);
     };
 
-    useEffect(() => {
-        if (selectedTab === 0) {
-            fetchComments();
-        } else {
-            fetchReportedComments();
-        }
-    }, [selectedTab]);
-
     // Utility functions
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
@@ -191,7 +263,7 @@ const CommentComponent = () => {
         setSelectedTab(newValue);
     };
 
-    if (isLoading) {
+    if (loading) {
         return (
             <Box 
                 display="flex" 
@@ -234,7 +306,7 @@ const CommentComponent = () => {
                         variant="outlined"
                         startIcon={<RefreshIcon />}
                         onClick={() => selectedTab === 0 ? fetchComments() : fetchReportedComments()}
-                        disabled={isLoading}
+                        disabled={loading}
                         sx={{
                             borderColor: '#d35255',
                             color: '#d35255',
@@ -259,11 +331,11 @@ const CommentComponent = () => {
                     />
                     <Tab 
                         icon={
-                            <Badge badgeContent={reportedComments.length} color="error">
+                            <Badge badgeContent={reportedComments.length} color="error" max={99}>
                                 <FlagIcon />
                             </Badge>
                         } 
-                        label={`Reported Comments`} 
+                        label={`Reported Comments (${reportedComments.length})`} 
                         iconPosition="start"
                     />
                 </Tabs>
@@ -273,7 +345,7 @@ const CommentComponent = () => {
             <Box display="flex" gap={2} mb={3}>
                 <Paper sx={{ p: 2, flex: 1 }}>
                     <Typography variant="h6" color="primary">
-                        Total Comments: {comments.length}
+                        Total: {totalComments}
                     </Typography>
                 </Paper>
                 <Paper sx={{ p: 2, flex: 1 }}>
@@ -281,7 +353,48 @@ const CommentComponent = () => {
                         Reported: {reportedComments.length}
                     </Typography>
                 </Paper>
+                <Paper sx={{ p: 2, flex: 1 }}>
+                    <Typography variant="h6" color="text.secondary">
+                        Showing: {paginatedComments.length}
+                    </Typography>
+                </Paper>
             </Box>
+
+            {/* Search and Filters */}
+            <Paper sx={{ p: 2, mb: 3 }}>
+                <Typography variant="h6" gutterBottom>Search & Filters</Typography>
+                <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
+                    {/* Search Box */}
+                    <TextField
+                        placeholder="Search comments or customer names..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        InputProps={{
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <SearchIcon />
+                                </InputAdornment>
+                            )
+                        }}
+                        sx={{ minWidth: 300 }}
+                    />
+
+                    {/* Rows per page */}
+                    <TextField
+                        select
+                        label="Rows per page"
+                        value={rowsPerPage}
+                        onChange={handleRowsPerPageChange}
+                        sx={{ minWidth: 120 }}
+                        SelectProps={{ native: true }}
+                    >
+                        <option value={5}>5</option>
+                        <option value={10}>10</option>
+                        <option value={25}>25</option>
+                        <option value={50}>50</option>
+                    </TextField>
+                </Box>
+            </Paper>
 
             {/* Table */}
             <TableContainer 
@@ -315,7 +428,7 @@ const CommentComponent = () => {
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            currentData.map((comment) => (
+                            paginatedComments.map((comment) => (
                                 <TableRow key={comment.commentId} hover>
                                     <TableCell>
                                         <Box display="flex" alignItems="center">
@@ -501,6 +614,21 @@ const CommentComponent = () => {
                 </DialogActions>
             </Dialog>
 
+            {/* Pagination */}
+            <Box display="flex" justifyContent="space-between" alignItems="center" mt={3}>
+                <Typography variant="body2" color="textSecondary">
+                    Showing {((page - 1) * rowsPerPage) + 1} to {Math.min(page * rowsPerPage, totalComments)} of {totalComments} comments
+                </Typography>
+                <Pagination
+                    count={Math.ceil(totalComments / rowsPerPage)}
+                    page={page}
+                    onChange={handlePageChange}
+                    color="primary"
+                    showFirstButton
+                    showLastButton
+                />
+            </Box>
+
             {/* Snackbar */}
             <Snackbar 
                 open={snackbar.open} 
@@ -517,6 +645,9 @@ const CommentComponent = () => {
                     {snackbar.message}
                 </Alert>
             </Snackbar>
+
+            {/* Material UI Dialogs */}
+            <DialogComponents />
         </Box>
     );
 };

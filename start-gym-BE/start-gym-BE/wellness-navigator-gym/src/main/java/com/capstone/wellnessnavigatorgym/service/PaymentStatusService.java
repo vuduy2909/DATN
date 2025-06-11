@@ -296,6 +296,182 @@ public class PaymentStatusService {
     }
     
     /**
+     * Cập nhật trường total_vip_spent cho customer khi có thanh toán thành công
+     */
+    @Transactional
+    public boolean updateCustomerTotalVipSpent(Integer customerId, BigDecimal amount, boolean isRefund) {
+        try {
+            Customer customer = customerRepository.findById(customerId).orElse(null);
+            if (customer == null) {
+                logger.warn("Customer not found with ID: {}", customerId);
+                return false;
+            }
+            
+            BigDecimal currentTotal = customer.getTotalVipSpent() != null ? customer.getTotalVipSpent() : BigDecimal.ZERO;
+            
+            if (isRefund) {
+                // Trừ tiền khi hoàn tiền
+                customer.setTotalVipSpent(currentTotal.subtract(amount));
+                logger.info("Refunded {} VND for customer {}. New total: {} VND", 
+                    amount, customerId, customer.getTotalVipSpent());
+            } else {
+                // Cộng tiền khi thanh toán thành công
+                customer.setTotalVipSpent(currentTotal.add(amount));
+                logger.info("Added {} VND to customer {} total. New total: {} VND", 
+                    amount, customerId, customer.getTotalVipSpent());
+            }
+            
+            // Đảm bảo không âm
+            if (customer.getTotalVipSpent().compareTo(BigDecimal.ZERO) < 0) {
+                customer.setTotalVipSpent(BigDecimal.ZERO);
+                logger.warn("Total VIP spent for customer {} was negative, reset to 0", customerId);
+            }
+            
+            customerRepository.save(customer);
+            
+            // Tự động cập nhật customer type dựa trên tổng tiền mới
+            updateCustomerTypeBasedOnTotalSpent(customerId);
+            
+            return true;
+            
+        } catch (Exception e) {
+            logger.error("Error updating total VIP spent for customer {}", customerId, e);
+            return false;
+        }
+    }
+    
+    /**
+     * Cập nhật customer type dựa trên trường total_vip_spent (thay vì tính từ payments)
+     */
+    @Transactional
+    public boolean updateCustomerTypeBasedOnTotalSpent(Integer customerId) {
+        try {
+            Customer customer = customerRepository.findById(customerId).orElse(null);
+            if (customer == null) {
+                logger.warn("Customer not found with ID: {}", customerId);
+                return false;
+            }
+            
+            BigDecimal totalSpent = customer.getTotalVipSpent() != null ? customer.getTotalVipSpent() : BigDecimal.ZERO;
+            logger.info("Customer {} total VIP spent: {} VND", customerId, totalSpent);
+            
+            // Lấy danh sách customer types theo thứ tự price tăng dần
+            List<CustomerType> customerTypes = customerTypeRepository.findAllOrderByPriceAsc();
+            
+            if (customerTypes.isEmpty()) {
+                logger.error("No customer types found in database");
+                return false;
+            }
+            
+            // Tìm customer type phù hợp dựa trên total spent
+            CustomerType appropriateType = null;
+            
+            for (CustomerType type : customerTypes) {
+                if (type.getPrice() != null) {
+                    BigDecimal threshold = BigDecimal.valueOf(type.getPrice());
+                    if (totalSpent.compareTo(threshold) >= 0) {
+                        appropriateType = type;
+                    } else {
+                        break; // Đã tìm được type phù hợp
+                    }
+                }
+            }
+            
+            // Nếu không tìm được type nào phù hợp (totalSpent < threshold thấp nhất)
+            // thì chọn type có price thấp nhất (Regular)
+            if (appropriateType == null && !customerTypes.isEmpty()) {
+                appropriateType = customerTypes.get(0);
+            }
+            
+            if (appropriateType == null) {
+                logger.error("Could not determine appropriate customer type for customer {}", customerId);
+                return false;
+            }
+            
+            // Cập nhật customer type nếu khác với type hiện tại
+            if (customer.getCustomerType() == null || 
+                !customer.getCustomerType().getCustomerTypeId().equals(appropriateType.getCustomerTypeId())) {
+                
+                String oldType = customer.getCustomerType() != null ? 
+                    customer.getCustomerType().getCustomerTypeName() : "None";
+                
+                customer.setCustomerType(appropriateType);
+                customerRepository.save(customer);
+                
+                logger.info("Updated customer {} type from {} to {} based on total spent: {} VND", 
+                    customerId, oldType, appropriateType.getCustomerTypeName(), totalSpent);
+                return true;
+            }
+            
+            return false; // No update needed
+            
+        } catch (Exception e) {
+            logger.error("Error updating customer type for customer {}", customerId, e);
+            return false;
+        }
+    }
+    
+    /**
+     * Tính lại total_vip_spent cho tất cả customers dựa trên lịch sử thanh toán
+     */
+    @Transactional
+    public int recalculateAllCustomerTotalVipSpent() {
+        try {
+            List<Customer> allCustomers = customerRepository.findAll();
+            int updatedCount = 0;
+            
+            for (Customer customer : allCustomers) {
+                BigDecimal actualTotal = getTotalPaidAmount(customer.getCustomerId());
+                BigDecimal currentTotal = customer.getTotalVipSpent() != null ? customer.getTotalVipSpent() : BigDecimal.ZERO;
+                
+                // Chỉ cập nhật nếu khác nhau
+                if (actualTotal.compareTo(currentTotal) != 0) {
+                    customer.setTotalVipSpent(actualTotal);
+                    customerRepository.save(customer);
+                    
+                    // Cập nhật customer type sau khi cập nhật total spent
+                    updateCustomerTypeBasedOnTotalSpent(customer.getCustomerId());
+                    
+                    logger.info("Recalculated total VIP spent for customer {}: {} VND (was {} VND)", 
+                        customer.getCustomerId(), actualTotal, currentTotal);
+                    updatedCount++;
+                }
+            }
+            
+            logger.info("Recalculated total VIP spent for {} customers", updatedCount);
+            return updatedCount;
+            
+        } catch (Exception e) {
+            logger.error("Error recalculating customer total VIP spent", e);
+            return 0;
+        }
+    }
+    
+    /**
+     * Cập nhật tất cả customer types dựa trên total_vip_spent hiện tại
+     */
+    @Transactional
+    public int updateAllCustomerTypesBasedOnSpent() {
+        try {
+            List<Customer> allCustomers = customerRepository.findAll();
+            int updatedCount = 0;
+            
+            for (Customer customer : allCustomers) {
+                if (updateCustomerTypeBasedOnTotalSpent(customer.getCustomerId())) {
+                    updatedCount++;
+                }
+            }
+            
+            logger.info("Updated customer types for {} customers based on total VIP spent", updatedCount);
+            return updatedCount;
+            
+        } catch (Exception e) {
+            logger.error("Error updating all customer types", e);
+            return 0;
+        }
+    }
+    
+    /**
      * DTO cho thống kê thanh toán của customer
      */
     @lombok.Builder

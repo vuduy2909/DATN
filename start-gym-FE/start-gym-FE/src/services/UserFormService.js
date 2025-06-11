@@ -7,6 +7,22 @@ const UserFormService = {
     try {
       console.log('UserFormService: Submitting form data:', formData);
       
+      // Sanitize data to ensure only expected fields are sent to the backend
+      const sanitizedData = { ...formData };
+      
+      // Remove any fields that might cause conflicts with backend DTO
+      const fieldsToDelete = ['trainingFrequency', 'desiredFrequency', 'trainingGoal', 
+                              'waistSize', 'chestSize', 'bodyImage', 'workEnvironment'];
+      
+      fieldsToDelete.forEach(field => {
+        if (sanitizedData.hasOwnProperty(field)) {
+          console.log(`UserFormService: Removing field '${field}' to prevent backend DTO conflicts`);
+          delete sanitizedData[field];
+        }
+      });
+      
+      console.log('UserFormService: Sanitized data:', sanitizedData);
+      
       // Lấy token từ localStorage
       const token = localStorage.getItem('token');
       const headers = {};
@@ -24,7 +40,7 @@ const UserFormService = {
         };
         
         // Call the correct AI recommendation endpoint
-        const response = await request.post('/track-data-ai/recommend-course', formData, { headers });
+        const response = await request.post('/track-data-ai/recommend-course', sanitizedData, { headers });
         
         // Restore original alert
         window.alert = originalAlert;
@@ -88,13 +104,18 @@ const UserFormService = {
   },
 
   // Phân tích ảnh cơ thể bằng Claude AI
-  analyzeBodyImage: async (imageFile, height, weight, gender, waistCircumference, chestCircumference) => {
+  analyzeBodyImage: async (imageFile, height, weight, gender, waistCircumference, chestCircumference, customerId = null) => {
     try {
       const formData = new FormData();
       formData.append('image', imageFile);
       formData.append('height', height);
       formData.append('weight', weight);
       formData.append('gender', gender);
+      
+      // Add customerId if provided
+      if (customerId) {
+        formData.append('customerId', customerId);
+      }
       
       // Add waist and chest circumference if provided
       if (waistCircumference) {
@@ -111,21 +132,26 @@ const UserFormService = {
         gender, 
         waist_circumference: waistCircumference || 'not provided',
         chest_circumference: chestCircumference || 'not provided',
+        customerId: customerId || 'not provided',
         fileName: imageFile.name, 
         fileSize: imageFile.size 
       });
       
       // Lấy token từ localStorage (hoặc vị trí lưu trữ khác)
       const token = localStorage.getItem('token');
-      const headers = {
-        'Content-Type': 'multipart/form-data'
-      };
+      const headers = {};
       
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
       
-      const response = await request.post('/track-data-ai/analyze-image', formData, { headers });
+      // NOTE: Không set 'Content-Type': 'multipart/form-data' cho FormData
+      // Browser sẽ tự động set với boundary chính xác
+      
+      const response = await request.post('/track-data-ai/analyze-image', formData, { 
+        headers,
+        timeout: 30000  // 30 seconds timeout for image analysis
+      });
       console.log('Received response from image analysis:', response);
       
       // Kiểm tra nếu phản hồi là lỗi
@@ -159,13 +185,14 @@ const UserFormService = {
 
       // Lấy token từ localStorage (hoặc vị trí lưu trữ khác)
       const token = localStorage.getItem('token');
-      const headers = {
-        'Content-Type': 'multipart/form-data'
-      };
+      const headers = {};
       
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
+      
+      // NOTE: Không set 'Content-Type': 'multipart/form-data' cho FormData
+      // Browser sẽ tự động set với boundary chính xác
 
       const response = await request.post('/track-data-ai/upload-csv', formData, { headers });
       return response;
@@ -175,10 +202,89 @@ const UserFormService = {
     }
   },
 
+  // Lấy kết quả phân tích hình ảnh đã lưu cho customer
+  getSavedAnalysis: async (customerId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = {};
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      console.log('Getting saved analysis for customer:', customerId);
+      const response = await request.get(`/track-data-ai/get-analysis-result/${customerId}`, { headers });
+      console.log('Received saved analysis response:', response);
+      
+      return response;
+    } catch (error) {
+      console.error('Error getting saved analysis:', error);
+      
+      // If it's a 404 or customer not found, don't throw error
+      if (error.response && (error.response.status === 404 || error.response.status === 400)) {
+        return { hasAnalysis: false, message: 'No saved analysis found' };
+      }
+      
+      throw error;
+    }
+  },
+
+  // Kiểm tra trạng thái phân tích (có thể dùng cho anonymous user)
+  checkAnalysisStatus: async (customerId = null, sessionId = null) => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = {};
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const requestData = {};
+      if (customerId) {
+        requestData.customerId = customerId;
+      }
+      if (sessionId) {
+        requestData.sessionId = sessionId;
+      }
+
+      console.log('Checking analysis status with data:', requestData);
+      const response = await request.post('/track-data-ai/check-analysis-status', requestData, { headers });
+      console.log('Analysis status response:', response);
+      
+      return response;
+    } catch (error) {
+      console.error('Error checking analysis status:', error);
+      return { hasAnalysis: false, userType: 'unknown', error: error.message };
+    }
+  },
+
   // Method mới cho Step7 với formData và courseId
   getRecommendationStep7DataNew: async (formDataJson, recommendedCourseId) => {
     try {
       console.log('UserFormService: Calling Step7 with formDataJson and courseId:', formDataJson, recommendedCourseId);
+      
+      // Validate recommendedCourseId and provide detailed error logging
+      if (!recommendedCourseId) {
+        console.error('UserFormService: Missing recommendedCourseId!');
+        console.error('FormData JSON:', formDataJson);
+        
+        // Try to extract courseId from formData if possible
+        try {
+          const parsedFormData = JSON.parse(formDataJson);
+          if (parsedFormData.recommendedCourseId) {
+            recommendedCourseId = parsedFormData.recommendedCourseId;
+            console.log('UserFormService: Extracted recommendedCourseId from formData:', recommendedCourseId);
+          }
+        } catch (parseError) {
+          console.error('UserFormService: Failed to parse formDataJson:', parseError);
+        }
+        
+        // If still no courseId, use a default or fallback value
+        if (!recommendedCourseId) {
+          recommendedCourseId = 1; // Use a default course ID as fallback
+          console.warn('UserFormService: Using default courseId=1 as fallback');
+        }
+      }
       
       // Lấy token từ localStorage
       const token = localStorage.getItem('token');
@@ -220,7 +326,43 @@ const UserFormService = {
   // Method để confirm recommendation
   confirmRecommendation: async (formData, recommendedCourseId) => {
     try {
-      console.log('UserFormService: Confirming recommendation with formData and courseId:', formData, recommendedCourseId);
+      console.log('=== ENHANCED UserFormService confirmRecommendation ===');
+      console.log('UserFormService: Confirming recommendation with data:');
+      console.log('FormData:', JSON.stringify(formData, null, 2));
+      console.log('RecommendedCourseId:', recommendedCourseId, 'Type:', typeof recommendedCourseId);
+      
+      // Enhanced validation with detailed error messages
+      if (!formData) {
+        console.error('UserFormService: formData is null or undefined');
+        throw new Error('Form data is required for confirmation');
+      }
+      
+      if (!recommendedCourseId) {
+        console.error('UserFormService: recommendedCourseId is null or undefined');
+        throw new Error('Recommended course ID is required for confirmation');
+      }
+      
+      // Validate and convert recommendedCourseId to ensure it's a valid number
+      let validatedCourseId = null;
+      if (typeof recommendedCourseId === 'number' && !isNaN(recommendedCourseId)) {
+        validatedCourseId = recommendedCourseId;
+      } else if (typeof recommendedCourseId === 'string' && !isNaN(Number(recommendedCourseId))) {
+        validatedCourseId = Number(recommendedCourseId);
+      } else if (typeof recommendedCourseId === 'object') {
+        // Handle case where it's an object with courseId or id property
+        if (recommendedCourseId.courseId && !isNaN(Number(recommendedCourseId.courseId))) {
+          validatedCourseId = Number(recommendedCourseId.courseId);
+        } else if (recommendedCourseId.id && !isNaN(Number(recommendedCourseId.id))) {
+          validatedCourseId = Number(recommendedCourseId.id);
+        }
+      }
+      
+      if (!validatedCourseId || isNaN(validatedCourseId)) {
+        console.error('UserFormService: Invalid recommendedCourseId format:', recommendedCourseId);
+        throw new Error(`Invalid recommended course ID format: ${recommendedCourseId}`);
+      }
+      
+      console.log('UserFormService: Validated course ID:', validatedCourseId);
       
       // Lấy token từ localStorage
       const token = localStorage.getItem('token');
@@ -230,58 +372,33 @@ const UserFormService = {
         headers['Authorization'] = `Bearer ${token}`;
       }
       
-      // Đảm bảo recommendedCourseId là số nguyên hợp lệ
-      let validCourseId = recommendedCourseId;
-      
-      // Kiểm tra và chuyển đổi recommendedCourseId
-      if (recommendedCourseId === null || recommendedCourseId === undefined) {
-        console.error('UserFormService: recommendedCourseId is null or undefined');
-        throw new Error('Không thể xác nhận đề xuất: ID khóa học không hợp lệ');
-      } else if (typeof recommendedCourseId === 'object') {
-        // Nếu là object, thử lấy courseId hoặc id
-        if (recommendedCourseId.courseId) {
-          validCourseId = Number(recommendedCourseId.courseId);
-        } else if (recommendedCourseId.id) {
-          validCourseId = Number(recommendedCourseId.id);
-        } else {
-          console.error('UserFormService: recommendedCourseId object does not have courseId or id');
-          throw new Error('Không thể xác nhận đề xuất: ID khóa học không hợp lệ');
-        }
-      } else if (typeof recommendedCourseId === 'string') {
-        // Nếu là string, chuyển đổi sang số
-        if (!isNaN(recommendedCourseId)) {
-          validCourseId = Number(recommendedCourseId);
-        } else {
-          console.error('UserFormService: recommendedCourseId string is not a valid number');
-          throw new Error('Không thể xác nhận đề xuất: ID khóa học không hợp lệ');
-        }
-      } else if (typeof recommendedCourseId === 'number') {
-        // Nếu đã là số, giữ nguyên
-        validCourseId = recommendedCourseId;
-      } else {
-        console.error('UserFormService: recommendedCourseId has unsupported type', typeof recommendedCourseId);
-        throw new Error('Không thể xác nhận đề xuất: ID khóa học không hợp lệ');
-      }
-      
-      // Kiểm tra cuối cùng
-      if (isNaN(validCourseId)) {
-        console.error('UserFormService: validCourseId is NaN after processing');
-        throw new Error('Không thể xác nhận đề xuất: ID khóa học không hợp lệ');
-      }
-      
-      console.log('UserFormService: Using validated courseId:', validCourseId);
-      
+      // Chuẩn bị dữ liệu gửi đi với enhanced validation
       const requestData = {
         formData: formData,
-        recommendedCourseId: validCourseId
+        recommendedCourseId: validatedCourseId
       };
       
-      const response = await request.post('/track-data-ai/confirm-recommendation', requestData, { headers });
+      console.log('UserFormService: Final request data:', JSON.stringify(requestData, null, 2));
       
-      console.log('UserFormService: Received confirmation response:', response);
+      // Gọi API endpoint xác nhận
+      const response = await request.post('/track-data-ai/confirm-recommendation', requestData, { headers });
+      console.log('UserFormService: Recommendation confirmation response:', response);
+      
       return response;
     } catch (error) {
-      console.error('Error confirming recommendation:', error);
+      console.error('UserFormService: Error confirming recommendation:', error);
+      
+      // Enhanced error logging
+      if (error.response) {
+        console.error('UserFormService: Response status:', error.response.status);
+        console.error('UserFormService: Response data:', error.response.data);
+        console.error('UserFormService: Response headers:', error.response.headers);
+      } else if (error.request) {
+        console.error('UserFormService: Request made but no response received:', error.request);
+      } else {
+        console.error('UserFormService: Error in request setup:', error.message);
+      }
+      
       throw error;
     }
   }

@@ -1,21 +1,29 @@
-.kyoRoundLogo1 {
-    width: 130px;
-    height: 160px;
+.startRoundLogo1 {
+    width: 70px;
+    height: 80px;
+    transition: transform 0.2s ease;
+}
+
+.startRoundLogo1:hover {
+    transform: scale(1.05);
 }
 
 .appBar {
-    box-shadow: unset;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
     background-color: #37383c !important;
+    min-height: 80px !important;
 }
 
 .container {
     border-radius: 11px;
     margin-top: 20px;
-    padding-left: 10px !important;
-    padding-right: 57px !important;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
     max-width: 1393px !important;
     margin-top: unset;
     background-color: #37383c !important;
+    padding-top: 12px !important;
+    padding-bottom: 12px !important;
 }
 
 .menuItem {
@@ -25,17 +33,18 @@
 .menuItem:hover {}
 
 .menuItemText {
-    font-size: 17px !important;
-    margin: 0 8px !important;
+    font-size: 16px !important;
+    margin: 0 6px !important;
     line-height: 0.1 !important;
-
+    padding: 4px 0px !important;
 }
 
 .menuItemText>a>p {
-    padding: 6px 0px;
+    padding: 4px 0px;
     color: #ffffff !important;
     transition: all 2s ease !important;
     transition-delay: 1s;
+    margin: 0 !important;
 }
 
 .menuItemText>a>p:hover {
@@ -59,4 +68,45 @@
     margin-left: 0;
     color: #ffffff;
     background-color: #f0ece838;
+}
+
+/* Avatar dropdown styling */
+.userAvatar {
+    cursor: pointer;
+    transition: transform 0.3s ease;
+}
+
+.userAvatar:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+.userMenuHeader {
+    padding: 16px;
+    text-align: center;
+    background: linear-gradient(135deg, #CF4044 0%, #B8363C 100%);
+    color: white;
+    border-radius: 8px 8px 0 0;
+}
+
+.userMenuItem {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    transition: all 0.2s ease;
+}
+
+.userMenuItem:hover {
+    background-color: rgba(207, 64, 68, 0.08);
+    transform: translateX(5px);
+}
+
+.userMenuIcon {
+    margin-right: 12px;
+    color: #CF4044;
+}
+
+.userMenuDivider {
+    margin: 8px 0;
+    background-color: rgba(0, 0, 0, 0.12);
 }

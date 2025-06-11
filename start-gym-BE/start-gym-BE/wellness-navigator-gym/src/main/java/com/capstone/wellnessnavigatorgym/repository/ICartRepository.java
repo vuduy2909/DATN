@@ -36,10 +36,11 @@ public interface ICartRepository extends JpaRepository<Cart, Integer> {
             "FROM cart ORDER BY cart_id DESC LIMIT 1", nativeQuery = true)
     Optional<Cart> findLastCart();
 
-    @Query(value = "SELECT c.cart_id, c.receiver_address, c.receiver_email, c.receiver_name, c.receiver_phone " +
-            "FROM cart c " +
-            "JOIN customer ct ON ct.cart_id = c.cart_id " +
-            "JOIN account a ON a.account_id = ct.account_id " +
-            "WHERE a.user_name = :username", nativeQuery = true)
-    Optional<Cart> findCartByUsername(@Param("username") String username);
+    // Temporarily commented out due to cart_id removal from customer table
+    // @Query(value = "SELECT c.cart_id, c.receiver_address, c.receiver_email, c.receiver_name, c.receiver_phone " +
+    //         "FROM cart c " +
+    //         "JOIN customer ct ON ct.cart_id = c.cart_id " +
+    //         "JOIN account a ON a.account_id = ct.account_id " +
+    //         "WHERE a.user_name = :username", nativeQuery = true)
+    // Optional<Cart> findCartByUsername(@Param("username") String username);
 }
