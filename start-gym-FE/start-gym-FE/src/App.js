@@ -21,8 +21,6 @@ import EditExercise from './pages/Admin/EditExercise';
 import EditCustomer from './pages/Admin/EditCustomer';
 import NewCustomerType from './pages/Admin/NewCustomerType';
 import EditCustomerType from './pages/Admin/EditCustomerType';
-import ViewCourse from './pages/Admin/ViewCourse';
-import EditCourse from './pages/Admin/EditCourse';
 import AdminRoute from './components/AdminRoute';
 import NotFound from './pages/NotFound';
 import ScrollToTop from './components/ScrollToTop';
@@ -56,10 +54,6 @@ function App() {
       <Route path='/editcustomer/:id' element={<AdminRoute><EditCustomer /></AdminRoute>} />
       <Route path='/admin/customer-types/new' element={<AdminRoute><NewCustomerType /></AdminRoute>} />
       <Route path='/admin/customer-types/edit/:id' element={<AdminRoute><EditCustomerType /></AdminRoute>} />
-      
-      {/* Course Management Routes */}
-      <Route path='/admin/courses/view/:courseId' element={<AdminRoute><ViewCourse /></AdminRoute>} />
-      <Route path='/admin/courses/edit/:courseId' element={<AdminRoute><EditCourse /></AdminRoute>} />
       
       {/* 404 Not Found - Must be last route */}
       <Route path="*" element={<NotFound />} />
