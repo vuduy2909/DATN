@@ -40,17 +40,24 @@ dependencies {
     testImplementation 'org.springframework.security:spring-security-test'
     //     https://mvnrepository.com/artifact/io.jsonwebtoken/jjwt
     implementation group: 'io.jsonwebtoken', name: 'jjwt', version: '0.9.1'
-    // https://mvnrepository.com/artifact/com.google.api-client/google-api-client
-    implementation group: 'com.google.api-client', name: 'google-api-client', version: '1.30.9'
+    
+    // Firebase dependencies - compatible versions to avoid conflicts
+    implementation 'com.google.firebase:firebase-admin:9.2.0'
+    implementation('com.google.cloud:google-cloud-storage:2.22.2') {
+        exclude group: 'com.google.guava', module: 'guava'
+    }
+    
+    // Explicit Guava version to resolve conflicts
+    implementation 'com.google.guava:guava:31.1-jre'
+    
+    // Google API client with compatible version
+    implementation 'com.google.api-client:google-api-client:2.0.0'
+    
     // Jackson for JSON processing
     implementation 'com.fasterxml.jackson.core:jackson-databind'
     // For logging
     implementation 'org.slf4j:slf4j-api'
     implementation 'ch.qos.logback:logback-classic'
-    
-    // Firebase dependencies
-    implementation 'com.google.firebase:firebase-admin:9.2.0'
-    implementation 'com.google.cloud:google-cloud-storage:2.23.0'
 }
 
 tasks.named('test') {

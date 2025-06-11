@@ -365,17 +365,27 @@ const CourseComponent = () => {
             <Box display="flex" gap={2} mb={3}>
                 <Paper sx={{ p: 2, flex: 1 }}>
                     <Typography variant="h6" color="primary">
-                        Total Courses: {totalCourses}
+                        Total Courses: {courses.length}
                     </Typography>
                 </Paper>
                 <Paper sx={{ p: 2, flex: 1 }}>
                     <Typography variant="h6" color="success.main">
-                        Active: {filteredCourses.filter(c => c.status).length}
+                        Active: {courses.filter(c => c.status === 1 || c.status === true).length}
                     </Typography>
                 </Paper>
                 <Paper sx={{ p: 2, flex: 1 }}>
                     <Typography variant="h6" color="text.secondary">
-                        Hidden: {filteredCourses.filter(c => !c.status).length}
+                        Hidden: {courses.filter(c => c.status === 0 || c.status === false).length}
+                    </Typography>
+                </Paper>
+                <Paper sx={{ p: 2, flex: 1 }}>
+                    <Typography variant="h6" color="warning.main">
+                        VIP: {courses.filter(c => c.is_vip === 1 || c.is_vip === true).length}
+                    </Typography>
+                </Paper>
+                <Paper sx={{ p: 2, flex: 1 }}>
+                    <Typography variant="h6" color="info.main">
+                        Showing: {filteredCourses.length}
                     </Typography>
                 </Paper>
             </Box>

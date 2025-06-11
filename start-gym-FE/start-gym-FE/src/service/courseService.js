@@ -24,42 +24,32 @@ export const courseService = {
   // Get recommended courses only
   getRecommendedCourses: async () => {
     try {
-      // Try different possible endpoints for getting recommended courses
-      let response;
+      const response = await request.get('/customer-course/recommended');
+      console.log('Recommended courses API response:', response);
       
-      try {
-        // First try the most specific endpoint
-        response = await request.get('/customer-course/recommended');
-        console.log('Endpoint /customer-course/recommended response:', response);
-      } catch (error) {
-        console.log('Failed to fetch from recommended endpoint, trying alternative');
-        
-        try {
-          // Try alternative endpoint with "my-recommended-courses"
-          response = await request.get('/customer-course/my-recommended-courses');
-          console.log('Endpoint /customer-course/my-recommended-courses response:', response);
-        } catch (secondError) {
-          // If both fail, try my-courses and filter client-side
-          console.log('Failed alternative endpoint too, will fall back to my-courses');
-          
-          // Rethrow to handle in component
-          throw secondError;
-        }
+      // The new API returns course objects directly
+      if (Array.isArray(response)) {
+        return response;
+      } else if (response && Array.isArray(response.data)) {
+        return response.data;
+      } else {
+        console.log('No recommended courses found or unexpected response format');
+        return [];
       }
-      
-      return response;
     } catch (error) {
       console.error('Error fetching recommended courses:', error);
       throw error;
     }
   },
 
-  // Debug endpoint to check user's course enrollments
+  // Debug endpoint to check user's course enrollments and recommendations
   debugRecommendations: async () => {
     try {
-      const response = await request.get('/customer-course/debug');
+      const response = await request.get('/customer-course/debug-recommended');
+      console.log('Debug recommended courses response:', response);
       return response;
     } catch (error) {
+      console.error('Error debugging recommendations:', error);
       throw error;
     }
   },

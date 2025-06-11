@@ -57,3 +57,4 @@ Thumbs.db
 
 # Ignore CSV files
 *.csv
+*.zip

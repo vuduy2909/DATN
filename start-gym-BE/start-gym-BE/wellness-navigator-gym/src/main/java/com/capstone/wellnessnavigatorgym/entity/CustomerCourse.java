@@ -10,6 +10,7 @@ import javax.persistence.*;
 @Setter
 @Getter
 @RequiredArgsConstructor
+@Table(name = "customer_course") 
 public class CustomerCourse {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

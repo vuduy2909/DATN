@@ -1272,15 +1272,25 @@ public class AdminController {
             Map<String, Object> response = new HashMap<>();
             response.put("courses", coursesResponse);
             response.put("totalCourses", courses.size());
-            response.put("activeCourses", courses.stream().filter(c -> c.getStatus() != null && c.getStatus()).count());
-            response.put("hiddenCourses", courses.stream().filter(c -> c.getStatus() == null || !c.getStatus()).count());
             
-            // Add VIP statistics
-            long vipCourses = courses.stream().filter(c -> c.getIsVip() != null && c.getIsVip()).count();
-            long freeCourses = courses.stream().filter(c -> c.getIsVip() == null || !c.getIsVip()).count();
+            // Fix boolean handling for status and isVip fields
+            long activeCourses = courses.stream()
+                .filter(c -> Boolean.TRUE.equals(c.getStatus()))
+                .count();
+            long hiddenCourses = courses.stream()
+                .filter(c -> !Boolean.TRUE.equals(c.getStatus()))
+                .count();
+            long vipCourses = courses.stream()
+                .filter(c -> Boolean.TRUE.equals(c.getIsVip()))
+                .count();
+            long freeCourses = courses.stream()
+                .filter(c -> !Boolean.TRUE.equals(c.getIsVip()))
+                .count();
+            
+            response.put("activeCourses", activeCourses);
+            response.put("hiddenCourses", hiddenCourses);
             response.put("vipCourses", vipCourses);
             response.put("freeCourses", freeCourses);
-            
             response.put("timestamp", LocalDateTime.now());
             
             return ResponseEntity.ok(response);
@@ -1298,52 +1308,66 @@ public class AdminController {
      * Lấy tất cả comments
      */
     @GetMapping("/comments")
+    @Transactional
     public ResponseEntity<?> getAllComments() {
         try {
-            List<Comment> comments = commentRepository.findAll();
+            // Use native query để tránh lazy loading issues
+            String query = "SELECT c.*, " +
+                          "cu.customer_name, cu.customer_img, " +
+                          "e.exercise_name, " +
+                          "course.course_name, " +
+                          "d.day_name " +
+                          "FROM comments c " +
+                          "LEFT JOIN customer cu ON c.customer_id = cu.customer_id " +
+                          "LEFT JOIN exercise e ON c.exercise_id = e.exercise_id " +
+                          "LEFT JOIN course ON c.course_id = course.course_id " +
+                          "LEFT JOIN days d ON c.day_id = d.day_id " +
+                          "ORDER BY c.created_date DESC";
             
-            // Convert to response format với thông tin đầy đủ
-            List<Map<String, Object>> commentsResponse = comments.stream()
-                .map(comment -> {
+            @SuppressWarnings("unchecked")
+            List<Object[]> results = entityManager.createNativeQuery(query).getResultList();
+            
+            List<Map<String, Object>> commentsResponse = results.stream()
+                .map(row -> {
                     Map<String, Object> commentInfo = new HashMap<>();
-                    commentInfo.put("commentId", comment.getCommentId());
-                    commentInfo.put("commentText", comment.getCommentText());
-                    commentInfo.put("createdAt", comment.getCreatedDate());
-                    commentInfo.put("updatedAt", comment.getUpdatedDate());
-                    commentInfo.put("isReported", comment.getIsReported());
-                    commentInfo.put("reportCount", comment.getReportCount());
-                    commentInfo.put("reportReason", comment.getReportReason());
+                    commentInfo.put("commentId", row[0]);
+                    commentInfo.put("commentText", row[1]);
+                    commentInfo.put("createdAt", row[8]);
+                    commentInfo.put("updatedAt", row[9]);
+                    commentInfo.put("isReported", row[10] != null ? (Boolean) row[10] : false);
+                    commentInfo.put("reportCount", row[11] != null ? row[11] : 0);
+                    commentInfo.put("reportReason", row[12]);
                     
                     // Customer info
-                    if (comment.getCustomer() != null) {
+                    if (row[13] != null) {
                         Map<String, Object> customerInfo = new HashMap<>();
-                        customerInfo.put("customerId", comment.getCustomer().getCustomerId());
-                        customerInfo.put("customerName", comment.getCustomer().getCustomerName());
-                        customerInfo.put("customerImg", comment.getCustomer().getCustomerImg());
+                        customerInfo.put("customerId", row[2]);
+                        customerInfo.put("customerName", row[13]);
+                        customerInfo.put("customerImg", row[14]);
                         commentInfo.put("customer", customerInfo);
                     }
                     
                     // Exercise info
-                    if (comment.getExercise() != null) {
+                    if (row[15] != null) {
                         Map<String, Object> exerciseInfo = new HashMap<>();
-                        exerciseInfo.put("exerciseId", comment.getExercise().getExerciseId());
-                        exerciseInfo.put("exerciseName", comment.getExercise().getExerciseName());
+                        exerciseInfo.put("exerciseId", row[3]);
+                        exerciseInfo.put("exerciseName", row[15]);
                         commentInfo.put("exercise", exerciseInfo);
                     }
                     
                     // Course info
-                    if (comment.getCourse() != null) {
+                    if (row[16] != null) {
                         Map<String, Object> courseInfo = new HashMap<>();
-                        courseInfo.put("courseId", comment.getCourse().getCourseId());
-                        courseInfo.put("courseName", comment.getCourse().getCourseName());
+                        courseInfo.put("courseId", row[4]);
+                        courseInfo.put("courseName", row[16]);
                         commentInfo.put("course", courseInfo);
                     }
                     
                     // Day info
-                    if (comment.getDay() != null) {
+                    if (row[17] != null) {
                         Map<String, Object> dayInfo = new HashMap<>();
-                        dayInfo.put("dayId", comment.getDay().getDayId());
-                        dayInfo.put("dayName", comment.getDay().getDayName());
+                        dayInfo.put("dayId", row[5]);
+                        dayInfo.put("dayName", row[17]);
                         commentInfo.put("day", dayInfo);
                     }
                     
@@ -1354,7 +1378,7 @@ public class AdminController {
             return ResponseEntity.ok(commentsResponse);
             
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Error getting comments: ", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error getting comments: " + e.getMessage());
         }
@@ -1364,56 +1388,67 @@ public class AdminController {
      * Lấy reported comments
      */
     @GetMapping("/comments/reported")
+    @Transactional
     public ResponseEntity<?> getReportedComments() {
         try {
-            // Lấy comments có isReported = true hoặc reportCount > 0
-            List<Comment> allComments = commentRepository.findAll();
-            List<Comment> reportedComments = allComments.stream()
-                .filter(comment -> comment.getIsReported() != null && comment.getIsReported() ||
-                                 comment.getReportCount() != null && comment.getReportCount() > 0)
-                .collect(Collectors.toList());
+            // Native query để lấy chỉ reported comments
+            String query = "SELECT c.*, " +
+                          "cu.customer_name, cu.customer_img, " +
+                          "e.exercise_name, " +
+                          "course.course_name, " +
+                          "d.day_name " +
+                          "FROM comments c " +
+                          "LEFT JOIN customer cu ON c.customer_id = cu.customer_id " +
+                          "LEFT JOIN exercise e ON c.exercise_id = e.exercise_id " +
+                          "LEFT JOIN course ON c.course_id = course.course_id " +
+                          "LEFT JOIN days d ON c.day_id = d.day_id " +
+                          "WHERE (c.is_reported = true OR c.report_count > 0) " +
+                          "ORDER BY c.created_date DESC";
             
-            // Convert to response format tương tự như getAllComments
-            List<Map<String, Object>> commentsResponse = reportedComments.stream()
-                .map(comment -> {
+            @SuppressWarnings("unchecked")
+            List<Object[]> results = entityManager.createNativeQuery(query).getResultList();
+            
+            List<Map<String, Object>> commentsResponse = results.stream()
+                .map(row -> {
                     Map<String, Object> commentInfo = new HashMap<>();
-                    commentInfo.put("commentId", comment.getCommentId());
-                    commentInfo.put("commentText", comment.getCommentText());
-                    commentInfo.put("createdAt", comment.getCreatedDate());
-                    commentInfo.put("isReported", comment.getIsReported());
-                    commentInfo.put("reportCount", comment.getReportCount());
-                    commentInfo.put("reportReason", comment.getReportReason());
+                    commentInfo.put("commentId", row[0]);
+                    commentInfo.put("commentText", row[1]);
+                    commentInfo.put("createdAt", row[8]);
+                    commentInfo.put("updatedAt", row[9]);
+                    commentInfo.put("isReported", row[10] != null ? (Boolean) row[10] : false);
+                    commentInfo.put("reportCount", row[11] != null ? row[11] : 0);
+                    commentInfo.put("reportReason", row[12]);
                     
                     // Customer info
-                    if (comment.getCustomer() != null) {
+                    if (row[13] != null) {
                         Map<String, Object> customerInfo = new HashMap<>();
-                        customerInfo.put("customerId", comment.getCustomer().getCustomerId());
-                        customerInfo.put("customerName", comment.getCustomer().getCustomerName());
-                        customerInfo.put("customerImg", comment.getCustomer().getCustomerImg());
+                        customerInfo.put("customerId", row[2]);
+                        customerInfo.put("customerName", row[13]);
+                        customerInfo.put("customerImg", row[14]);
                         commentInfo.put("customer", customerInfo);
                     }
                     
                     // Exercise info
-                    if (comment.getExercise() != null) {
+                    if (row[15] != null) {
                         Map<String, Object> exerciseInfo = new HashMap<>();
-                        exerciseInfo.put("exerciseId", comment.getExercise().getExerciseId());
-                        exerciseInfo.put("exerciseName", comment.getExercise().getExerciseName());
+                        exerciseInfo.put("exerciseId", row[3]);
+                        exerciseInfo.put("exerciseName", row[15]);
                         commentInfo.put("exercise", exerciseInfo);
                     }
                     
                     // Course info
-                    if (comment.getCourse() != null) {
+                    if (row[16] != null) {
                         Map<String, Object> courseInfo = new HashMap<>();
-                        courseInfo.put("courseId", comment.getCourse().getCourseId());
-                        courseInfo.put("courseName", comment.getCourse().getCourseName());
+                        courseInfo.put("courseId", row[4]);
+                        courseInfo.put("courseName", row[16]);
                         commentInfo.put("course", courseInfo);
                     }
                     
                     // Day info
-                    if (comment.getDay() != null) {
+                    if (row[17] != null) {
                         Map<String, Object> dayInfo = new HashMap<>();
-                        dayInfo.put("dayId", comment.getDay().getDayId());
-                        dayInfo.put("dayName", comment.getDay().getDayName());
+                        dayInfo.put("dayId", row[5]);
+                        dayInfo.put("dayName", row[17]);
                         commentInfo.put("day", dayInfo);
                     }
                     
@@ -1424,7 +1459,7 @@ public class AdminController {
             return ResponseEntity.ok(commentsResponse);
             
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Error getting reported comments: ", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error getting reported comments: " + e.getMessage());
         }

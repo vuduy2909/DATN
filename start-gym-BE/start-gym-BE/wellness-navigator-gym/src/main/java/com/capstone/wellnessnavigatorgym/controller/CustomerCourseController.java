@@ -38,26 +38,59 @@ public class CustomerCourseController {
     private IVipPaymentRepository vipPaymentRepository;
 
     @GetMapping("/recommended")
-    public ResponseEntity<List<SimpleCourseDto>> getRecommendedCourses() {
+    public ResponseEntity<?> getRecommendedCourses() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String username = authentication.getName();
         
-        List<CustomerCourse> recommendedCourses = customerCourseService.findRecommendedCoursesByUsername(username);
-        
-        if (recommendedCourses == null || recommendedCourses.isEmpty()) {
-            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
-        }
-        
-        List<SimpleCourseDto> simpleCourses = recommendedCourses.stream()
-                .map(SimpleCourseDto::fromCustomerCourse)
-                .filter(dto -> dto != null)
+        try {
+            Customer customer = customerRepository.findActiveCustomerByAccountUserName(username);
+            if (customer == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body("Customer not found for username: " + username);
+            }
+            
+            List<CustomerCourse> recommendedCourses = customerCourseService.findByCustomerId(customer.getCustomerId())
+                .stream()
+                .filter(cc -> cc.getRecommendedStatus() != null && cc.getRecommendedStatus())
                 .collect(Collectors.toList());
-        
-        if (simpleCourses.isEmpty()) {
-            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+            
+            if (recommendedCourses.isEmpty()) {
+                return ResponseEntity.ok(new ArrayList<>());
+            }
+            
+            List<Map<String, Object>> coursesResponse = recommendedCourses.stream()
+                .map(cc -> {
+                    Map<String, Object> courseInfo = new HashMap<>();
+                    if (cc.getCourse() != null) {
+                        courseInfo.put("courseId", cc.getCourse().getCourseId());
+                        courseInfo.put("courseName", cc.getCourse().getCourseName());
+                        courseInfo.put("description", cc.getCourse().getDescription());
+                        courseInfo.put("duration", cc.getCourse().getDuration());
+                        courseInfo.put("image", cc.getCourse().getImage());
+                        courseInfo.put("isRecommended", true);
+                        courseInfo.put("joinType", "Recommended");
+                        courseInfo.put("price", cc.getCourse().getPrice());
+                        courseInfo.put("isVip", cc.getCourse().getIsVip());
+                        
+                        // Add course type info
+                        if (cc.getCourse().getCourseType() != null) {
+                            Map<String, Object> typeInfo = new HashMap<>();
+                            typeInfo.put("courseTypeId", cc.getCourse().getCourseType().getCourseTypeId());
+                            typeInfo.put("courseTypeName", cc.getCourse().getCourseType().getCourseTypeName());
+                            courseInfo.put("courseType", typeInfo);
+                        }
+                    }
+                    return courseInfo;
+                })
+                .collect(Collectors.toList());
+            
+            return ResponseEntity.ok(coursesResponse);
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("Error getting recommended courses: " + e.getMessage());
         }
-        
-        return new ResponseEntity<>(simpleCourses, HttpStatus.OK);
     }
     
     @GetMapping("/debug")
@@ -608,6 +641,69 @@ public class CustomerCourseController {
                 return details;
             }).collect(Collectors.toList());
             debug.put("courseDetails", courseDetails);
+            
+            return ResponseEntity.ok(debug);
+            
+        } catch (Exception e) {
+            debug.put("error", e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.ok(debug);
+        }
+    }
+
+    @GetMapping("/debug-recommended")
+    public ResponseEntity<?> debugRecommendedCourses() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication.getName();
+        
+        Map<String, Object> debug = new HashMap<>();
+        debug.put("username", username);
+        
+        try {
+            Customer customer = customerRepository.findActiveCustomerByAccountUserName(username);
+            if (customer == null) {
+                debug.put("error", "Customer not found for username: " + username);
+                return ResponseEntity.ok(debug);
+            }
+            
+            debug.put("customerId", customer.getCustomerId());
+            debug.put("customerName", customer.getCustomerName());
+            
+            // Get all customer courses
+            List<CustomerCourse> allCourses = customerCourseService.findByCustomerId(customer.getCustomerId());
+            debug.put("totalCoursesInCustomerCourse", allCourses.size());
+            
+            // Debug all courses with their recommendation status
+            List<Map<String, Object>> courseDetails = allCourses.stream().map(cc -> {
+                Map<String, Object> details = new HashMap<>();
+                if (cc.getCourse() != null) {
+                    details.put("courseId", cc.getCourse().getCourseId());
+                    details.put("courseName", cc.getCourse().getCourseName());
+                    details.put("recommendedStatus", cc.getRecommendedStatus());
+                    details.put("isVipCourse", cc.getCourse().getIsVip());
+                }
+                return details;
+            }).collect(Collectors.toList());
+            debug.put("courseDetails", courseDetails);
+            
+            // Filter only recommended courses
+            List<CustomerCourse> recommendedCourses = allCourses.stream()
+                .filter(cc -> cc.getRecommendedStatus() != null && cc.getRecommendedStatus())
+                .collect(Collectors.toList());
+            debug.put("totalRecommendedCourses", recommendedCourses.size());
+            
+            List<Map<String, Object>> recommendedDetails = recommendedCourses.stream().map(cc -> {
+                Map<String, Object> details = new HashMap<>();
+                if (cc.getCourse() != null) {
+                    details.put("courseId", cc.getCourse().getCourseId());
+                    details.put("courseName", cc.getCourse().getCourseName());
+                    details.put("description", cc.getCourse().getDescription());
+                    details.put("duration", cc.getCourse().getDuration());
+                    details.put("image", cc.getCourse().getImage());
+                }
+                return details;
+            }).collect(Collectors.toList());
+            debug.put("recommendedCourseDetails", recommendedDetails);
             
             return ResponseEntity.ok(debug);
             

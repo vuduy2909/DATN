@@ -67,83 +67,20 @@ const RecommendedCourses = ({ customerId }) => {
         // Get recommended courses from API
         try {
           const recommendedCoursesResponse = await courseService.getRecommendedCourses();
-          console.log('Recommended courses direct API response:', recommendedCoursesResponse);
+          console.log('Recommended courses API response:', recommendedCoursesResponse);
           
-          let courses = [];
-          
-          if (recommendedCoursesResponse && Array.isArray(recommendedCoursesResponse) && recommendedCoursesResponse.length > 0) {
-            courses = recommendedCoursesResponse;
-          } else if (recommendedCoursesResponse && recommendedCoursesResponse.courses && Array.isArray(recommendedCoursesResponse.courses)) {
-            // Check if response has courses nested property
-            console.log('Found courses in nested property:', recommendedCoursesResponse.courses);
-            courses = recommendedCoursesResponse.courses;
-          } else {
-            // Fallback to my-courses and filter there
-            const allCoursesResponse = await request.get('/customer-course/my-courses');
-            console.log('All courses response:', allCoursesResponse);
+          if (Array.isArray(recommendedCoursesResponse) && recommendedCoursesResponse.length > 0) {
+            setRecommendedCourses(recommendedCoursesResponse);
             
-            // Print all properties of the response to debug
-            console.log('All courses response properties:', Object.keys(allCoursesResponse));
-            
-            // Check for nested properties like data
-            if (allCoursesResponse.data && Array.isArray(allCoursesResponse.data)) {
-              console.log('Found data in nested property:', allCoursesResponse.data);
-            }
-            
-            // Access the courses array correctly
-            const coursesArray = allCoursesResponse.courses || [];
-            
-            // Check different possible field names for recommendation status
-            const recommendedCoursesFiltered = coursesArray.filter(course => {
-              // Debug each course to check its structure
-              console.log('Course object:', course);
-              console.log('Course properties:', Object.keys(course));
-              
-              // Try different possible field names
-              return course.recommendedStatus === true || 
-                     course.recommendedStatus === 1 || 
-                     course.isRecommended === true || 
-                     course.isRecommended === 1 || 
-                     course.recommended === true || 
-                     course.is_recommended === true ||
-                     // Using bit(1) type in database, so also check for numeric values
-                     course.recommendedStatus === true || 
-                     course.recommendedStatus === 1;
-            });
-            
-            console.log('Filtered recommended courses:', recommendedCoursesFiltered);
-            
-            if (recommendedCoursesFiltered.length > 0) {
-              courses = recommendedCoursesFiltered;
-            } else {
-              console.log('No recommended courses found after filtering');
-              // Try to query directly from backend to check
-              try {
-                const debugResponse = await courseService.debugRecommendations();
-                console.log('Debug recommendations response:', debugResponse);
-                if (debugResponse && Array.isArray(debugResponse) && debugResponse.length > 0) {
-                  courses = debugResponse;
-                }
-              } catch(err) {
-                console.error('Debug recommendations failed:', err);
-              }
-            }
-          }
-          
-          // Set the recommended courses
-          setRecommendedCourses(courses);
-          
-          // Immediately fetch completion status for the courses
-          if (courses.length > 0) {
-            // For each course, check completion status
-            const completionPromises = courses.map(course => 
+            // Fetch completion status for the courses
+            const completionPromises = recommendedCoursesResponse.map(course => 
               courseService.getCourseCompletion(course.courseId, customerId)
                 .then(completion => ({ courseId: course.courseId, completion }))
                 .catch(() => ({ courseId: course.courseId, completion: null }))
             );
             
-            // For each course, check if last day is completed
-            const lastDayPromises = courses.map(course => 
+            // Check if last day is completed for each course
+            const lastDayPromises = recommendedCoursesResponse.map(course => 
               courseService.isLastDayCompleted(course.courseId, customerId)
                 .then(isLastDayCompleted => ({ courseId: course.courseId, isLastDayCompleted }))
                 .catch(() => ({ courseId: course.courseId, isLastDayCompleted: false }))
@@ -169,10 +106,22 @@ const RecommendedCourses = ({ customerId }) => {
             
             setCourseCompletions(completionMap);
             setLastDayCompletions(lastDayCompletionMap);
+          } else {
+            console.log('No recommended courses found');
+            setRecommendedCourses([]);
+            
+            // Debug to see what's in the customer_course table
+            try {
+              const debugResponse = await courseService.debugRecommendations();
+              console.log('Debug recommendations:', debugResponse);
+            } catch (debugErr) {
+              console.error('Debug failed:', debugErr);
+            }
           }
         } catch (error) {
           console.error('Error fetching recommended courses:', error);
           setError('Không thể tải khóa học được đề xuất. Vui lòng thử lại sau.');
+          setRecommendedCourses([]);
         }
         
         // Get user data from the user_data_ai table
