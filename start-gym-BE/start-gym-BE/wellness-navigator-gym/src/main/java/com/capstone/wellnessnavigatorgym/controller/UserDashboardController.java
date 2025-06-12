@@ -170,8 +170,8 @@ public class UserDashboardController {
             // Tìm customer ID thông qua username - cần implement logic này
             // Tạm thời sử dụng customer ID mặc định hoặc lấy từ context khác
             Integer customerId = getCustomerIdFromUsername(username);
-            
-            Map<String, Object> chartData = userDashboardService.getProgressChartData(customerId);
+        
+        Map<String, Object> chartData = userDashboardService.getProgressChartData(customerId);
             
             // Đảm bảo format phù hợp với frontend ChartCircle component
             Map<String, Object> response = new HashMap<>();

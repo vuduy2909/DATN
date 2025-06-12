@@ -22,11 +22,11 @@ import java.util.List;
 @Transactional
 public interface ICustomerRepository extends JpaRepository<Customer, Integer> {
 
-        @Query(value = "select c.customer_id, c.customer_address, c.customer_code, c.customer_email, c.customer_gender, " +            "c.customer_img, c.customer_name, c.customer_phone, c.date_of_birth, c.is_enable, " +            "ct.customer_type_id, a.account_id " +            "from customer c " +            "inner join customer_type ct on c.customer_type_id = ct.customer_type_id " +            "left join account a on c.account_id = a.account_id " +            "where c.is_enable = true " +            "order by c.customer_code ",
+        @Query(value = "select c.customer_id, c.customer_address, c.customer_code, c.customer_email, c.customer_gender, " +            "c.customer_img, c.customer_name, c.customer_phone, c.date_of_birth, c.is_enable, " +            "ct.customer_type_id, a.account_id " +            "from customer c " +            "inner join customer_type ct on c.customer_type_id = ct.customer_type_id " +            "inner join account a on c.account_id = a.account_id " +            "where c.is_enable = true " +            "order by c.customer_code ",
             countQuery = "select count(c.customer_id) " +
                     "from customer c " +
                     "inner join customer_type ct on c.customer_type_id = ct.customer_type_id " +
-                    "left join account a on c.account_id = a.account_id where c.is_enable = true order by c.customer_code ",
+                    "inner join account a on c.account_id = a.account_id where c.is_enable = true order by c.customer_code ",
             nativeQuery = true)
     Page<Customer> findAllCustomers(Pageable pageable);
 
@@ -36,14 +36,14 @@ public interface ICustomerRepository extends JpaRepository<Customer, Integer> {
             "ct.customer_type_id, ct.customer_type_name, ct.price, a.account_id " +
             "from customer c " +
             "inner join customer_type ct on c.customer_type_id = ct.customer_type_id " +
-            "left join account a on c.account_id = a.account_id " +
+            "inner join account a on c.account_id = a.account_id " +
             "where (ct.customer_type_name like concat('%', :type, '%') and c.customer_name like concat('%', :name, '%') " +
             "and c.customer_address like concat('%', :address, '%')  and c.customer_phone like concat('%', :phone, '%')) " +
             "and (c.is_enable = true) order by c.customer_code ",
             countQuery = "select count(c.customer_id) " +
                     "from customer c " +
                     "inner join customer_type ct on c.customer_type_id = ct.customer_type_id " +
-                    "left join account a on c.account_id = a.account_id " +
+                    "inner join account a on c.account_id = a.account_id " +
                     "where (ct.customer_type_name like concat('%', :type, '%') and c.customer_name like concat('%', :name, '%') " +
                     "and c.customer_address like concat('%', :address, '%')  and c.customer_phone like concat('%', :phone, '%')) " +
                     "and (c.is_enable = true) order by c.customer_code",

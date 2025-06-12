@@ -111,15 +111,29 @@ const Contact = () => {
                             <Typography variant="body1" paragraph sx={{ mb: 2 }}>
                                 Tài khoản <strong>{username}</strong> 
                                 {customerName && username !== customerName && (
-                                    <> (thuộc về <strong>{customerName}</strong>)</>
+                                    <> (thuộc về <strong>{customerName}</strong>) </>
                                 )} 
                                 hiện tại đang bị tạm dừng đăng nhập. 
                             </Typography>
                             
+                            {/* Show technical reason if available */}
+                            {location.state?.reason && (
+                                <Typography variant="body2" paragraph sx={{ 
+                                    mb: 2, 
+                                    backgroundColor: '#f5f5f5', 
+                                    p: 2, 
+                                    borderRadius: 1,
+                                    fontStyle: 'italic'
+                                }}>
+                                    <strong>Lý do kỹ thuật:</strong> {location.state.reason}
+                                </Typography>
+                            )}
+                            
                             <Typography variant="body1" paragraph sx={{ mb: 3 }}>
                                 Nếu bạn nghĩ đây là một hiểu lầm, hãy liên hệ với bộ phận chăm sóc khách hàng 
                                 của chúng tôi qua các thông tin liên lạc bên dưới. 
-                                Chúng tôi rất tiếc về sự bất tiện này.
+                                Khi liên hệ, vui lòng cung cấp thông tin tài khoản <strong>{username} </strong> 
+                                để chúng tôi hỗ trợ bạn nhanh chóng.
                             </Typography>
                             
                             <Button 

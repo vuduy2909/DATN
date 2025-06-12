@@ -97,12 +97,13 @@ public class PublicController {
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {
-            logger.error("Error checking banned status for {}: {}", username, e.getMessage());
+            logger.error("Error checking banned status for user: {}", username, e);
             Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("exists", false);
-            errorResponse.put("isBanned", false);
-            errorResponse.put("error", "Error checking status: " + e.getMessage());
+            errorResponse.put("error", "Error checking user status");
+            errorResponse.put("message", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
+
+    // Removed test endpoints - production only
 } 

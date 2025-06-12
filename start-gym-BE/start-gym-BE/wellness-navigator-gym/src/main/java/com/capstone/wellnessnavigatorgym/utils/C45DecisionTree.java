@@ -1064,7 +1064,7 @@ public class C45DecisionTree {
                     if (courseName != null && courseName.toLowerCase().contains("weight loss")) {
                         logger.debug("Weight loss course {} not suitable for Thin body type", courseId);
                         return false;
-                    }
+        }
                     break;
                 case "Overweight":
                     // Người thừa cân ưu tiên cardio và weight loss

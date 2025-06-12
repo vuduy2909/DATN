@@ -73,7 +73,7 @@ public class CommentController {
             }
             
             // Course and day are optional - can be null for exercise-only comments
-            Comment comment = new Comment(commentDto);
+        Comment comment = new Comment(commentDto);
             
             // Save comment synchronously to handle errors properly
             commentService.saveComment(comment);

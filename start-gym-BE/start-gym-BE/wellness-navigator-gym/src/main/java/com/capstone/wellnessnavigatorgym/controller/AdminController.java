@@ -8,6 +8,7 @@ import com.capstone.wellnessnavigatorgym.entity.Course;
 import com.capstone.wellnessnavigatorgym.entity.CourseType;
 import com.capstone.wellnessnavigatorgym.entity.Exercise;
 import com.capstone.wellnessnavigatorgym.entity.Account;
+import com.capstone.wellnessnavigatorgym.entity.Role;
 import com.capstone.wellnessnavigatorgym.repository.ICustomerRepository;
 import com.capstone.wellnessnavigatorgym.repository.ICustomerTypeRepository;
 import com.capstone.wellnessnavigatorgym.repository.IVipPaymentRepository;
@@ -27,6 +28,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
@@ -77,20 +79,11 @@ public class AdminController {
     @Autowired
     private FirebaseStorageService firebaseStorageService;
 
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
     @PersistenceContext
     private EntityManager entityManager;
-
-    /**
-     * Test endpoint đơn giản
-     */
-    @GetMapping("/test-connection")
-    public ResponseEntity<?> testConnection() {
-        Map<String, Object> response = new HashMap<>();
-        response.put("message", "Connection successful");
-        response.put("timestamp", LocalDateTime.now());
-        response.put("status", "OK");
-        return ResponseEntity.ok(response);
-    }
 
     /**
      * Dashboard chính cho admin
@@ -1311,136 +1304,106 @@ public class AdminController {
     @Transactional
     public ResponseEntity<?> getAllComments() {
         try {
-            logger.info("=== FETCHING ALL COMMENTS ===");
+            List<Comment> allComments = commentRepository.findAll();
+            List<Comment> comments = allComments.stream()
+                .sorted((c1, c2) -> {
+                    if (c1.getCreatedDate() == null && c2.getCreatedDate() == null) return 0;
+                    if (c1.getCreatedDate() == null) return 1;
+                    if (c2.getCreatedDate() == null) return -1;
+                    return c2.getCreatedDate().compareTo(c1.getCreatedDate());
+                })
+                .collect(Collectors.toList());
             
-            // Enhanced query to get all fields from comments table plus related data
-            String query = "SELECT " +
-                          "c.comment_id, " +               // 0
-                          "c.comment_text, " +             // 1
-                          "c.customer_id, " +              // 2
-                          "c.exercise_id, " +              // 3
-                          "c.course_id, " +                // 4
-                          "c.day_id, " +                   // 5
-                          "c.created_date, " +             // 6
-                          "c.updated_date, " +             // 7
-                          "COALESCE(c.is_reported, false) as is_reported, " +  // 8
-                          "COALESCE(c.report_count, 0) as report_count, " +    // 9
-                          "c.report_reason, " +            // 10
-                          "cu.customer_name, " +           // 11
-                          "cu.customer_img, " +            // 12
-                          "cu.customer_email, " +          // 13
-                          "acc.user_name, " +              // 14 - username from account
-                          "e.exercise_name, " +            // 15
-                          "e.body_part, " +                // 16
-                          "e.target, " +                   // 17
-                          "course.course_name, " +         // 18
-                          "course.description as course_description, " +  // 19
-                          "d.day_name, " +                 // 20
-                          "d.description as day_description " +           // 21
-                          "FROM comments c " +
-                          "LEFT JOIN customer cu ON c.customer_id = cu.customer_id " +
-                          "LEFT JOIN account acc ON cu.account_id = acc.account_id " +
-                          "LEFT JOIN exercise e ON c.exercise_id = e.exercise_id " +
-                          "LEFT JOIN course ON c.course_id = course.course_id " +
-                          "LEFT JOIN days d ON c.day_id = d.day_id " +
-                          "ORDER BY c.created_date DESC";
-            
-            @SuppressWarnings("unchecked")
-            List<Object[]> results = entityManager.createNativeQuery(query).getResultList();
-            
-            logger.info("Found {} comments in database", results.size());
-            
-            // Log first few results for debugging
-            if (results.size() > 0) {
-                Object[] firstRow = results.get(0);
-                logger.info("Sample comment data: commentId={}, text={}, customerId={}, customer_name={}, exercise_name={}, course_name={}, day_name={}", 
-                    firstRow[0], firstRow[1], firstRow[2], firstRow[11], firstRow[15], firstRow[18], firstRow[20]);
-            }
-            
-            List<Map<String, Object>> commentsResponse = results.stream()
-                .map(row -> {
+            List<Map<String, Object>> commentsResponse = comments.stream()
+                .map(comment -> {
                     Map<String, Object> commentInfo = new HashMap<>();
                     
                     try {
-                        commentInfo.put("commentId", row[0]);
-                        commentInfo.put("commentText", row[1]);
-                        commentInfo.put("createdAt", row[6]);
-                        commentInfo.put("updatedAt", row[7]);
-                        commentInfo.put("isReported", row[8] != null ? (Boolean) row[8] : false);
-                        commentInfo.put("reportCount", row[9] != null ? ((Number) row[9]).intValue() : 0);
-                        commentInfo.put("reportReason", row[10]);
+                        // Basic comment info
+                        commentInfo.put("commentId", comment.getCommentId());
+                        commentInfo.put("commentText", comment.getCommentText());
+                        commentInfo.put("createdAt", comment.getCreatedDate());
+                        commentInfo.put("updatedAt", comment.getUpdatedDate());
+                        commentInfo.put("isReported", comment.getIsReported() != null ? comment.getIsReported() : false);
+                        commentInfo.put("reportCount", comment.getReportCount() != null ? comment.getReportCount() : 0);
+                        commentInfo.put("reportReason", comment.getReportReason());
                         
-                        // Customer info - đầy đủ thông tin
+                        // Customer info
                         Map<String, Object> customerInfo = new HashMap<>();
-                        customerInfo.put("customerId", row[2]);
-                        customerInfo.put("customerName", row[11] != null ? row[11] : "Unknown User");
-                        customerInfo.put("customerImg", row[12] != null ? row[12] : "");
-                        customerInfo.put("customerEmail", row[13] != null ? row[13] : "");
-                        customerInfo.put("username", row[14] != null ? row[14] : "");
+                        if (comment.getCustomer() != null) {
+                            customerInfo.put("customerId", comment.getCustomer().getCustomerId());
+                            customerInfo.put("customerName", comment.getCustomer().getCustomerName() != null ? comment.getCustomer().getCustomerName() : "Unknown User");
+                            customerInfo.put("customerImg", comment.getCustomer().getCustomerImg() != null ? comment.getCustomer().getCustomerImg() : "");
+                            customerInfo.put("customerEmail", comment.getCustomer().getCustomerEmail() != null ? comment.getCustomer().getCustomerEmail() : "");
+                            if (comment.getCustomer().getAccount() != null) {
+                                customerInfo.put("username", comment.getCustomer().getAccount().getUserName() != null ? comment.getCustomer().getAccount().getUserName() : "");
+                            } else {
+                                customerInfo.put("username", "");
+                            }
+                        } else {
+                            customerInfo.put("customerId", null);
+                            customerInfo.put("customerName", "Unknown User");
+                            customerInfo.put("customerImg", "");
+                            customerInfo.put("customerEmail", "");
+                            customerInfo.put("username", "");
+                        }
                         commentInfo.put("customer", customerInfo);
                         
-                        // Exercise info - đầy đủ thông tin
+                        // Exercise info
                         Map<String, Object> exerciseInfo = new HashMap<>();
-                        exerciseInfo.put("exerciseId", row[3]);
-                        exerciseInfo.put("exerciseName", row[15] != null ? row[15] : "N/A");
-                        exerciseInfo.put("bodyPart", row[16] != null ? row[16] : "N/A");
-                        exerciseInfo.put("target", row[17] != null ? row[17] : "N/A");
+                        if (comment.getExercise() != null) {
+                            exerciseInfo.put("exerciseId", comment.getExercise().getExerciseId());
+                            exerciseInfo.put("exerciseName", comment.getExercise().getExerciseName() != null ? comment.getExercise().getExerciseName() : "N/A");
+                            exerciseInfo.put("bodyPart", comment.getExercise().getBodyPart() != null ? comment.getExercise().getBodyPart() : "N/A");
+                            exerciseInfo.put("target", comment.getExercise().getTarget() != null ? comment.getExercise().getTarget() : "N/A");
+                        } else {
+                            exerciseInfo.put("exerciseId", null);
+                            exerciseInfo.put("exerciseName", "N/A");
+                            exerciseInfo.put("bodyPart", "N/A");
+                            exerciseInfo.put("target", "N/A");
+                        }
                         commentInfo.put("exercise", exerciseInfo);
                         
-                        // Course info - đầy đủ thông tin
+                        // Course info (optional)
                         Map<String, Object> courseInfo = new HashMap<>();
-                        courseInfo.put("courseId", row[4]);
-                        courseInfo.put("courseName", row[18] != null ? row[18] : "N/A");
-                        courseInfo.put("courseDescription", row[19] != null ? row[19] : "");
+                        if (comment.getCourse() != null) {
+                            courseInfo.put("courseId", comment.getCourse().getCourseId());
+                            courseInfo.put("courseName", comment.getCourse().getCourseName() != null ? comment.getCourse().getCourseName() : "N/A");
+                            courseInfo.put("courseDescription", comment.getCourse().getDescription() != null ? comment.getCourse().getDescription() : "");
+                        } else {
+                            courseInfo.put("courseId", null);
+                            courseInfo.put("courseName", "N/A");
+                            courseInfo.put("courseDescription", "");
+                        }
                         commentInfo.put("course", courseInfo);
                         
-                        // Day info - đầy đủ thông tin
+                        // Day info (optional)
                         Map<String, Object> dayInfo = new HashMap<>();
-                        dayInfo.put("dayId", row[5]);
-                        dayInfo.put("dayName", row[20] != null ? row[20] : "N/A");
-                        dayInfo.put("dayDescription", row[21] != null ? row[21] : "");
+                        if (comment.getDay() != null) {
+                            dayInfo.put("dayId", comment.getDay().getDayId());
+                            dayInfo.put("dayName", comment.getDay().getDayName() != null ? comment.getDay().getDayName() : "N/A");
+                        } else {
+                            dayInfo.put("dayId", null);
+                            dayInfo.put("dayName", "N/A");
+                        }
                         commentInfo.put("day", dayInfo);
                         
                     } catch (Exception e) {
-                        logger.error("Error mapping comment row: {}", e.getMessage());
+                        logger.error("Error mapping comment: {}", e.getMessage(), e);
                         // Return minimal comment info on error
-                        commentInfo.put("commentId", row[0] != null ? row[0] : 0);
-                        commentInfo.put("commentText", row[1] != null ? row[1] : "");
-                        commentInfo.put("error", "Data mapping error");
+                        commentInfo.put("commentId", comment.getCommentId());
+                        commentInfo.put("commentText", comment.getCommentText());
+                        commentInfo.put("error", "Data mapping error: " + e.getMessage());
                     }
                     
                     return commentInfo;
                 })
                 .collect(Collectors.toList());
             
-            Map<String, Object> response = new HashMap<>();
-            response.put("comments", commentsResponse);
-            response.put("total", commentsResponse.size());
-            
-            logger.info("✅ Successfully fetched {} comments", commentsResponse.size());
-            
-            // Log first comment for debugging
-            if (!commentsResponse.isEmpty()) {
-                Map<String, Object> firstComment = commentsResponse.get(0);
-                logger.info("Sample response structure: {}", firstComment);
-                
-                // Check nested objects
-                if (firstComment.get("customer") instanceof Map) {
-                    Map<String, Object> customer = (Map<String, Object>) firstComment.get("customer");
-                    logger.info("Customer object: {}", customer);
-                }
-                if (firstComment.get("exercise") instanceof Map) {
-                    Map<String, Object> exercise = (Map<String, Object>) firstComment.get("exercise");
-                    logger.info("Exercise object: {}", exercise);
-                }
-            }
-            
-            // Return comments in consistent format
             Map<String, Object> finalResponse = new HashMap<>();
             finalResponse.put("comments", commentsResponse);
             finalResponse.put("total", commentsResponse.size());
             finalResponse.put("status", "success");
-            
             return ResponseEntity.ok(finalResponse);
             
         } catch (Exception e) {
@@ -1460,103 +1423,110 @@ public class AdminController {
     @Transactional
     public ResponseEntity<?> getReportedComments() {
         try {
-            logger.info("=== FETCHING REPORTED COMMENTS ===");
+            List<Comment> allComments = commentRepository.findAll();
+            List<Comment> reportedComments = allComments.stream()
+                .filter(c -> (c.getIsReported() != null && c.getIsReported()) || 
+                           (c.getReportCount() != null && c.getReportCount() > 0))
+                .sorted((c1, c2) -> {
+                    int reportCompare = Integer.compare(
+                        c2.getReportCount() != null ? c2.getReportCount() : 0,
+                        c1.getReportCount() != null ? c1.getReportCount() : 0
+                    );
+                    if (reportCompare != 0) return reportCompare;
+                    
+                    if (c1.getCreatedDate() == null && c2.getCreatedDate() == null) return 0;
+                    if (c1.getCreatedDate() == null) return 1;
+                    if (c2.getCreatedDate() == null) return -1;
+                    return c2.getCreatedDate().compareTo(c1.getCreatedDate());
+                })
+                .collect(Collectors.toList());
             
-            // Enhanced query for reported comments - same structure as getAllComments
-            String query = "SELECT " +
-                          "c.comment_id, " +               // 0
-                          "c.comment_text, " +             // 1
-                          "c.customer_id, " +              // 2
-                          "c.exercise_id, " +              // 3
-                          "c.course_id, " +                // 4
-                          "c.day_id, " +                   // 5
-                          "c.created_date, " +             // 6
-                          "c.updated_date, " +             // 7
-                          "COALESCE(c.is_reported, false) as is_reported, " +  // 8
-                          "COALESCE(c.report_count, 0) as report_count, " +    // 9
-                          "c.report_reason, " +            // 10
-                          "cu.customer_name, " +           // 11
-                          "cu.customer_img, " +            // 12
-                          "cu.customer_email, " +          // 13
-                          "acc.user_name, " +              // 14 - username from account
-                          "e.exercise_name, " +            // 15
-                          "e.body_part, " +                // 16
-                          "e.target, " +                   // 17
-                          "course.course_name, " +         // 18
-                          "course.description as course_description, " +  // 19
-                          "d.day_name, " +                 // 20
-                          "d.description as day_description " +           // 21
-                          "FROM comments c " +
-                          "LEFT JOIN customer cu ON c.customer_id = cu.customer_id " +
-                          "LEFT JOIN account acc ON cu.account_id = acc.account_id " +
-                          "LEFT JOIN exercise e ON c.exercise_id = e.exercise_id " +
-                          "LEFT JOIN course ON c.course_id = course.course_id " +
-                          "LEFT JOIN days d ON c.day_id = d.day_id " +
-                          "WHERE (c.is_reported = true OR c.report_count > 0) " +
-                          "ORDER BY c.created_date DESC";
-            
-            @SuppressWarnings("unchecked")
-            List<Object[]> results = entityManager.createNativeQuery(query).getResultList();
-            
-            logger.info("Found {} reported comments in database", results.size());
-            
-            List<Map<String, Object>> commentsResponse = results.stream()
-                .map(row -> {
+            List<Map<String, Object>> commentsResponse = reportedComments.stream()
+                .map(comment -> {
                     Map<String, Object> commentInfo = new HashMap<>();
                     
                     try {
-                        commentInfo.put("commentId", row[0]);
-                        commentInfo.put("commentText", row[1]);
-                        commentInfo.put("createdAt", row[6]);
-                        commentInfo.put("updatedAt", row[7]);
-                        commentInfo.put("isReported", row[8] != null ? (Boolean) row[8] : false);
-                        commentInfo.put("reportCount", row[9] != null ? ((Number) row[9]).intValue() : 0);
-                        commentInfo.put("reportReason", row[10]);
+                        // Basic comment info
+                        commentInfo.put("commentId", comment.getCommentId());
+                        commentInfo.put("commentText", comment.getCommentText());
+                        commentInfo.put("createdAt", comment.getCreatedDate());
+                        commentInfo.put("updatedAt", comment.getUpdatedDate());
+                        commentInfo.put("isReported", comment.getIsReported() != null ? comment.getIsReported() : false);
+                        commentInfo.put("reportCount", comment.getReportCount() != null ? comment.getReportCount() : 0);
+                        commentInfo.put("reportReason", comment.getReportReason());
                         
-                        // Customer info - đầy đủ thông tin
+                        // Customer info
                         Map<String, Object> customerInfo = new HashMap<>();
-                        customerInfo.put("customerId", row[2]);
-                        customerInfo.put("customerName", row[11] != null ? row[11] : "Unknown User");
-                        customerInfo.put("customerImg", row[12] != null ? row[12] : "");
-                        customerInfo.put("customerEmail", row[13] != null ? row[13] : "");
-                        customerInfo.put("username", row[14] != null ? row[14] : "");
+                        if (comment.getCustomer() != null) {
+                            customerInfo.put("customerId", comment.getCustomer().getCustomerId());
+                            customerInfo.put("customerName", comment.getCustomer().getCustomerName() != null ? comment.getCustomer().getCustomerName() : "Unknown User");
+                            customerInfo.put("customerImg", comment.getCustomer().getCustomerImg() != null ? comment.getCustomer().getCustomerImg() : "");
+                            customerInfo.put("customerEmail", comment.getCustomer().getCustomerEmail() != null ? comment.getCustomer().getCustomerEmail() : "");
+                            if (comment.getCustomer().getAccount() != null) {
+                                customerInfo.put("username", comment.getCustomer().getAccount().getUserName() != null ? comment.getCustomer().getAccount().getUserName() : "");
+                            } else {
+                                customerInfo.put("username", "");
+                            }
+                        } else {
+                            customerInfo.put("customerId", null);
+                            customerInfo.put("customerName", "Unknown User");
+                            customerInfo.put("customerImg", "");
+                            customerInfo.put("customerEmail", "");
+                            customerInfo.put("username", "");
+                        }
                         commentInfo.put("customer", customerInfo);
                         
-                        // Exercise info - đầy đủ thông tin
+                        // Exercise info
                         Map<String, Object> exerciseInfo = new HashMap<>();
-                        exerciseInfo.put("exerciseId", row[3]);
-                        exerciseInfo.put("exerciseName", row[15] != null ? row[15] : "N/A");
-                        exerciseInfo.put("bodyPart", row[16] != null ? row[16] : "N/A");
-                        exerciseInfo.put("target", row[17] != null ? row[17] : "N/A");
+                        if (comment.getExercise() != null) {
+                            exerciseInfo.put("exerciseId", comment.getExercise().getExerciseId());
+                            exerciseInfo.put("exerciseName", comment.getExercise().getExerciseName() != null ? comment.getExercise().getExerciseName() : "N/A");
+                            exerciseInfo.put("bodyPart", comment.getExercise().getBodyPart() != null ? comment.getExercise().getBodyPart() : "N/A");
+                            exerciseInfo.put("target", comment.getExercise().getTarget() != null ? comment.getExercise().getTarget() : "N/A");
+                        } else {
+                            exerciseInfo.put("exerciseId", null);
+                            exerciseInfo.put("exerciseName", "N/A");
+                            exerciseInfo.put("bodyPart", "N/A");
+                            exerciseInfo.put("target", "N/A");
+                        }
                         commentInfo.put("exercise", exerciseInfo);
                         
-                        // Course info - đầy đủ thông tin
+                        // Course info (optional)
                         Map<String, Object> courseInfo = new HashMap<>();
-                        courseInfo.put("courseId", row[4]);
-                        courseInfo.put("courseName", row[18] != null ? row[18] : "N/A");
-                        courseInfo.put("courseDescription", row[19] != null ? row[19] : "");
+                        if (comment.getCourse() != null) {
+                            courseInfo.put("courseId", comment.getCourse().getCourseId());
+                            courseInfo.put("courseName", comment.getCourse().getCourseName() != null ? comment.getCourse().getCourseName() : "N/A");
+                            courseInfo.put("courseDescription", comment.getCourse().getDescription() != null ? comment.getCourse().getDescription() : "");
+                        } else {
+                            courseInfo.put("courseId", null);
+                            courseInfo.put("courseName", "N/A");
+                            courseInfo.put("courseDescription", "");
+                        }
                         commentInfo.put("course", courseInfo);
                         
-                        // Day info - đầy đủ thông tin
+                        // Day info (optional)
                         Map<String, Object> dayInfo = new HashMap<>();
-                        dayInfo.put("dayId", row[5]);
-                        dayInfo.put("dayName", row[20] != null ? row[20] : "N/A");
-                        dayInfo.put("dayDescription", row[21] != null ? row[21] : "");
+                        if (comment.getDay() != null) {
+                            dayInfo.put("dayId", comment.getDay().getDayId());
+                            dayInfo.put("dayName", comment.getDay().getDayName() != null ? comment.getDay().getDayName() : "N/A");
+                        } else {
+                            dayInfo.put("dayId", null);
+                            dayInfo.put("dayName", "N/A");
+                        }
                         commentInfo.put("day", dayInfo);
                         
                     } catch (Exception e) {
-                        logger.error("Error mapping reported comment row: {}", e.getMessage());
+                        logger.error("Error mapping reported comment: {}", e.getMessage(), e);
                         // Return minimal comment info on error
-                        commentInfo.put("commentId", row[0] != null ? row[0] : 0);
-                        commentInfo.put("commentText", row[1] != null ? row[1] : "");
-                        commentInfo.put("error", "Data mapping error");
+                        commentInfo.put("commentId", comment.getCommentId());
+                        commentInfo.put("commentText", comment.getCommentText());
+                        commentInfo.put("error", "Data mapping error: " + e.getMessage());
                     }
                     
                     return commentInfo;
                 })
                 .collect(Collectors.toList());
             
-            logger.info("✅ Successfully fetched {} reported comments", commentsResponse.size());
             return ResponseEntity.ok(commentsResponse);
             
         } catch (Exception e) {
@@ -2346,10 +2316,22 @@ public class AdminController {
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {
-            logger.error("Failed to upload course image: {}", e.getMessage(), e);
+            logger.error("🔥 FAILED to upload course image: {}", e.getMessage(), e);
             
             Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("message", "Failed to upload course image: " + e.getMessage());
+            
+            // Check if this is a Firebase upload error specifically
+            if (e.getMessage().contains("FIREBASE UPLOAD FAILED") || 
+                e.getMessage().contains("Firebase Storage") ||
+                e.getMessage().contains("UPLOAD FAILED")) {
+                errorResponse.put("message", "❌ FIREBASE UPLOAD FAILED: " + e.getMessage());
+                errorResponse.put("error_type", "firebase_upload_failure");
+                errorResponse.put("firebase_status", "NOT_WORKING");
+            } else {
+                errorResponse.put("message", "Failed to upload course image: " + e.getMessage());
+                errorResponse.put("error_type", "general_error");
+            }
+            
             errorResponse.put("status", "error");
             errorResponse.put("timestamp", LocalDateTime.now());
             
@@ -2403,48 +2385,6 @@ public class AdminController {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error checking customer ban status: " + e.getMessage());
-        }
-    }
-
-    /**
-     * Test banned customer login prevention
-     */
-    @PostMapping("/test-banned-login")
-    public ResponseEntity<?> testBannedLogin(@RequestBody Map<String, String> request) {
-        try {
-            String username = request.get("username");
-            Map<String, Object> response = new HashMap<>();
-            response.put("username", username);
-            
-            // Simulate what UserDetailService does
-            Customer customer = customerRepository.findByAccountUserName(username);
-            
-            if (customer == null) {
-                response.put("result", "NO_CUSTOMER_FOUND");
-                response.put("message", "No customer found for username");
-                return ResponseEntity.ok(response);
-            }
-            
-            if (!customer.getIsEnable()) {
-                response.put("result", "BANNED_CUSTOMER");
-                response.put("message", "Customer is banned - login should fail");
-                response.put("customerId", customer.getCustomerId());
-                response.put("customerName", customer.getCustomerName());
-                response.put("shouldBlockLogin", true);
-            } else {
-                response.put("result", "ACTIVE_CUSTOMER");
-                response.put("message", "Customer is active - login should succeed");
-                response.put("customerId", customer.getCustomerId());
-                response.put("customerName", customer.getCustomerName());
-                response.put("shouldBlockLogin", false);
-            }
-            
-            return ResponseEntity.ok(response);
-            
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Error testing banned login: " + e.getMessage());
         }
     }
 
@@ -3372,10 +3312,22 @@ public class AdminController {
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {
-            logger.error("Failed to upload exercise image: {}", e.getMessage(), e);
+            logger.error("🔥 FAILED to upload exercise image: {}", e.getMessage(), e);
             
             Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("message", "Failed to upload exercise image: " + e.getMessage());
+            
+            // Check if this is a Firebase upload error specifically
+            if (e.getMessage().contains("FIREBASE UPLOAD FAILED") || 
+                e.getMessage().contains("Firebase Storage") ||
+                e.getMessage().contains("UPLOAD FAILED")) {
+                errorResponse.put("message", "❌ FIREBASE UPLOAD FAILED: " + e.getMessage());
+                errorResponse.put("error_type", "firebase_upload_failure");
+                errorResponse.put("firebase_status", "NOT_WORKING");
+            } else {
+                errorResponse.put("message", "Failed to upload exercise image: " + e.getMessage());
+                errorResponse.put("error_type", "general_error");
+            }
+            
             errorResponse.put("status", "error");
             errorResponse.put("timestamp", LocalDateTime.now());
             
@@ -3432,10 +3384,22 @@ public class AdminController {
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {
-            logger.error("Failed to upload exercise video: {}", e.getMessage(), e);
+            logger.error("🔥 FAILED to upload exercise video: {}", e.getMessage(), e);
             
             Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("message", "Failed to upload exercise video: " + e.getMessage());
+            
+            // Check if this is a Firebase upload error specifically
+            if (e.getMessage().contains("FIREBASE UPLOAD FAILED") || 
+                e.getMessage().contains("Firebase Storage") ||
+                e.getMessage().contains("UPLOAD FAILED")) {
+                errorResponse.put("message", "❌ FIREBASE UPLOAD FAILED: " + e.getMessage());
+                errorResponse.put("error_type", "firebase_upload_failure");
+                errorResponse.put("firebase_status", "NOT_WORKING");
+            } else {
+                errorResponse.put("message", "Failed to upload exercise video: " + e.getMessage());
+                errorResponse.put("error_type", "general_error");
+            }
+            
             errorResponse.put("status", "error");
             errorResponse.put("timestamp", LocalDateTime.now());
             
@@ -3490,10 +3454,22 @@ public class AdminController {
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {
-            logger.error("Failed to upload customer avatar: {}", e.getMessage(), e);
+            logger.error("🔥 FAILED to upload customer avatar: {}", e.getMessage(), e);
             
             Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("message", "Failed to upload customer avatar: " + e.getMessage());
+            
+            // Check if this is a Firebase upload error specifically
+            if (e.getMessage().contains("FIREBASE UPLOAD FAILED") || 
+                e.getMessage().contains("Firebase Storage") ||
+                e.getMessage().contains("UPLOAD FAILED")) {
+                errorResponse.put("message", "❌ FIREBASE UPLOAD FAILED: " + e.getMessage());
+                errorResponse.put("error_type", "firebase_upload_failure");
+                errorResponse.put("firebase_status", "NOT_WORKING");
+            } else {
+                errorResponse.put("message", "Failed to upload customer avatar: " + e.getMessage());
+                errorResponse.put("error_type", "general_error");
+            }
+            
             errorResponse.put("status", "error");
             errorResponse.put("timestamp", LocalDateTime.now());
             
@@ -3617,6 +3593,110 @@ public class AdminController {
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("error", "Failed to unban customer: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+    // Removed test-user-ban-status endpoint - production only
+
+    /**
+     * Admin endpoint: Create account for existing customer who doesn't have account yet
+     */
+    @PostMapping("/customers/{customerId}/create-account")
+    public ResponseEntity<?> createAccountForCustomer(
+            @PathVariable Integer customerId,
+            @RequestBody Map<String, String> request) {
+        try {
+            String username = request.get("username");
+            String password = request.get("password");
+            String email = request.get("email");
+            
+            logger.info("=== ADMIN CREATING ACCOUNT FOR CUSTOMER {} ===", customerId);
+            logger.info("Username: {}, Email: {}", username, email);
+            
+            // Validation
+            if (username == null || username.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("Username is required");
+            }
+            if (password == null || password.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("Password is required");
+            }
+            if (email == null || email.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("Email is required");
+            }
+            
+            // Find customer
+            Optional<Customer> customerOpt = customerRepository.findById(customerId);
+            if (!customerOpt.isPresent()) {
+                return ResponseEntity.badRequest().body("Customer not found with ID: " + customerId);
+            }
+            
+            Customer customer = customerOpt.get();
+            
+            // Check if customer already has account
+            if (customer.getAccount() != null) {
+                return ResponseEntity.badRequest().body("Customer already has an account: " + customer.getAccount().getUserName());
+            }
+            
+            // Check if username already exists
+            Optional<Account> existingAccount = accountRepository.findAccountByUserName(username);
+            if (existingAccount.isPresent()) {
+                return ResponseEntity.badRequest().body("Username already exists: " + username);
+            }
+            
+            // Check if email already exists
+            Account existingEmailAccount = accountRepository.findByEmail(email);
+            if (existingEmailAccount != null) {
+                return ResponseEntity.badRequest().body("Email already exists: " + email);
+            }
+            
+            // Create new account
+            Account newAccount = new Account();
+            newAccount.setUserName(username);
+            newAccount.setEmail(email);
+            newAccount.setEncryptPassword(passwordEncoder.encode(password)); // Properly encode password
+            newAccount.setIsEnable(true); // Enable by default
+            
+            // Set default USER role
+            Role userRole = new Role(1, "ROLE_USER");
+            Set<Role> roles = new HashSet<>();
+            roles.add(userRole);
+            newAccount.setRoles(roles);
+            
+            // Save account first
+            Account savedAccount = accountRepository.save(newAccount);
+            logger.info("Account created with ID: {}", savedAccount.getAccountId());
+            
+            // Link account to customer
+            customer.setAccount(savedAccount);
+            Customer savedCustomer = customerRepository.save(customer);
+            
+            logger.info("✅ Account linked to customer - Customer: {}, Account: {}", 
+                customer.getCustomerName(), savedAccount.getUserName());
+            
+            // Prepare response
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Account created successfully for customer: " + customer.getCustomerName());
+            Map<String, Object> customerInfo = new HashMap<>();
+            customerInfo.put("customerId", customer.getCustomerId());
+            customerInfo.put("customerName", customer.getCustomerName());
+            customerInfo.put("customerEmail", customer.getCustomerEmail());
+            customerInfo.put("isEnable", customer.getIsEnable());
+            response.put("customer", customerInfo);
+            
+            Map<String, Object> accountInfo = new HashMap<>();
+            accountInfo.put("accountId", savedAccount.getAccountId());
+            accountInfo.put("username", savedAccount.getUserName());
+            accountInfo.put("email", savedAccount.getEmail());
+            accountInfo.put("isEnable", savedAccount.getIsEnable());
+            response.put("account", accountInfo);
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("Error creating account for customer {}: {}", customerId, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("Error creating account: " + e.getMessage());
         }
     }
 } 

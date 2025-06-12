@@ -14,6 +14,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.persistence.Tuple;
 import java.util.List;
@@ -23,6 +25,7 @@ import java.util.Optional;
 @Service
 public class CustomerServiceImpl implements ICustomerService {
 
+    private static final Logger logger = LoggerFactory.getLogger(CustomerServiceImpl.class);
     private final ICustomerRepository customerRepository;
 
     @Autowired
@@ -100,10 +103,28 @@ public class CustomerServiceImpl implements ICustomerService {
 
     @Override
     public void updateCustomerAvatar(String username, String avatarUrl) {
+        logger.info("🔧 [DB_UPDATE] Starting avatar update for user: {}", username);
+        logger.info("🔧 [DB_UPDATE] New avatar URL: {}", avatarUrl);
+        
         Customer customer = customerRepository.findActiveCustomerByAccountUserName(username);
         if (customer != null) {
+            logger.info("🔧 [DB_UPDATE] Customer found - ID: {}, Current avatar: {}", 
+                customer.getCustomerId(), customer.getCustomerImg());
+            
+            String oldAvatarUrl = customer.getCustomerImg();
             customer.setCustomerImg(avatarUrl);
-            customerRepository.save(customer);
+            
+            try {
+                customerRepository.save(customer);
+                logger.info("🔧 [DB_UPDATE] ✅ Avatar updated successfully - Old: {}, New: {}", 
+                    oldAvatarUrl, avatarUrl);
+            } catch (Exception e) {
+                logger.error("🔧 [DB_UPDATE] ❌ Failed to save customer avatar: {}", e.getMessage(), e);
+                throw new RuntimeException("Failed to update avatar in database", e);
+            }
+        } else {
+            logger.error("🔧 [DB_UPDATE] ❌ Customer not found for username: {}", username);
+            throw new RuntimeException("Customer not found for username: " + username);
         }
     }
 

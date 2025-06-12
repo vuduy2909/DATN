@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 public class Comment {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "comment_id")
     private Integer commentId;
     
     @Column(name = "comment_text", nullable = false)
@@ -62,11 +63,11 @@ public class Comment {
         
         // Handle optional course and day
         if (commentDto.getCourse() != null && !commentDto.getCourse().trim().isEmpty()) {
-            this.course = new Course(Integer.parseInt(commentDto.getCourse()));
+        this.course = new Course(Integer.parseInt(commentDto.getCourse()));
         }
         
         if (commentDto.getDay() != null && !commentDto.getDay().trim().isEmpty()) {
-            this.day = new Day(Integer.parseInt(commentDto.getDay()));
+        this.day = new Day(Integer.parseInt(commentDto.getDay()));
         }
     }
     

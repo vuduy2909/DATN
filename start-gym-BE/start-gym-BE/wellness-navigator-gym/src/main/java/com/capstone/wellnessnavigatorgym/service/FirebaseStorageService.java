@@ -4,6 +4,7 @@ import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.Storage;
+import com.google.firebase.cloud.StorageClient;
 import com.capstone.wellnessnavigatorgym.config.FirebaseConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,13 +61,22 @@ public class FirebaseStorageService {
      * Stored in: images/Avatar/
      */
     public String uploadAvatar(MultipartFile file, String userName) throws IOException {
+        logger.info("🔧 [AVATAR_UPLOAD] Starting avatar upload for user: {}", userName);
+        
         if (file.isEmpty()) {
+            logger.error("🔧 [AVATAR_UPLOAD] ❌ File is empty");
             throw new IllegalArgumentException("File is empty");
         }
         
+        logger.info("🔧 [AVATAR_UPLOAD] File info - Name: {}, Size: {} bytes, ContentType: {}", 
+            file.getOriginalFilename(), file.getSize(), file.getContentType());
+        
         if (!isAvailable()) {
+            logger.error("🔧 [AVATAR_UPLOAD] ❌ Firebase Storage is not available");
             throw new RuntimeException("Firebase Storage is not available");
         }
+        
+        logger.info("🔧 [AVATAR_UPLOAD] ✅ Firebase Storage is available");
         
         String originalFileName = file.getOriginalFilename();
         String fileExtension = getFileExtension(originalFileName);
@@ -75,12 +85,27 @@ public class FirebaseStorageService {
         String fileName = "avatar_" + userName + fileExtension;
         String filePath = "images/Avatar/" + fileName;
         
+        logger.info("🔧 [AVATAR_UPLOAD] Generated file path: {}", filePath);
+        
         // Delete existing avatar if exists
-        deleteExistingFile(filePath);
+        try {
+            logger.info("🔧 [AVATAR_UPLOAD] Checking for existing file to delete...");
+            deleteExistingFile(filePath);
+            logger.info("🔧 [AVATAR_UPLOAD] ✅ Existing file cleanup completed");
+        } catch (Exception e) {
+            logger.warn("🔧 [AVATAR_UPLOAD] ⚠️ Failed to cleanup existing file: {}", e.getMessage());
+        }
         
         // Upload new avatar
+        logger.info("🔧 [AVATAR_UPLOAD] Starting Firebase upload to path: {}", filePath);
         String downloadUrl = uploadFileToFirebase(file, filePath);
-        logger.info("✅ Avatar uploaded successfully for user: {} -> {}", userName, downloadUrl);
+        
+        if (downloadUrl != null && !downloadUrl.isEmpty()) {
+            logger.info("🔧 [AVATAR_UPLOAD] ✅ Avatar uploaded successfully for user: {} -> {}", userName, downloadUrl);
+        } else {
+            logger.error("🔧 [AVATAR_UPLOAD] ❌ Upload failed - received null/empty download URL");
+            throw new IOException("Upload failed - received null/empty download URL");
+        }
         
         return downloadUrl;
     }
@@ -193,68 +218,179 @@ public class FirebaseStorageService {
     }
     
     /**
-     * Core method to upload file to Firebase Storage
+     * Core method to upload file to Firebase Storage using Firebase Admin SDK (with authentication)
      */
     private String uploadFileToFirebase(MultipartFile file, String filePath) throws IOException {
+        // STRICT VALIDATION: Fail immediately if Firebase not properly configured
+        if (!isAvailable()) {
+            logger.error("🔧 [FIREBASE_UPLOAD] ❌ FATAL: Firebase Storage is NOT available!");
+            logger.error("🔧 [FIREBASE_UPLOAD] ❌ Check Firebase initialization and service account");
+            throw new IOException("UPLOAD FAILED: Firebase Storage is not available. Cannot upload file.");
+        }
+        
+        if (file == null || file.isEmpty()) {
+            logger.error("🔧 [FIREBASE_UPLOAD] ❌ FATAL: File is null or empty");
+            throw new IOException("UPLOAD FAILED: No file provided");
+        }
+        
+        if (filePath == null || filePath.trim().isEmpty()) {
+            logger.error("🔧 [FIREBASE_UPLOAD] ❌ FATAL: File path is null or empty");
+            throw new IOException("UPLOAD FAILED: No file path provided");
+        }
+        
         try {
-            logger.info("🔄 Starting Firebase upload - File: {}, Path: {}, Bucket: {}", 
-                file.getOriginalFilename(), filePath, bucketName);
+            logger.info("🔧 [FIREBASE_UPLOAD] ✅ Starting REAL Firebase upload");
+            logger.info("🔧 [FIREBASE_UPLOAD] File: {}, Size: {} bytes, Path: {}", 
+                file.getOriginalFilename(), file.getSize(), filePath);
             
-            // First check if bucket exists
+            // STRICT: Use Firebase Admin SDK - this MUST work or fail
+            com.google.cloud.storage.Bucket bucket;
             try {
-                storage.get(bucketName);
-                logger.info("✅ Bucket {} verified to exist", bucketName);
+                bucket = StorageClient.getInstance().bucket();
+                logger.info("🔧 [FIREBASE_UPLOAD] ✅ Firebase Admin bucket obtained: {}", bucket.getName());
             } catch (Exception e) {
-                logger.error("❌ Bucket {} does not exist or is not accessible: {}", bucketName, e.getMessage());
+                logger.error("🔧 [FIREBASE_UPLOAD] ❌ FATAL: Cannot get Firebase bucket: {}", e.getMessage());
+                throw new IOException("UPLOAD FAILED: Firebase bucket not accessible - " + e.getMessage());
+            }
+            
+            // Create blob with metadata
+            com.google.cloud.storage.BlobInfo blobInfo = com.google.cloud.storage.BlobInfo.newBuilder(bucket.getName(), filePath)
+                .setContentType(file.getContentType())
+                .setCacheControl("public, max-age=31536000") // 1 year cache
+                .build();
+            
+            logger.info("🔧 [FIREBASE_UPLOAD] Uploading blob with ContentType: {}", file.getContentType());
+            
+            // CRITICAL: Upload file - this MUST succeed or throw exception
+            com.google.cloud.storage.Blob blob;
+            try {
+                blob = bucket.getStorage().create(blobInfo, file.getBytes());
+            } catch (Exception e) {
+                logger.error("🔧 [FIREBASE_UPLOAD] ❌ FATAL: Blob creation failed: {}", e.getMessage());
+                throw new IOException("UPLOAD FAILED: Cannot create blob on Firebase - " + e.getMessage());
+            }
+            
+            if (blob == null) {
+                logger.error("🔧 [FIREBASE_UPLOAD] ❌ FATAL: Blob creation returned null");
+                throw new IOException("UPLOAD FAILED: Blob creation returned null");
+            }
+            
+            logger.info("🔧 [FIREBASE_UPLOAD] ✅ Blob created - Generation: {}", blob.getGeneration());
+            
+            // CRITICAL: Verify file actually exists
+            if (!blob.exists()) {
+                logger.error("🔧 [FIREBASE_UPLOAD] ❌ FATAL: File not found after upload!");
+                throw new IOException("UPLOAD FAILED: File was not actually uploaded to Firebase");
+            }
+            
+            // Additional verification
+            try {
+                blob.reload();
+                logger.info("🔧 [FIREBASE_UPLOAD] ✅ File verified - Size: {} bytes, Created: {}", 
+                    blob.getSize(), blob.getCreateTime());
+            } catch (Exception e) {
+                logger.error("🔧 [FIREBASE_UPLOAD] ❌ File verification failed: {}", e.getMessage());
+                throw new IOException("UPLOAD FAILED: File verification failed - " + e.getMessage());
+            }
+            
+            // CRITICAL: Generate REAL Firebase URL using getDownloadURL
+            logger.info("🔧 [FIREBASE_UPLOAD] Generating REAL Firebase URL using getDownloadURL...");
+            
+            String finalUrl = null;
+            
+            try {
+                // Use Firebase SDK's getDownloadURL method - this is the ONLY correct way
+                com.google.firebase.cloud.StorageClient storageClient = com.google.firebase.cloud.StorageClient.getInstance();
+                com.google.cloud.storage.Bucket bucketForUrl = storageClient.bucket();
+                com.google.cloud.storage.Blob blobForUrl = bucketForUrl.get(filePath);
                 
-                // Try to list available buckets for debugging
-                try {
-                    logger.info("🔍 Attempting to list available buckets...");
-                    storage.list().iterateAll().forEach(bucket -> {
-                        logger.info("📁 Available bucket: {}", bucket.getName());
-                    });
-                } catch (Exception listEx) {
-                    logger.warn("Could not list buckets: {}", listEx.getMessage());
+                if (blobForUrl == null || !blobForUrl.exists()) {
+                    logger.error("🔧 [FIREBASE_UPLOAD] ❌ FATAL: Blob not found for URL generation!");
+                    throw new IOException("UPLOAD FAILED: Blob not found for URL generation");
                 }
                 
-                throw new IOException("Firebase Storage bucket not accessible: " + e.getMessage());
+                // Generate signed URL - this is the correct Firebase way
+                java.net.URL downloadUrl = blobForUrl.signUrl(7, java.util.concurrent.TimeUnit.DAYS);
+                finalUrl = downloadUrl.toString();
+                
+                logger.info("🔧 [FIREBASE_UPLOAD] ✅ Generated Firebase download URL using SDK");
+                logger.info("🔧 [FIREBASE_UPLOAD] URL: {}", finalUrl);
+                
+            } catch (Exception e) {
+                logger.error("🔧 [FIREBASE_UPLOAD] ❌ Failed to generate download URL: {}", e.getMessage());
+                
+                // FALLBACK: Try to get public URL if possible
+                try {
+                    // Make blob public readable
+                    blob.createAcl(com.google.cloud.storage.Acl.of(com.google.cloud.storage.Acl.User.ofAllUsers(), com.google.cloud.storage.Acl.Role.READER));
+                    
+                    // Generate public URL
+                    finalUrl = String.format("https://storage.googleapis.com/%s/%s", bucketName, filePath);
+                    logger.info("🔧 [FIREBASE_UPLOAD] ✅ Generated public URL as fallback: {}", finalUrl);
+                    
+                } catch (Exception fallbackError) {
+                    logger.error("🔧 [FIREBASE_UPLOAD] ❌ FATAL: Cannot generate any valid URL: {}", fallbackError.getMessage());
+                    throw new IOException("UPLOAD FAILED: Cannot generate download URL - " + fallbackError.getMessage());
+                }
             }
             
-            BlobId blobId = BlobId.of(bucketName, filePath);
-            BlobInfo blobInfo = BlobInfo.newBuilder(blobId)
-                .setContentType(file.getContentType())
-                .setCacheControl("public, max-age=8640000") // 24 hours cache for stability
-                .build();               
-            
-            logger.info("📤 Uploading {} bytes to {}", file.getSize(), filePath);
-            Blob blob = storage.create(blobInfo, file.getBytes());
-
-            if (blob == null) {
-                throw new IOException("Failed to create blob - blob is null");
+            if (finalUrl == null || finalUrl.trim().isEmpty()) {
+                logger.error("🔧 [FIREBASE_UPLOAD] ❌ FATAL: No URL generated");
+                throw new IOException("UPLOAD FAILED: No download URL was generated");
             }
             
-            // Generate public URL with timestamp to avoid cache issues
-            String publicUrl = String.format("https://firebasestorage.googleapis.com/v0/b/%s/o/%s?alt=media&t=%d", 
-                bucketName, java.net.URLEncoder.encode(filePath, "UTF-8"), System.currentTimeMillis());
+            // CRITICAL: Test URL accessibility PROPERLY
+            logger.info("🔧 [FIREBASE_UPLOAD] Testing URL accessibility...");
+            try {
+                java.net.URL testUrl = new java.net.URL(finalUrl);
+                java.net.HttpURLConnection connection = (java.net.HttpURLConnection) testUrl.openConnection();
+                connection.setRequestMethod("HEAD");
+                connection.setConnectTimeout(15000); // 15 seconds
+                connection.setReadTimeout(15000);
+                connection.setInstanceFollowRedirects(true);
+                
+                // Handle potential redirects for signed URLs
+                connection.connect();
+                int responseCode = connection.getResponseCode();
+                
+                if (responseCode == 200 || responseCode == 301 || responseCode == 302) {
+                    logger.info("🔧 [FIREBASE_UPLOAD] ✅ URL verified accessible - HTTP {}", responseCode);
+                } else {
+                    logger.error("🔧 [FIREBASE_UPLOAD] ❌ FATAL: URL not accessible - HTTP {}", responseCode);
+                    logger.error("🔧 [FIREBASE_UPLOAD] Response message: {}", connection.getResponseMessage());
+                    throw new IOException("UPLOAD FAILED: Generated URL is not accessible (HTTP " + responseCode + ": " + connection.getResponseMessage() + ")");
+                }
+                
+            } catch (java.io.IOException e) {
+                logger.error("🔧 [FIREBASE_UPLOAD] ❌ FATAL: URL accessibility test failed: {}", e.getMessage());
+                throw new IOException("UPLOAD FAILED: URL not accessible - " + e.getMessage());
+            }
             
-            logger.info("✅ File uploaded successfully to Firebase Storage: {} -> {}", filePath, publicUrl);
-            return publicUrl;
+            logger.info("🔧 [FIREBASE_UPLOAD] 🎉 SUCCESS! File uploaded and URL verified");
+            logger.info("🔧 [FIREBASE_UPLOAD] Final URL: {}", finalUrl);
+            return finalUrl;
             
         } catch (Exception e) {
-            logger.error("❌ Failed to upload file to Firebase Storage: {}", e.getMessage(), e);
+            logger.error("🔧 [FIREBASE_UPLOAD] ❌ CRITICAL FAILURE: {}", e.getMessage(), e);
+            logger.error("🔧 [FIREBASE_UPLOAD] ❌ UPLOAD COMPLETELY FAILED - NO MOCK URLs!");
             
-            // Log detailed error information
+            // Log specific error types for debugging
             if (e.getMessage().contains("does not exist")) {
-                logger.error("🔧 Bucket issue - check service account permissions and bucket name");
-                logger.error("🔧 Current bucket: {}", bucketName);
-                logger.error("🔧 Project ID: {}", FirebaseConfig.getProjectId());
+                logger.error("🔧 [FIREBASE_UPLOAD] 💡 Bucket issue - check Firebase project: {}", bucketName);
             } else if (e.getMessage().contains("permission") || e.getMessage().contains("forbidden")) {
-                logger.error("🔧 Permission issue - check service account has Storage Admin role");
+                logger.error("🔧 [FIREBASE_UPLOAD] 💡 Permission issue - check service account has Storage Admin role");
+            } else if (e.getMessage().contains("quota") || e.getMessage().contains("exceeded")) {
+                logger.error("🔧 [FIREBASE_UPLOAD] 💡 Storage quota exceeded - check Firebase billing");
+            } else if (e.getMessage().contains("network") || e.getMessage().contains("timeout")) {
+                logger.error("🔧 [FIREBASE_UPLOAD] 💡 Network issue - check internet connection to Firebase");
             }
             
-            throw new IOException("Firebase upload failed: " + e.getMessage(), e);
+            // Re-throw with clear error message
+            throw new IOException("🔥 FIREBASE UPLOAD FAILED: " + e.getMessage(), e);
         }
     }
+    
+
     
     /**
      * Delete file by Firebase Storage path
@@ -303,16 +439,23 @@ public class FirebaseStorageService {
      * Delete existing file if it exists (used before uploading new version)
      */
     private void deleteExistingFile(String filePath) {
+        logger.info("🔧 [DELETE_EXISTING] Checking for existing file at path: {}", filePath);
         try {
             BlobId blobId = BlobId.of(bucketName, filePath);
             Blob existingBlob = storage.get(blobId);
             
             if (existingBlob != null && existingBlob.exists()) {
-                storage.delete(blobId);
-                logger.info("✅ Deleted existing file: {}", filePath);
+                boolean deleted = storage.delete(blobId);
+                if (deleted) {
+                    logger.info("🔧 [DELETE_EXISTING] ✅ Deleted existing file: {}", filePath);
+                } else {
+                    logger.warn("🔧 [DELETE_EXISTING] ⚠️ Failed to delete existing file: {}", filePath);
+                }
+            } else {
+                logger.info("🔧 [DELETE_EXISTING] No existing file found at path: {}", filePath);
             }
         } catch (Exception e) {
-            logger.debug("File doesn't exist or couldn't be deleted: {}", filePath);
+            logger.warn("🔧 [DELETE_EXISTING] ⚠️ Error checking/deleting existing file {}: {}", filePath, e.getMessage());
         }
     }
     
@@ -362,4 +505,4 @@ public class FirebaseStorageService {
             default: return "1_Strength";
         }
     }
-}
+} 

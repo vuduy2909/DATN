@@ -42,7 +42,7 @@ public class Customer {
     @Column(name = "customer_address")
     private String customerAddress;
     
-    @Column(name = "customer_img")
+    @Column(name = "customer_img", length = 500)
     private String customerImg;
     
     @Column(name = "is_enable")
@@ -56,7 +56,7 @@ public class Customer {
     private CustomerType customerType;
 
     @OneToOne
-    @JoinColumn(name = "account_id")
+    @JoinColumn(name = "account_id", nullable = false)
     private Account account;
 
     public Customer(Integer customerId) {

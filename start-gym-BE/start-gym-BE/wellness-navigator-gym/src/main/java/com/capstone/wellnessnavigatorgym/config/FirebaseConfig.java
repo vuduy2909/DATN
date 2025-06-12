@@ -26,9 +26,19 @@ public class FirebaseConfig {
     @PostConstruct
     public void initializeFirebase() {
         try {
+            logger.info("🔧 [FIREBASE_INIT] Starting Firebase initialization...");
+            
             if (FirebaseApp.getApps().isEmpty()) {
+                logger.info("🔧 [FIREBASE_INIT] Loading service account from: {}", SERVICE_ACCOUNT_KEY_PATH);
                 ClassPathResource resource = new ClassPathResource(SERVICE_ACCOUNT_KEY_PATH);
+                
+                if (!resource.exists()) {
+                    logger.error("🔧 [FIREBASE_INIT] ❌ Service account file not found: {}", SERVICE_ACCOUNT_KEY_PATH);
+                    throw new RuntimeException("Service account file not found");
+                }
+                
                 InputStream serviceAccount = resource.getInputStream();
+                logger.info("🔧 [FIREBASE_INIT] Service account file loaded successfully");
                 
                 FirebaseOptions options = FirebaseOptions.builder()
                     .setCredentials(GoogleCredentials.fromStream(serviceAccount))
@@ -37,13 +47,14 @@ public class FirebaseConfig {
                     .build();
                 
                 FirebaseApp.initializeApp(options);
-                logger.info("✅ Firebase initialized successfully with project: {}", PROJECT_ID);
-                logger.info("📁 Storage bucket: {}", BUCKET_NAME);
+                logger.info("🔧 [FIREBASE_INIT] ✅ Firebase initialized successfully");
+                logger.info("🔧 [FIREBASE_INIT] Project ID: {}", PROJECT_ID);
+                logger.info("🔧 [FIREBASE_INIT] Storage bucket: {}", BUCKET_NAME);
             } else {
-                logger.info("✅ Firebase already initialized");
+                logger.info("🔧 [FIREBASE_INIT] ✅ Firebase already initialized");
             }
-        } catch (IOException e) {
-            logger.error("❌ Failed to initialize Firebase", e);
+        } catch (Exception e) {
+            logger.error("🔧 [FIREBASE_INIT] ❌ Failed to initialize Firebase: {}", e.getMessage(), e);
             throw new RuntimeException("Firebase initialization failed", e);
         }
     }

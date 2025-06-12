@@ -9,7 +9,7 @@
             </Pattern>
         </layout>
     </appender>
-
+    
     <appender name="RollingFile" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${LOGS}/spring-boot-logger.log</file>
         <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
@@ -26,7 +26,7 @@
             <maxHistory>30</maxHistory>
         </rollingPolicy>
     </appender>
-
+    
     <!-- LOG at INFO level -->
     <root level="info">
         <appender-ref ref="RollingFile" />

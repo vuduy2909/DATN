@@ -107,29 +107,6 @@ const Login = () => {
         e.preventDefault();
         setErrorMessage('');
         
-        // First check if this username is banned before attempting login
-        try {
-            // Check banned status using our public endpoint
-            const checkBannedResponse = await axios.get(`http://localhost:8080/api/v1/public/check-banned-status?username=${username}`);
-            console.log("Pre-login ban check response:", checkBannedResponse.data);
-            
-            // If user exists and is banned, redirect to contact page immediately
-            if (checkBannedResponse.data.exists === true && checkBannedResponse.data.isBanned === true) {
-                console.log("User is banned before login attempt - redirecting to contact page");
-                navigate('/contact', { 
-                    state: { 
-                        isBanned: true, 
-                        username: username,
-                        customerName: checkBannedResponse.data.customerName || username
-                    } 
-                });
-                return;
-            }
-        } catch (error) {
-            // If we can't check banned status, continue with normal login flow
-            console.log("Error checking banned status before login:", error);
-        }
-        
         try {
             const response = await axios.post('http://localhost:8080/api/v1/public/login', {
                 username: username,
@@ -144,42 +121,6 @@ const Login = () => {
                 localStorage.setItem('token', token);
                 localStorage.setItem('username', username);
                 setUser(token);
-                
-                // Check customer enabled status explicitly after successful login
-                try {
-                    const userInfoResponse = await axios.get('http://localhost:8080/api/v1/users/info', {
-                        headers: { 'Authorization': 'Bearer ' + token }
-                    });
-                    
-                    console.log("User info response:", userInfoResponse.data);
-                    
-                    // Check if user data contains customer info with is_enable field
-                    const customerEnabled = userInfoResponse.data.is_enable !== false && 
-                                          userInfoResponse.data.isEnable !== false;
-                    
-                    // Alternative check in case customer info is nested
-                    const nestedCustomerEnabled = userInfoResponse.data.customer?.is_enable !== false && 
-                                                userInfoResponse.data.customer?.isEnable !== false;
-                    
-                    if (!customerEnabled || !nestedCustomerEnabled) {
-                        console.log("User is banned (is_enable = false), redirecting to contact page");
-                        // Clear stored token
-                        localStorage.removeItem('token');
-                        localStorage.removeItem('isAdmin');
-                        setUser(null);
-                        // Redirect to contact page with banned user info
-                        navigate('/contact', { 
-                            state: { 
-                                isBanned: true, 
-                                username: username 
-                            } 
-                        });
-                        return;
-                    }
-                } catch (error) {
-                    console.log("Error checking customer status:", error);
-                    // Continue with normal flow if we can't check the status
-                }
                 
                 // Set admin status and redirect accordingly
                 if (response.data.roles == 'ROLE_ADMIN') {
@@ -199,71 +140,79 @@ const Login = () => {
             console.error('Đã xảy ra lỗi:', error);
             console.log("Login error details:", error);
 
-            // Check if this is a banned user error
             if (error.response && error.response.data) {
                 console.log("Login error response:", error.response.data);
                 
-                // Get the error message in whatever format it might be
+                // ===== CASE 1: USER IS BANNED =====
+                // Check if backend explicitly returned ban information
+                if (error.response.data.isBanned === true) {
+                    console.log("🚫 User is banned - redirecting to contact page");
+                    navigate('/contact', { 
+                        state: { 
+                            isBanned: true, 
+                            username: username,
+                            customerName: error.response.data.customerName || username,
+                            reason: error.response.data.reason || error.response.data.banDetails || 'Account is disabled'
+                        } 
+                    });
+                    return;
+                }
+                
+                // ===== CASE 2: CHECK SPECIFIC ERROR MESSAGES =====
                 const errorMessage = error.response.data.error || 
                                     error.response.data.message || 
                                     (typeof error.response.data === 'string' ? error.response.data : '');
                 
-                // Check for 403 Forbidden status (account banned)
-                if (error.response.status === 403) {
-                    console.log("User is banned (403 Forbidden), redirecting to contact page");
+                // Check for ban keywords in error message
+                const bannedKeywords = ['banned', 'contact support', 'disabled'];
+                const isBannedMessage = bannedKeywords.some(keyword => 
+                    errorMessage && errorMessage.toLowerCase().includes(keyword.toLowerCase())
+                );
+                
+                if (isBannedMessage) {
+                    console.log("🚫 Ban keyword detected - redirecting to contact page");
                     navigate('/contact', { 
                         state: { 
                             isBanned: true, 
-                            username: username 
+                            username: username,
+                            reason: errorMessage
                         } 
                     });
                     return;
                 }
                 
-                // When the server responds with "Bad credentials" for a banned user OR 401 status
+                // ===== CASE 3: USER NOT FOUND vs INVALID CREDENTIALS =====
                 if (error.response.status === 401) {
-                    // Always check if this user exists and is banned when we get 401
-                    try {
-                        const checkUserResponse = await axios.get(`http://localhost:8080/api/v1/public/check-banned-status?username=${username}`);
-                        console.log("Ban check response:", checkUserResponse.data);
-                        
-                        // If user exists and is banned
-                        if (checkUserResponse.data.exists === true && checkUserResponse.data.isBanned === true) {
-                            console.log("User exists but is banned - redirecting to contact page");
-                            navigate('/contact', { 
-                                state: { 
-                                    isBanned: true, 
-                                    username: username,
-                                    customerName: checkUserResponse.data.customerName || username
-                                } 
-                            });
-                            return;
-                        }
-                    } catch (checkError) {
-                        console.log("Error checking banned status:", checkError);
-                        // If we can't check, continue to show generic error
+                    // Backend should return specific messages for these cases
+                    if (errorMessage.includes('does not exist') || 
+                        errorMessage.includes('not found') ||
+                        errorMessage.includes('không tồn tại')) {
+                        console.log("ℹ️ User does not exist");
+                        setErrorMessage('Tài khoản không tồn tại. Vui lòng kiểm tra lại username hoặc đăng ký tài khoản mới.');
+                        return;
+                    } else {
+                        console.log("ℹ️ Invalid credentials for existing user");
+                        setErrorMessage('Thông tin đăng nhập không chính xác. Vui lòng kiểm tra lại username và password.');
+                        return;
                     }
                 }
                 
-                // Check for explicit ban messages
-                const bannedKeywords = ['banned', 'disabled', 'suspended', 'blocked', 'Customer account is banned'];
-                const isBanned = bannedKeywords.some(keyword => 
-                    errorMessage && errorMessage.toLowerCase().includes(keyword.toLowerCase())
-                );
+                // ===== CASE 4: OTHER SPECIFIC ERRORS =====
+                if (error.response.status === 500) {
+                    console.log("🔧 Server configuration error");
+                    setErrorMessage('Lỗi hệ thống. Vui lòng liên hệ hỗ trợ.');
+                    return;
+                }
                 
-                if (isBanned) {
-                    console.log("User is explicitly banned, redirecting to contact page");
-                    navigate('/contact', { 
-                        state: { 
-                            isBanned: true, 
-                            username: username 
-                        } 
-                    });
+                // Display specific error message if available
+                if (errorMessage) {
+                    setErrorMessage(errorMessage);
                     return;
                 }
             }
 
-            setErrorMessage('Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');
+            // Default error message for unexpected errors
+            setErrorMessage('Đăng nhập thất bại. Vui lòng thử lại sau.');
         }
     };
 

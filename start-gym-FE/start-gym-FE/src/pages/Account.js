@@ -196,7 +196,7 @@ const Account = () => {
         }
 
         try {
-            const response = await request.post('/customer/avatar', formData, {
+            const response = await request.post('customer/avatar', formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                 },

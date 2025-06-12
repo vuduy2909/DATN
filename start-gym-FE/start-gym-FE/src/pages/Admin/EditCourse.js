@@ -313,13 +313,36 @@ const EditCourse = () => {
             validateFile(imageFile, 'image', 5); // 5MB limit
             
             setUploadLoading(true);
+            showSnackbar('Uploading image...', 'info');
             
             // Get the course type name for folder organization
             const courseType = courseTypes.find(t => t.courseTypeId === course.courseTypeId);
             const courseTypeName = courseType?.courseTypeName || 'Other';
 
-            // Upload new image with automatic deletion of old image
-            const imageUrl = await uploadCourseImage(imageFile, course.courseName, courseTypeName, course.image);
+            // Delete old image first if it exists
+            if (course.image) {
+                try {
+                    console.log('Deleting old course image:', course.image);
+                    await deleteFileFromFirebaseByURL(course.image);
+                    showSnackbar('Old image deleted, uploading new one...', 'info');
+                } catch (deleteError) {
+                    console.warn('Failed to delete old image:', deleteError.message);
+                    // Continue with upload even if deletion fails
+                }
+            }
+
+            // Upload new image with course name as filename
+            // Clean course name for filename (remove special characters)
+            const cleanCourseName = course.courseName
+                .replace(/[^a-zA-Z0-9\s]/g, '') // Remove special chars
+                .replace(/\s+/g, '_') // Replace spaces with underscores
+                .toLowerCase();
+
+            const imageUrl = await uploadCourseImage(
+                imageFile, 
+                courseTypeName, 
+                cleanCourseName // Use cleaned course name as filename
+            );
             
             // Update course in database with new image URL
             await axiosInstance.patch(`/admin/courses/${courseId}`, {
@@ -332,7 +355,7 @@ const EditCourse = () => {
                 image: imageUrl
             });
             
-            showSnackbar('Course image updated successfully! 🖼️', 'success');
+            showSnackbar('Course image updated successfully! 🖼️✨', 'success');
             handleImageDialogClose();
             
         } catch (error) {

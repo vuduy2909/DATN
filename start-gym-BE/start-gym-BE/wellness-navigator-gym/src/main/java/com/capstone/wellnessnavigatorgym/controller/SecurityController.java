@@ -69,50 +69,116 @@ public class SecurityController {
 
     @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
-        // First check if user is banned before authentication
+        // ===== ENHANCED PRE-AUTHENTICATION BAN CHECK =====
         try {
+            System.out.println("=== PRE-AUTH BAN CHECK ===");
+            System.out.println("Checking ban status for username: " + loginRequest.getUsername());
+            
             // Check account
             Optional<Account> accountOpt = accountService.findAccountByUserName(loginRequest.getUsername());
             if (accountOpt.isPresent()) {
                 Account account = accountOpt.get();
-                boolean accountEnabled = account.getIsEnable() != null ? account.getIsEnable() : true;
                 
-                // Check customer if exists
+                // Enhanced bit(1) handling for account.is_enable
+                Boolean accountIsEnable = account.getIsEnable();
+                boolean accountEnabled = (accountIsEnable != null) ? accountIsEnable.booleanValue() : true;
+                
+                System.out.println("Account check - Raw is_enable: " + accountIsEnable + ", Parsed boolean: " + accountEnabled);
+                
+                // Check customer - MUST exist for every account
                 Customer customer = customerService.findByAccountUserName(loginRequest.getUsername());
+                String customerName = null;
                 boolean customerEnabled = true;
-                if (customer != null) {
-                    customerEnabled = customer.getIsEnable() != null ? customer.getIsEnable() : true;
+                
+                if (customer == null) {
+                    System.out.println("❌ PRE-AUTH CHECK: Account exists but no customer linked");
+                    System.out.println("❌ Username '" + loginRequest.getUsername() + "' has account but missing customer record");
+                    
+                    Map<String, Object> errorResponse = new HashMap<>();
+                    errorResponse.put("error", "Account configuration error");
+                    errorResponse.put("message", "Account missing customer data. Please contact support.");
+                    errorResponse.put("status", 500);
+                    errorResponse.put("timestamp", java.time.LocalDateTime.now());
+                    
+                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+                } else {
+                    Boolean customerIsEnable = customer.getIsEnable();
+                    customerEnabled = (customerIsEnable != null) ? customerIsEnable.booleanValue() : true;
+                    customerName = customer.getCustomerName();
+                    
+                    System.out.println("Customer check - Raw is_enable: " + customerIsEnable + ", Parsed boolean: " + customerEnabled);
                 }
                 
-                // If either account or customer is disabled, reject login with 401 status
+                // Ban logic: User is banned if EITHER Account.is_enable = 0 OR Customer.is_enable = 0
                 if (!accountEnabled || !customerEnabled) {
-                    System.out.println("🚫 User " + loginRequest.getUsername() + " is BANNED - Account enabled: " + accountEnabled + ", Customer enabled: " + customerEnabled);
+                    String banReason = "";
+                    if (!accountEnabled && !customerEnabled) {
+                        banReason = "Both Account and Customer are disabled";
+                    } else if (!accountEnabled) {
+                        banReason = "Account is disabled (Account.is_enable = 0)";
+                    } else {
+                        banReason = "Customer is disabled (Customer.is_enable = 0)";
+                    }
+                    
+                    System.out.println("🚫 PRE-AUTH BAN CHECK FAILED");
+                    System.out.println("🚫 User " + loginRequest.getUsername() + " is BANNED");
+                    System.out.println("🚫 Reason: " + banReason);
+                    System.out.println("🚫 Account enabled: " + accountEnabled + " (raw: " + accountIsEnable + ")");
+                    System.out.println("🚫 Customer enabled: " + customerEnabled + (customer != null ? " (raw: " + customer.getIsEnable() + ")" : " (no customer)"));
                     
                     // Return specific structure that frontend expects
                     Map<String, Object> bannedResponse = new HashMap<>();
                     bannedResponse.put("error", "Account is banned. Please contact support.");
                     bannedResponse.put("message", "Account is banned. Please contact support.");
                     bannedResponse.put("username", loginRequest.getUsername());
+                    bannedResponse.put("customerName", customerName);
                     bannedResponse.put("isBanned", true);
                     bannedResponse.put("accountEnabled", accountEnabled);
                     bannedResponse.put("customerEnabled", customerEnabled);
                     bannedResponse.put("status", 401);
+                    bannedResponse.put("reason", banReason);
+                    bannedResponse.put("banDetails", banReason);
                     
                     return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(bannedResponse);
+                } else {
+                    System.out.println("✅ PRE-AUTH BAN CHECK PASSED");
+                    System.out.println("✅ Account enabled: " + accountEnabled + ", Customer enabled: " + customerEnabled);
+                    System.out.println("✅ Both Account.is_enable = 1 AND Customer.is_enable = 1");
                 }
+            } else {
+                // ===== USER NOT FOUND HANDLING =====
+                System.out.println("❌ PRE-AUTH CHECK: User not found in database");
+                System.out.println("❌ Username '" + loginRequest.getUsername() + "' does not exist");
+                
+                // Don't proceed with authentication for non-existent users
+                // Return specific error message for user not found
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("error", "User does not exist");
+                errorResponse.put("message", "Tài khoản không tồn tại. Vui lòng kiểm tra lại username hoặc đăng ký tài khoản mới.");
+                errorResponse.put("status", 401);
+                errorResponse.put("timestamp", java.time.LocalDateTime.now());
+                errorResponse.put("userExists", false);
+                
+                System.out.println("❌ Returning 401 for non-existent user without proceeding to authentication");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
             }
         } catch (Exception e) {
             // Log error but continue with normal authentication flow
             System.err.println("Error checking banned status during login: " + e.getMessage());
+            e.printStackTrace();
         }
         
         Authentication authentication;
         try {
             authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword())
-            );
+                new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword())
+        );
         } catch (Exception authException) {
-            // Check if this is a banned user exception
+            System.out.println("🔍 Authentication failed for user: " + loginRequest.getUsername());
+            System.out.println("🔍 Exception type: " + authException.getClass().getSimpleName());
+            System.out.println("🔍 Exception message: " + authException.getMessage());
+            
+            // Check if this is a banned user exception from UserDetailService
             if (authException.getMessage() != null && authException.getMessage().contains("banned")) {
                 System.out.println("🚫 Authentication failed due to banned account: " + loginRequest.getUsername());
                 
@@ -126,8 +192,19 @@ public class SecurityController {
                 
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(bannedResponse);
             }
-            // Re-throw for other authentication failures
-            throw authException;
+            
+            // For other authentication failures (like bad credentials), return specific error
+            System.out.println("❌ Authentication failed - Invalid credentials for user: " + loginRequest.getUsername());
+            
+            Map<String, Object> credentialsResponse = new HashMap<>();
+            credentialsResponse.put("error", "Invalid credentials");
+            credentialsResponse.put("message", "Thông tin đăng nhập không chính xác. Vui lòng kiểm tra lại username và password.");
+            credentialsResponse.put("status", 401);
+            credentialsResponse.put("timestamp", java.time.LocalDateTime.now());
+            credentialsResponse.put("userExists", true);
+            credentialsResponse.put("isBanned", false);
+            
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(credentialsResponse);
         }
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
