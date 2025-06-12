@@ -7,6 +7,8 @@ import com.capstone.wellnessnavigatorgym.entity.Comment;
 import com.capstone.wellnessnavigatorgym.service.ICommentService;
 import com.capstone.wellnessnavigatorgym.service.ICustomerService;
 import com.capstone.wellnessnavigatorgym.service.IExerciseService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -26,6 +28,8 @@ import java.util.concurrent.Executors;
 @CrossOrigin(origins = "http://localhost:3000")
 public class CommentController {
 
+    private static final Logger logger = LoggerFactory.getLogger(CommentController.class);
+
     @Autowired
     private ICommentService commentService;
 
@@ -44,12 +48,52 @@ public class CommentController {
     }
 
     @PostMapping( "/create")
-    public ResponseEntity<ResponseToClient> createComment(@Valid @RequestBody CommentDto commentDto) {
-        Comment comment = new Comment(commentDto);
-        // xử lý bất dồng bộ
-        ExecutorService executorService = Executors.newSingleThreadExecutor();
-        executorService.execute(() -> commentService.saveComment(comment));
-        executorService.shutdown();
-        return new ResponseEntity<>(new ResponseToClient("New comment successfully added!"), HttpStatus.CREATED);
+    public ResponseEntity<?> createComment(@Valid @RequestBody CommentDto commentDto) {
+        try {
+            logger.info("=== CREATING NEW COMMENT ===");
+            logger.info("Comment data: {}", commentDto);
+            
+            // Validate required fields
+            if (commentDto.getCommentText() == null || commentDto.getCommentText().trim().isEmpty()) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Comment text is required");
+                return ResponseEntity.badRequest().body(errorResponse);
+            }
+            
+            if (commentDto.getCustomer() == null || commentDto.getCustomer().trim().isEmpty()) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Customer ID is required");
+                return ResponseEntity.badRequest().body(errorResponse);
+            }
+            
+            if (commentDto.getExercise() == null || commentDto.getExercise().trim().isEmpty()) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Exercise ID is required");
+                return ResponseEntity.badRequest().body(errorResponse);
+            }
+            
+            // Course and day are optional - can be null for exercise-only comments
+            Comment comment = new Comment(commentDto);
+            
+            // Save comment synchronously to handle errors properly
+            commentService.saveComment(comment);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Comment created successfully!");
+            response.put("commentText", commentDto.getCommentText());
+            response.put("customerId", commentDto.getCustomer());
+            response.put("exerciseId", commentDto.getExercise());
+            response.put("courseId", commentDto.getCourse());
+            response.put("dayId", commentDto.getDay());
+            
+            logger.info("✅ Comment created successfully");
+            return new ResponseEntity<>(response, HttpStatus.CREATED);
+            
+        } catch (Exception e) {
+            logger.error("Error creating comment: {}", e.getMessage(), e);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Failed to create comment: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
     }
 }

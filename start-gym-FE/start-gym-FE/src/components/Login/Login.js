@@ -197,11 +197,7 @@ const Login = () => {
             }
         } catch (error) {
             console.error('Đã xảy ra lỗi:', error);
-            console.log("Login error details:", { 
-                status: error.response?.status,
-                data: error.response?.data,
-                message: error.message
-            });
+            console.log("Login error details:", error);
 
             // Check if this is a banned user error
             if (error.response && error.response.data) {
@@ -224,16 +220,10 @@ const Login = () => {
                     return;
                 }
                 
-                // When the server responds with "Bad credentials" for a banned user
-                if (error.response.status === 401 && 
-                    (errorMessage.includes("Bad credentials") || 
-                     errorMessage.includes("Customer account is banned") ||
-                     errorMessage.includes("disabled") ||
-                     errorMessage.includes("banned"))) {
-                    
-                    // Make a check if this user exists and is banned
+                // When the server responds with "Bad credentials" for a banned user OR 401 status
+                if (error.response.status === 401) {
+                    // Always check if this user exists and is banned when we get 401
                     try {
-                        // Try to fetch public info to see if user exists
                         const checkUserResponse = await axios.get(`http://localhost:8080/api/v1/public/check-banned-status?username=${username}`);
                         console.log("Ban check response:", checkUserResponse.data);
                         
@@ -243,14 +233,15 @@ const Login = () => {
                             navigate('/contact', { 
                                 state: { 
                                     isBanned: true, 
-                                    username: username 
+                                    username: username,
+                                    customerName: checkUserResponse.data.customerName || username
                                 } 
                             });
                             return;
                         }
                     } catch (checkError) {
                         console.log("Error checking banned status:", checkError);
-                        // If we can't check, just show generic error
+                        // If we can't check, continue to show generic error
                     }
                 }
                 

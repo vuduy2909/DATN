@@ -23,6 +23,7 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -189,80 +190,108 @@ public class CustomerController {
         }
     }
 
-    @PostMapping("/upload-avatar")
-    @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<?> uploadAvatar(@RequestParam("file") MultipartFile file, Authentication authentication) {
+    @PostMapping("/avatar")
+    public ResponseEntity<?> updateAvatar(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "username", required = false) String username,
+            Authentication authentication
+    ) {
         try {
-            logger.info("🔵 Avatar upload request received. File: {}, Size: {}, ContentType: {}", 
-                file.getOriginalFilename(), file.getSize(), file.getContentType());
-            
-            if (file.isEmpty()) {
-                logger.warn("❌ Upload failed: File is empty");
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("error", "Please select a file to upload");
-                return ResponseEntity.badRequest().body(errorResponse);
-            }
-            
-            // File size validation (max 5MB)
-            if (file.getSize() > 5 * 1024 * 1024) {
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("error", "File size exceeds 5MB limit");
-                return ResponseEntity.badRequest().body(errorResponse);
-            }
-            
-            // File type validation
-            String contentType = file.getContentType();
-            if (contentType == null || !contentType.startsWith("image/")) {
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("error", "Only image files are allowed");
-                return ResponseEntity.badRequest().body(errorResponse);
-            }
-            
-            String username = authentication.getName();
-            logger.info("🔵 Processing upload for user: {}", username);
-            
-            // Check Firebase availability
-            if (!firebaseStorageService.isAvailable()) {
-                logger.error("❌ Firebase Storage is not available");
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("error", "Firebase Storage service is not available");
-                return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(errorResponse);
-            }
-            
-            // Get user's current avatar URL to delete the old one
-            Customer customer = customerService.findByAccountUserName(username);
-            String oldAvatarUrl = customer != null ? customer.getCustomerImg() : null;
-            logger.info("🔵 Current avatar URL: {}", oldAvatarUrl);
-            
-            // Upload to Firebase Storage with format: avatar_{username}.ext
-            logger.info("🔵 Starting Firebase upload...");
-            String avatarUrl = firebaseStorageService.uploadAvatar(file, username);
-            logger.info("✅ Firebase upload successful: {}", avatarUrl);
-            
-            // Delete old avatar from Firebase if it exists
-            if (oldAvatarUrl != null && oldAvatarUrl.contains("firebasestorage.googleapis.com")) {
-                try {
-                    firebaseStorageService.deleteFileByUrl(oldAvatarUrl);
-                    logger.info("✅ Deleted old avatar for user: {}", username);
-                } catch (Exception e) {
-                    logger.warn("⚠️ Failed to delete old avatar: {}", e.getMessage());
+            // Get username from authentication if not provided
+            if (username == null || username.trim().isEmpty()) {
+                if (authentication != null) {
+                    username = authentication.getName();
+                } else {
+                    logger.warn("❌ No username provided and no authentication found");
+                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Authentication required");
                 }
             }
             
-            // Update customer avatar in database
-            customerService.updateCustomerAvatar(username, avatarUrl);
+            logger.info("🔵 Avatar update request - Username: {}, File: {}", username, file.getOriginalFilename());
             
+            // Validate file
+            if (file.isEmpty()) {
+                logger.warn("❌ Empty file received");
+                return ResponseEntity.badRequest().body("File is empty");
+            }
+            
+            // Check file size (max 5MB)
+            if (file.getSize() > 5 * 1024 * 1024) {
+                logger.warn("❌ File too large: {} bytes", file.getSize());
+                return ResponseEntity.badRequest().body("File too large. Maximum size is 5MB");
+            }
+            
+            // Check file type
+            String contentType = file.getContentType();
+            if (contentType == null || !contentType.startsWith("image/")) {
+                logger.warn("❌ Invalid file type: {}", contentType);
+                return ResponseEntity.badRequest().body("Invalid file type. Only images are allowed");
+            }
+            
+            // Find customer by username
+            Customer customer = customerService.findByAccountUserName(username);
+            if (customer == null) {
+                logger.warn("❌ Customer not found: {}", username);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Customer not found");
+            }
+            
+            String currentAvatarUrl = customer.getCustomerImg();
+            logger.info("🔵 Current avatar URL: {}", currentAvatarUrl);
+            
+            logger.info("🔵 Starting Firebase upload...");
+            
+            // Upload new avatar to Firebase
+            String newAvatarUrl = firebaseStorageService.uploadAvatar(file, username);
+            
+            if (newAvatarUrl == null || newAvatarUrl.isEmpty()) {
+                logger.error("❌ Failed to upload avatar to Firebase");
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body("Failed to upload avatar");
+            }
+            
+            logger.info("✅ Firebase upload successful: {}", newAvatarUrl);
+            
+            // Update customer avatar URL in database
+            try {
+                customerService.updateCustomerAvatar(username, newAvatarUrl);
+                logger.info("✅ Database updated successfully with new avatar URL");
+            } catch (Exception e) {
+                logger.error("❌ Failed to update customer avatar in database: {}", e.getMessage());
+                // Try to delete uploaded file from Firebase since DB update failed
+                try {
+                    firebaseStorageService.deleteFileByUrl(newAvatarUrl);
+                } catch (Exception ex) {
+                    logger.warn("⚠️ Failed to cleanup uploaded file after DB error: {}", ex.getMessage());
+                }
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body("Failed to update avatar in database");
+            }
+            
+            // Delete old avatar from Firebase if it exists and is different
+            if (currentAvatarUrl != null && !currentAvatarUrl.isEmpty() && !currentAvatarUrl.equals(newAvatarUrl)) {
+                try {
+                    firebaseStorageService.deleteFileByUrl(currentAvatarUrl);
+                    logger.info("✅ Deleted old avatar for user: {}", username);
+                } catch (Exception e) {
+                    logger.warn("⚠️ Failed to delete old avatar: {}", e.getMessage());
+                    // Don't fail the request if old avatar deletion fails
+                }
+            }
+            
+            // Prepare response
             Map<String, Object> response = new HashMap<>();
-            response.put("message", "Avatar uploaded successfully to Firebase Storage");
-            response.put("avatarUrl", avatarUrl);
+            response.put("success", true);
+            response.put("message", "Avatar updated successfully");
+            response.put("avatarUrl", newAvatarUrl);
+            response.put("timestamp", System.currentTimeMillis());
             
+            logger.info("✅ Avatar update completed successfully for user: {}", username);
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {
-            logger.error("Failed to upload avatar for user: {}", authentication.getName(), e);
-            Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("error", "Failed to upload avatar: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+            logger.error("❌ Error updating avatar for user {}: {}", username, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Internal server error: " + e.getMessage());
         }
     }
 

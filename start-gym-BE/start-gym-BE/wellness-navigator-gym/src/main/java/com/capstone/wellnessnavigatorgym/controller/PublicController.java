@@ -48,9 +48,15 @@ public class PublicController {
             
             Account account = accountOpt.get();
             
-            // Check account enabled status
-            boolean accountEnabled = account.getIsEnable() != null ? account.getIsEnable() : true;
-            logger.info("Account {} enabled status: {}", username, accountEnabled);
+            // Check account enabled status - handle bit(1) from database
+            Boolean accountIsEnable = account.getIsEnable();
+            boolean accountEnabled;
+            if (accountIsEnable == null) {
+                accountEnabled = true; // Default enabled if null
+            } else {
+                accountEnabled = accountIsEnable.booleanValue();
+            }
+            logger.info("Account {} enabled status: {} (raw: {})", username, accountEnabled, accountIsEnable);
             
             // Also check customer enabled status if exists
             Customer customer = customerRepository.findByAccountUserName(username);
@@ -58,12 +64,17 @@ public class PublicController {
             String customerName = null;
             
             if (customer != null) {
-                customerEnabled = customer.getIsEnable() != null ? customer.getIsEnable() : true;
+                Boolean customerIsEnable = customer.getIsEnable();
+                if (customerIsEnable == null) {
+                    customerEnabled = true; // Default enabled if null
+                } else {
+                    customerEnabled = customerIsEnable.booleanValue();
+                }
                 customerName = customer.getCustomerName();
-                logger.info("Customer {} enabled status: {}", customerName, customerEnabled);
+                logger.info("Customer {} enabled status: {} (raw: {})", customerName, customerEnabled, customerIsEnable);
             }
             
-            // User is banned if either account or customer is disabled
+            // User is banned if either account or customer is disabled (bit value = 0)
             boolean isBanned = !accountEnabled || !customerEnabled;
             
             Map<String, Object> response = new HashMap<>();

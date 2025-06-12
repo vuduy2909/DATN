@@ -23,9 +23,8 @@ public class CommentDto {
     @NotNull(message = "Please provide exercise ID")
     private String exercise;
     
-    @NotNull(message = "Please provide course ID")
+    // Course and day are optional - can be null for exercise-only comments
     private String course;
     
-    @NotNull(message = "Please provide day ID")
     private String day;
 }

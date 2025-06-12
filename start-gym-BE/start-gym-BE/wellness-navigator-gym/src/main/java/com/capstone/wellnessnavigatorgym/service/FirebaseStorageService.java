@@ -223,19 +223,19 @@ public class FirebaseStorageService {
             BlobId blobId = BlobId.of(bucketName, filePath);
             BlobInfo blobInfo = BlobInfo.newBuilder(blobId)
                 .setContentType(file.getContentType())
-                .setCacheControl("public, max-age=31536000") // 1 year cache
-                .build();
+                .setCacheControl("public, max-age=8640000") // 24 hours cache for stability
+                .build();               
             
             logger.info("📤 Uploading {} bytes to {}", file.getSize(), filePath);
             Blob blob = storage.create(blobInfo, file.getBytes());
-            
+
             if (blob == null) {
                 throw new IOException("Failed to create blob - blob is null");
             }
             
-            // Generate public URL instead of signed URL to avoid authentication issues
-            String publicUrl = String.format("https://firebasestorage.googleapis.com/v0/b/%s/o/%s?alt=media", 
-                bucketName, java.net.URLEncoder.encode(filePath, "UTF-8"));
+            // Generate public URL with timestamp to avoid cache issues
+            String publicUrl = String.format("https://firebasestorage.googleapis.com/v0/b/%s/o/%s?alt=media&t=%d", 
+                bucketName, java.net.URLEncoder.encode(filePath, "UTF-8"), System.currentTimeMillis());
             
             logger.info("✅ File uploaded successfully to Firebase Storage: {} -> {}", filePath, publicUrl);
             return publicUrl;

@@ -31,11 +31,11 @@ public class Comment {
     private Exercise exercise;
     
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "course_id", nullable = false)
+    @JoinColumn(name = "course_id", nullable = true)
     private Course course;
     
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "day_id", nullable = false)
+    @JoinColumn(name = "day_id", nullable = true)
     private Day day;
     
     @Column(name = "created_date", nullable = false)
@@ -59,8 +59,15 @@ public class Comment {
         this.commentText = commentDto.getCommentText();
         this.customer = new Customer(Integer.parseInt(commentDto.getCustomer()));
         this.exercise = new Exercise(Integer.parseInt(commentDto.getExercise()));
-        this.course = new Course(Integer.parseInt(commentDto.getCourse()));
-        this.day = new Day(Integer.parseInt(commentDto.getDay()));
+        
+        // Handle optional course and day
+        if (commentDto.getCourse() != null && !commentDto.getCourse().trim().isEmpty()) {
+            this.course = new Course(Integer.parseInt(commentDto.getCourse()));
+        }
+        
+        if (commentDto.getDay() != null && !commentDto.getDay().trim().isEmpty()) {
+            this.day = new Day(Integer.parseInt(commentDto.getDay()));
+        }
     }
     
     @PreUpdate

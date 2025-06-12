@@ -1305,7 +1305,7 @@ public class AdminController {
     // ==================== COMMENT MANAGEMENT ENDPOINTS ====================
     
     /**
-     * Lấy tất cả comments với error handling cải thiện
+     * Lấy tất cả comments với đầy đủ thông tin từ tất cả các trường trong bảng comments
      */
     @GetMapping("/comments")
     @Transactional
@@ -1313,7 +1313,7 @@ public class AdminController {
         try {
             logger.info("=== FETCHING ALL COMMENTS ===");
             
-            // Cải thiện native query với proper field ordering
+            // Enhanced query to get all fields from comments table plus related data
             String query = "SELECT " +
                           "c.comment_id, " +               // 0
                           "c.comment_text, " +             // 1
@@ -1321,20 +1321,25 @@ public class AdminController {
                           "c.exercise_id, " +              // 3
                           "c.course_id, " +                // 4
                           "c.day_id, " +                   // 5
-                          "c.rating, " +                   // 6
-                          "c.status, " +                   // 7
-                          "c.created_date, " +             // 8
-                          "c.updated_date, " +             // 9
-                          "COALESCE(c.is_reported, false) as is_reported, " +  // 10
-                          "COALESCE(c.report_count, 0) as report_count, " +    // 11
-                          "c.report_reason, " +            // 12
-                          "cu.customer_name, " +           // 13
-                          "cu.customer_img, " +            // 14
+                          "c.created_date, " +             // 6
+                          "c.updated_date, " +             // 7
+                          "COALESCE(c.is_reported, false) as is_reported, " +  // 8
+                          "COALESCE(c.report_count, 0) as report_count, " +    // 9
+                          "c.report_reason, " +            // 10
+                          "cu.customer_name, " +           // 11
+                          "cu.customer_img, " +            // 12
+                          "cu.customer_email, " +          // 13
+                          "acc.user_name, " +              // 14 - username from account
                           "e.exercise_name, " +            // 15
-                          "course.course_name, " +         // 16
-                          "d.day_name " +                  // 17
+                          "e.body_part, " +                // 16
+                          "e.target, " +                   // 17
+                          "course.course_name, " +         // 18
+                          "course.description as course_description, " +  // 19
+                          "d.day_name, " +                 // 20
+                          "d.description as day_description " +           // 21
                           "FROM comments c " +
                           "LEFT JOIN customer cu ON c.customer_id = cu.customer_id " +
+                          "LEFT JOIN account acc ON cu.account_id = acc.account_id " +
                           "LEFT JOIN exercise e ON c.exercise_id = e.exercise_id " +
                           "LEFT JOIN course ON c.course_id = course.course_id " +
                           "LEFT JOIN days d ON c.day_id = d.day_id " +
@@ -1345,6 +1350,13 @@ public class AdminController {
             
             logger.info("Found {} comments in database", results.size());
             
+            // Log first few results for debugging
+            if (results.size() > 0) {
+                Object[] firstRow = results.get(0);
+                logger.info("Sample comment data: commentId={}, text={}, customerId={}, customer_name={}, exercise_name={}, course_name={}, day_name={}", 
+                    firstRow[0], firstRow[1], firstRow[2], firstRow[11], firstRow[15], firstRow[18], firstRow[20]);
+            }
+            
             List<Map<String, Object>> commentsResponse = results.stream()
                 .map(row -> {
                     Map<String, Object> commentInfo = new HashMap<>();
@@ -1352,54 +1364,42 @@ public class AdminController {
                     try {
                         commentInfo.put("commentId", row[0]);
                         commentInfo.put("commentText", row[1]);
-                        commentInfo.put("rating", row[6]);
-                        commentInfo.put("status", row[7]);
-                        commentInfo.put("createdAt", row[8]);
-                        commentInfo.put("updatedAt", row[9]);
-                        commentInfo.put("isReported", row[10] != null ? (Boolean) row[10] : false);
-                        commentInfo.put("reportCount", row[11] != null ? ((Number) row[11]).intValue() : 0);
-                        commentInfo.put("reportReason", row[12]);
+                        commentInfo.put("createdAt", row[6]);
+                        commentInfo.put("updatedAt", row[7]);
+                        commentInfo.put("isReported", row[8] != null ? (Boolean) row[8] : false);
+                        commentInfo.put("reportCount", row[9] != null ? ((Number) row[9]).intValue() : 0);
+                        commentInfo.put("reportReason", row[10]);
                         
-                        // Customer info
-                        if (row[2] != null && row[13] != null) {
-                            Map<String, Object> customerInfo = new HashMap<>();
-                            customerInfo.put("customerId", row[2]);
-                            customerInfo.put("customerName", row[13]);
-                            customerInfo.put("customerImg", row[14]);
-                            commentInfo.put("customer", customerInfo);
-                        } else {
-                            commentInfo.put("customer", null);
-                        }
+                        // Customer info - đầy đủ thông tin
+                        Map<String, Object> customerInfo = new HashMap<>();
+                        customerInfo.put("customerId", row[2]);
+                        customerInfo.put("customerName", row[11] != null ? row[11] : "Unknown User");
+                        customerInfo.put("customerImg", row[12] != null ? row[12] : "");
+                        customerInfo.put("customerEmail", row[13] != null ? row[13] : "");
+                        customerInfo.put("username", row[14] != null ? row[14] : "");
+                        commentInfo.put("customer", customerInfo);
                         
-                        // Exercise info
-                        if (row[3] != null && row[15] != null) {
-                            Map<String, Object> exerciseInfo = new HashMap<>();
-                            exerciseInfo.put("exerciseId", row[3]);
-                            exerciseInfo.put("exerciseName", row[15]);
-                            commentInfo.put("exercise", exerciseInfo);
-                        } else {
-                            commentInfo.put("exercise", null);
-                        }
+                        // Exercise info - đầy đủ thông tin
+                        Map<String, Object> exerciseInfo = new HashMap<>();
+                        exerciseInfo.put("exerciseId", row[3]);
+                        exerciseInfo.put("exerciseName", row[15] != null ? row[15] : "N/A");
+                        exerciseInfo.put("bodyPart", row[16] != null ? row[16] : "N/A");
+                        exerciseInfo.put("target", row[17] != null ? row[17] : "N/A");
+                        commentInfo.put("exercise", exerciseInfo);
                         
-                        // Course info
-                        if (row[4] != null && row[16] != null) {
-                            Map<String, Object> courseInfo = new HashMap<>();
-                            courseInfo.put("courseId", row[4]);
-                            courseInfo.put("courseName", row[16]);
-                            commentInfo.put("course", courseInfo);
-                        } else {
-                            commentInfo.put("course", null);
-                        }
+                        // Course info - đầy đủ thông tin
+                        Map<String, Object> courseInfo = new HashMap<>();
+                        courseInfo.put("courseId", row[4]);
+                        courseInfo.put("courseName", row[18] != null ? row[18] : "N/A");
+                        courseInfo.put("courseDescription", row[19] != null ? row[19] : "");
+                        commentInfo.put("course", courseInfo);
                         
-                        // Day info
-                        if (row[5] != null && row[17] != null) {
-                            Map<String, Object> dayInfo = new HashMap<>();
-                            dayInfo.put("dayId", row[5]);
-                            dayInfo.put("dayName", row[17]);
-                            commentInfo.put("day", dayInfo);
-                        } else {
-                            commentInfo.put("day", null);
-                        }
+                        // Day info - đầy đủ thông tin
+                        Map<String, Object> dayInfo = new HashMap<>();
+                        dayInfo.put("dayId", row[5]);
+                        dayInfo.put("dayName", row[20] != null ? row[20] : "N/A");
+                        dayInfo.put("dayDescription", row[21] != null ? row[21] : "");
+                        commentInfo.put("day", dayInfo);
                         
                     } catch (Exception e) {
                         logger.error("Error mapping comment row: {}", e.getMessage());
@@ -1418,7 +1418,30 @@ public class AdminController {
             response.put("total", commentsResponse.size());
             
             logger.info("✅ Successfully fetched {} comments", commentsResponse.size());
-            return ResponseEntity.ok(commentsResponse);
+            
+            // Log first comment for debugging
+            if (!commentsResponse.isEmpty()) {
+                Map<String, Object> firstComment = commentsResponse.get(0);
+                logger.info("Sample response structure: {}", firstComment);
+                
+                // Check nested objects
+                if (firstComment.get("customer") instanceof Map) {
+                    Map<String, Object> customer = (Map<String, Object>) firstComment.get("customer");
+                    logger.info("Customer object: {}", customer);
+                }
+                if (firstComment.get("exercise") instanceof Map) {
+                    Map<String, Object> exercise = (Map<String, Object>) firstComment.get("exercise");
+                    logger.info("Exercise object: {}", exercise);
+                }
+            }
+            
+            // Return comments in consistent format
+            Map<String, Object> finalResponse = new HashMap<>();
+            finalResponse.put("comments", commentsResponse);
+            finalResponse.put("total", commentsResponse.size());
+            finalResponse.put("status", "success");
+            
+            return ResponseEntity.ok(finalResponse);
             
         } catch (Exception e) {
             logger.error("Error fetching comments: {}", e.getMessage(), e);
@@ -1431,7 +1454,7 @@ public class AdminController {
     }
     
     /**
-     * Lấy reported comments
+     * Lấy reported comments với đầy đủ thông tin
      */
     @GetMapping("/comments/reported")
     @Transactional
@@ -1439,7 +1462,7 @@ public class AdminController {
         try {
             logger.info("=== FETCHING REPORTED COMMENTS ===");
             
-            // Cải thiện native query với proper field ordering để match với getAllComments
+            // Enhanced query for reported comments - same structure as getAllComments
             String query = "SELECT " +
                           "c.comment_id, " +               // 0
                           "c.comment_text, " +             // 1
@@ -1447,20 +1470,25 @@ public class AdminController {
                           "c.exercise_id, " +              // 3
                           "c.course_id, " +                // 4
                           "c.day_id, " +                   // 5
-                          "c.rating, " +                   // 6
-                          "c.status, " +                   // 7
-                          "c.created_date, " +             // 8
-                          "c.updated_date, " +             // 9
-                          "COALESCE(c.is_reported, false) as is_reported, " +  // 10
-                          "COALESCE(c.report_count, 0) as report_count, " +    // 11
-                          "c.report_reason, " +            // 12
-                          "cu.customer_name, " +           // 13
-                          "cu.customer_img, " +            // 14
+                          "c.created_date, " +             // 6
+                          "c.updated_date, " +             // 7
+                          "COALESCE(c.is_reported, false) as is_reported, " +  // 8
+                          "COALESCE(c.report_count, 0) as report_count, " +    // 9
+                          "c.report_reason, " +            // 10
+                          "cu.customer_name, " +           // 11
+                          "cu.customer_img, " +            // 12
+                          "cu.customer_email, " +          // 13
+                          "acc.user_name, " +              // 14 - username from account
                           "e.exercise_name, " +            // 15
-                          "course.course_name, " +         // 16
-                          "d.day_name " +                  // 17
+                          "e.body_part, " +                // 16
+                          "e.target, " +                   // 17
+                          "course.course_name, " +         // 18
+                          "course.description as course_description, " +  // 19
+                          "d.day_name, " +                 // 20
+                          "d.description as day_description " +           // 21
                           "FROM comments c " +
                           "LEFT JOIN customer cu ON c.customer_id = cu.customer_id " +
+                          "LEFT JOIN account acc ON cu.account_id = acc.account_id " +
                           "LEFT JOIN exercise e ON c.exercise_id = e.exercise_id " +
                           "LEFT JOIN course ON c.course_id = course.course_id " +
                           "LEFT JOIN days d ON c.day_id = d.day_id " +
@@ -1479,54 +1507,42 @@ public class AdminController {
                     try {
                         commentInfo.put("commentId", row[0]);
                         commentInfo.put("commentText", row[1]);
-                        commentInfo.put("rating", row[6]);
-                        commentInfo.put("status", row[7]);
-                        commentInfo.put("createdAt", row[8]);
-                        commentInfo.put("updatedAt", row[9]);
-                        commentInfo.put("isReported", row[10] != null ? (Boolean) row[10] : false);
-                        commentInfo.put("reportCount", row[11] != null ? ((Number) row[11]).intValue() : 0);
-                        commentInfo.put("reportReason", row[12]);
+                        commentInfo.put("createdAt", row[6]);
+                        commentInfo.put("updatedAt", row[7]);
+                        commentInfo.put("isReported", row[8] != null ? (Boolean) row[8] : false);
+                        commentInfo.put("reportCount", row[9] != null ? ((Number) row[9]).intValue() : 0);
+                        commentInfo.put("reportReason", row[10]);
                         
-                        // Customer info
-                        if (row[2] != null && row[13] != null) {
-                            Map<String, Object> customerInfo = new HashMap<>();
-                            customerInfo.put("customerId", row[2]);
-                            customerInfo.put("customerName", row[13]);
-                            customerInfo.put("customerImg", row[14]);
-                            commentInfo.put("customer", customerInfo);
-                        } else {
-                            commentInfo.put("customer", null);
-                        }
+                        // Customer info - đầy đủ thông tin
+                        Map<String, Object> customerInfo = new HashMap<>();
+                        customerInfo.put("customerId", row[2]);
+                        customerInfo.put("customerName", row[11] != null ? row[11] : "Unknown User");
+                        customerInfo.put("customerImg", row[12] != null ? row[12] : "");
+                        customerInfo.put("customerEmail", row[13] != null ? row[13] : "");
+                        customerInfo.put("username", row[14] != null ? row[14] : "");
+                        commentInfo.put("customer", customerInfo);
                         
-                        // Exercise info
-                        if (row[3] != null && row[15] != null) {
-                            Map<String, Object> exerciseInfo = new HashMap<>();
-                            exerciseInfo.put("exerciseId", row[3]);
-                            exerciseInfo.put("exerciseName", row[15]);
-                            commentInfo.put("exercise", exerciseInfo);
-                        } else {
-                            commentInfo.put("exercise", null);
-                        }
+                        // Exercise info - đầy đủ thông tin
+                        Map<String, Object> exerciseInfo = new HashMap<>();
+                        exerciseInfo.put("exerciseId", row[3]);
+                        exerciseInfo.put("exerciseName", row[15] != null ? row[15] : "N/A");
+                        exerciseInfo.put("bodyPart", row[16] != null ? row[16] : "N/A");
+                        exerciseInfo.put("target", row[17] != null ? row[17] : "N/A");
+                        commentInfo.put("exercise", exerciseInfo);
                         
-                        // Course info
-                        if (row[4] != null && row[16] != null) {
-                            Map<String, Object> courseInfo = new HashMap<>();
-                            courseInfo.put("courseId", row[4]);
-                            courseInfo.put("courseName", row[16]);
-                            commentInfo.put("course", courseInfo);
-                        } else {
-                            commentInfo.put("course", null);
-                        }
+                        // Course info - đầy đủ thông tin
+                        Map<String, Object> courseInfo = new HashMap<>();
+                        courseInfo.put("courseId", row[4]);
+                        courseInfo.put("courseName", row[18] != null ? row[18] : "N/A");
+                        courseInfo.put("courseDescription", row[19] != null ? row[19] : "");
+                        commentInfo.put("course", courseInfo);
                         
-                        // Day info
-                        if (row[5] != null && row[17] != null) {
-                            Map<String, Object> dayInfo = new HashMap<>();
-                            dayInfo.put("dayId", row[5]);
-                            dayInfo.put("dayName", row[17]);
-                            commentInfo.put("day", dayInfo);
-                        } else {
-                            commentInfo.put("day", null);
-                        }
+                        // Day info - đầy đủ thông tin
+                        Map<String, Object> dayInfo = new HashMap<>();
+                        dayInfo.put("dayId", row[5]);
+                        dayInfo.put("dayName", row[20] != null ? row[20] : "N/A");
+                        dayInfo.put("dayDescription", row[21] != null ? row[21] : "");
+                        commentInfo.put("day", dayInfo);
                         
                     } catch (Exception e) {
                         logger.error("Error mapping reported comment row: {}", e.getMessage());

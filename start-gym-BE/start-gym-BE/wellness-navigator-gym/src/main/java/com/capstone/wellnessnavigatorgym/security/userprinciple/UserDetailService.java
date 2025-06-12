@@ -39,8 +39,8 @@ public class UserDetailService implements UserDetailsService {
         
         // Check if account is enabled
         if (!account.getIsEnable()) {
-            logger.warn("Account is disabled for username: {}", username);
-            throw new UsernameNotFoundException("Account is disabled: " + username);
+            logger.warn("🚫 Account is DISABLED for username: {}", username);
+            throw new RuntimeException("Account is banned. Please contact support.");
         }
         
         // Check if associated customer (if any) is banned
@@ -51,9 +51,10 @@ public class UserDetailService implements UserDetailsService {
                        customer.getCustomerEmail(), customer.getIsEnable());
             
             if (!customer.getIsEnable()) {
-                logger.warn("Customer is banned for username: {}, Customer ID: {}, Customer Name: {}", 
+                logger.warn("🚫 Customer is BANNED for username: {}, Customer ID: {}, Customer Name: {}", 
                            username, customer.getCustomerId(), customer.getCustomerName());
-                throw new UsernameNotFoundException("Customer account is banned: " + username);
+                // Throw a more specific exception that can be caught by SecurityController
+                throw new RuntimeException("Account is banned. Please contact support.");
             }
         } else {
             logger.info("No customer found for username: {} (likely admin account)", username);

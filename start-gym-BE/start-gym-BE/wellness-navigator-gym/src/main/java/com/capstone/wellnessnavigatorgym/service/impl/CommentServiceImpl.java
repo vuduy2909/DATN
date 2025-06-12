@@ -34,12 +34,16 @@ public class CommentServiceImpl implements ICommentService {
 
     @Override
     public void saveComment(Comment comment) {
+        // Handle nullable course and day
+        String courseId = comment.getCourse() != null ? String.valueOf(comment.getCourse().getCourseId()) : null;
+        String dayId = comment.getDay() != null ? String.valueOf(comment.getDay().getDayId()) : null;
+        
         commentRepository.insertComment(
                 comment.getCommentText(),
                 String.valueOf(comment.getCustomer().getCustomerId()),
                 String.valueOf(comment.getExercise().getExerciseId()),
-                String.valueOf(comment.getCourse().getCourseId()),
-                String.valueOf(comment.getDay().getDayId()));
+                courseId,
+                dayId);
     }
 
 }

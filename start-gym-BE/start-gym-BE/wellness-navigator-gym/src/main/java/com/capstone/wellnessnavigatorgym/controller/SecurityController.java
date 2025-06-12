@@ -84,10 +84,21 @@ public class SecurityController {
                     customerEnabled = customer.getIsEnable() != null ? customer.getIsEnable() : true;
                 }
                 
-                // If either account or customer is disabled, reject login
+                // If either account or customer is disabled, reject login with 401 status
                 if (!accountEnabled || !customerEnabled) {
-                    return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body(new MessageResponse("Account is banned. Please contact support."));
+                    System.out.println("🚫 User " + loginRequest.getUsername() + " is BANNED - Account enabled: " + accountEnabled + ", Customer enabled: " + customerEnabled);
+                    
+                    // Return specific structure that frontend expects
+                    Map<String, Object> bannedResponse = new HashMap<>();
+                    bannedResponse.put("error", "Account is banned. Please contact support.");
+                    bannedResponse.put("message", "Account is banned. Please contact support.");
+                    bannedResponse.put("username", loginRequest.getUsername());
+                    bannedResponse.put("isBanned", true);
+                    bannedResponse.put("accountEnabled", accountEnabled);
+                    bannedResponse.put("customerEnabled", customerEnabled);
+                    bannedResponse.put("status", 401);
+                    
+                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(bannedResponse);
                 }
             }
         } catch (Exception e) {
@@ -95,9 +106,29 @@ public class SecurityController {
             System.err.println("Error checking banned status during login: " + e.getMessage());
         }
         
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword())
-        );
+        Authentication authentication;
+        try {
+            authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword())
+            );
+        } catch (Exception authException) {
+            // Check if this is a banned user exception
+            if (authException.getMessage() != null && authException.getMessage().contains("banned")) {
+                System.out.println("🚫 Authentication failed due to banned account: " + loginRequest.getUsername());
+                
+                // Return specific structure that frontend expects
+                Map<String, Object> bannedResponse = new HashMap<>();
+                bannedResponse.put("error", "Account is banned. Please contact support.");
+                bannedResponse.put("message", "Account is banned. Please contact support.");
+                bannedResponse.put("username", loginRequest.getUsername());
+                bannedResponse.put("isBanned", true);
+                bannedResponse.put("status", 401);
+                
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(bannedResponse);
+            }
+            // Re-throw for other authentication failures
+            throw authException;
+        }
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
         String jwt = jwtUtility.generateJwtToken(authentication);

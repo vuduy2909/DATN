@@ -26,8 +26,8 @@ public interface ICommentRepository extends JpaRepository<Comment, Integer> {
     void insertComment(@Param("comment_text") String comment_text,
                         @Param("customer_id") String customer_id,
                         @Param("exercise_id") String exercise_id,
-                        @Param("course_id") String course_id,
-                        @Param("day_id") String day_id);
+                        @Param("course_id") String course_id,  // Can be null
+                        @Param("day_id") String day_id);       // Can be null
     
     // Additional queries for new Comment structure
     @Query("SELECT c FROM Comment c ORDER BY c.createdDate DESC")

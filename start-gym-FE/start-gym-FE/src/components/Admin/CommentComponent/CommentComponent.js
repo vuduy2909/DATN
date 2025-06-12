@@ -93,10 +93,21 @@ const CommentComponent = () => {
             const response = await axiosInstance.get('/admin/comments');
             console.log('Comments response:', response.data);
             
-            if (response.data && Array.isArray(response.data)) {
-                setComments(response.data);
-                setTotalComments(response.data.length);
-                console.log('Comments loaded:', response.data.length);
+            // Handle both old format (direct array) and new format (object with comments array)
+            let commentsData = [];
+            if (Array.isArray(response.data)) {
+                // Old format - direct array
+                commentsData = response.data;
+            } else if (response.data && Array.isArray(response.data.comments)) {
+                // New format - object with comments array
+                commentsData = response.data.comments;
+            }
+            
+            if (commentsData.length > 0) {
+                setComments(commentsData);
+                setTotalComments(commentsData.length);
+                console.log('Comments loaded:', commentsData.length);
+                console.log('Sample comment structure:', commentsData[0]);
             } else {
                 setComments([]);
                 setTotalComments(0);
@@ -121,10 +132,21 @@ const CommentComponent = () => {
             const response = await axiosInstance.get('/admin/comments/reported');
             console.log('Reported comments response:', response.data);
             
-            if (response.data && Array.isArray(response.data)) {
-                setReportedComments(response.data);
-                setTotalComments(response.data.length);
-                console.log('Reported comments loaded:', response.data.length);
+            // Handle both old format (direct array) and new format (object with comments array)
+            let commentsData = [];
+            if (Array.isArray(response.data)) {
+                // Old format - direct array
+                commentsData = response.data;
+            } else if (response.data && Array.isArray(response.data.comments)) {
+                // New format - object with comments array
+                commentsData = response.data.comments;
+            }
+            
+            if (commentsData.length > 0) {
+                setReportedComments(commentsData);
+                setTotalComments(commentsData.length);
+                console.log('Reported comments loaded:', commentsData.length);
+                console.log('Sample reported comment structure:', commentsData[0]);
             } else {
                 setReportedComments([]);
                 setTotalComments(0);

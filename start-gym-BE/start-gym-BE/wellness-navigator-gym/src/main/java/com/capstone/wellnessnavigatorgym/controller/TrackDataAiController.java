@@ -43,6 +43,7 @@ import java.nio.file.Paths;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.TimeUnit;
 import java.util.Base64;
+import javax.servlet.http.HttpServletRequest;
 
 @RestController
 @RequestMapping("/api/v1/track-data-ai")
@@ -522,61 +523,39 @@ public class TrackDataAiController {
         final String trainingFrequency = dto.getTraining_frequency() != null && !dto.getTraining_frequency().trim().isEmpty() 
             ? dto.getTraining_frequency().trim() : "Moderate";
         
-        logger.info("Processing training_frequency: '{}'", trainingFrequency);
         try {
-            // Use standard TrainingFrequency enum (database now synchronized)
-            TrainingFrequency frequencyEnum = TrainingFrequency.valueOf(trainingFrequency);
-            userDataAi.setTraining_frequency(frequencyEnum);
-            logger.info("Successfully set training frequency enum: {} (name: {})", frequencyEnum.name(), frequencyEnum);
-        } catch (IllegalArgumentException e) {
-            logger.error("Invalid training frequency '{}', using default Moderate. Error: {}", trainingFrequency, e.getMessage());
+            TrainingFrequency freqEnum = TrainingFrequency.valueOf(trainingFrequency.toUpperCase());
+            userDataAi.setTraining_frequency(freqEnum);
+            logger.info("Set training frequency enum: {}", freqEnum.name());
+        } catch (Exception e) {
+            logger.warn("Failed to map training frequency '{}', using default", trainingFrequency);
             userDataAi.setTraining_frequency(TrainingFrequency.Moderate);
         }
-
-        // Set physical measurements
+        
+        // Physical measurements
         userDataAi.setHeight(dto.getHeight());
         userDataAi.setWeight(dto.getWeight());
         userDataAi.setChest_circumference(dto.getChest_circumference());
         userDataAi.setWaist_circumference(dto.getWaist_circumference());
         
-        // Convert and set body_type using new BodyType enum
-        String bodyType = dto.getBody_type();
-        if (bodyType == null || bodyType.trim().isEmpty()) {
-            bodyType = "Normal"; // Default body type
-            logger.info("Using default body type: Normal");
-        }
-        
-        logger.info("=== BODY TYPE ENUM CONVERSION ===");
-        logger.info("Body type from DTO: '{}'", bodyType);
+        // Convert body_type
+        final String bodyType = dto.getBody_type() != null && !dto.getBody_type().trim().isEmpty() 
+            ? dto.getBody_type().trim() : "Thin";
         
         try {
-            // Sử dụng fromDatabaseValue để convert
-            BodyType bodyTypeEnum = BodyType.fromDatabaseValue(bodyType.trim());
+            BodyType bodyTypeEnum = BodyType.fromDatabaseValue(bodyType);
             userDataAi.setBody_type(bodyTypeEnum);
-            logger.info("✅ Successfully converted body type '{}' to enum: {} (database value: {})", 
-                bodyType, bodyTypeEnum.name(), bodyTypeEnum.getDatabaseValue());
+            logger.info("Set body type enum: {} (database value: {})", bodyTypeEnum.name(), bodyTypeEnum.getDatabaseValue());
         } catch (Exception e) {
-            logger.warn("⚠️ Failed to map body type '{}', using default Normal. Error: {}", bodyType, e.getMessage());
-            userDataAi.setBody_type(BodyType.NORMAL);
+            logger.warn("Failed to map body type '{}', using default", bodyType);
+            userDataAi.setBody_type(BodyType.THIN);
         }
         
-        logger.info("=== END BODY TYPE ENUM CONVERSION ===");
+        // Set work-related fields as Strings
+        userDataAi.setOccupation(dto.getOccupation() != null ? dto.getOccupation() : "Office Worker");
+        userDataAi.setWork_environment(dto.getWork_environment() != null ? dto.getWork_environment() : "Indoor");
         
-        // Set occupation as String (not enum in user_data_ai table)
-        final String occupation = dto.getOccupation() != null && !dto.getOccupation().trim().isEmpty() 
-            ? dto.getOccupation() : "Student";
-        userDataAi.setOccupation(occupation);
-        logger.info("Set occupation string: '{}'", occupation);
-        
-        // Set work_environment as String (not enum in user_data_ai table)
-        final String workEnvironment = dto.getWork_environment() != null && !dto.getWork_environment().trim().isEmpty() 
-            ? dto.getWork_environment() : "Office";
-        userDataAi.setWork_environment(workEnvironment);
-        logger.info("Set work environment string: '{}'", workEnvironment);
-        
-        userDataAi.setCustomer(customer);
-        
-        // Save the recommended course if available - USING FULL COURSE OBJECT
+        // Set course if recommendedCourseId is provided
         if (dto.getRecommendedCourseId() != null) {
             logger.info("=== ENHANCED COURSE OBJECT CREATION ===");
             logger.info("Processing course ID: {}", dto.getRecommendedCourseId());
@@ -600,29 +579,19 @@ public class TrackDataAiController {
                 logger.error("❌ Invalid course ID (null): {}", dto.getRecommendedCourseId());
                 throw new RuntimeException("Course ID cannot be null when creating Course object", e);
             } catch (Exception e) {
-                logger.error("❌ Failed to retrieve course with ID: {}. Error: {}", dto.getRecommendedCourseId(), e.getMessage());
-                
-                                 // Enhanced fallback with proper validation
-                 if (dto.getRecommendedCourseId() != null) {
-                     try {
-                         Course fallbackCourse2 = new Course(dto.getRecommendedCourseId());
-                         userDataAi.setCourse(fallbackCourse2);
-                         logger.warn("Using fallback: Set course with ID only: {}", dto.getRecommendedCourseId());
-                     } catch (IllegalArgumentException fallbackError) {
-                         logger.error("❌ Fallback also failed due to null course ID");
-                         throw new RuntimeException("Cannot create Course object with null ID", fallbackError);
-                     }
-                 } else {
-                     logger.error("❌ Cannot create Course: recommendedCourseId is null");
-                     throw new RuntimeException("Cannot create Course object: recommendedCourseId is null");
-                 }
+                logger.error("❌ Error setting course object: {}", e.getMessage());
+                // Set course to null if there's an error
+                userDataAi.setCourse(null);
             }
-            
-            logger.info("=== END ENHANCED COURSE OBJECT CREATION ===");
         } else {
-            logger.warn("No recommendedCourseId provided in DTO - course will be null");
+            logger.warn("⚠️ No recommendedCourseId provided, course will be null");
+            userDataAi.setCourse(null);
         }
-
+        
+        // Set customer relationship
+        userDataAi.setCustomer(customer);
+        
+        logger.info("✅ Successfully created UserDataAi from DTO");
         return userDataAi;
     }
 
@@ -710,6 +679,31 @@ public class TrackDataAiController {
             // Lấy dữ liệu training và courses
             List<TrackDataAi> allTrainingData = trackDataAiService.getAllTrackDataAi();
             List<Course> allCourses = courseService.findAll();
+            
+            // Lấy danh sách khóa học user đã có để tránh đề xuất lại
+            List<Integer> userExistingCourseIds = new ArrayList<>();
+            if (userDataDTO.getCustomerId() != null) {
+                try {
+                    List<CustomerCourse> userCustomerCourses = customerCourseService.findByCustomerId(userDataDTO.getCustomerId());
+                    userExistingCourseIds = userCustomerCourses.stream()
+                        .map(customerCourse -> customerCourse.getCourse().getCourseId())
+                        .collect(Collectors.toList());
+                    
+                    logger.info("User {} already has {} courses: {}", 
+                        userDataDTO.getCustomerId(), userExistingCourseIds.size(), userExistingCourseIds);
+                } catch (Exception e) {
+                    logger.warn("Could not retrieve user courses: {}", e.getMessage());
+                }
+            }
+            
+            // Lọc bỏ các khóa học user đã có
+            final List<Integer> finalUserExistingCourseIds = userExistingCourseIds;
+            allCourses = allCourses.stream()
+                .filter(course -> !finalUserExistingCourseIds.contains(course.getCourseId()))
+                .collect(Collectors.toList());
+                
+            logger.info("Filtered courses for recommendation: {} available courses (excluded {} existing courses)", 
+                allCourses.size(), finalUserExistingCourseIds.size());
             
             logger.info("Loaded {} training records and {} courses", allTrainingData.size(), allCourses.size());
             
@@ -3062,7 +3056,7 @@ public class TrackDataAiController {
             }
             
             // Set timestamps
-            String currentTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
+                         String currentTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
             if (draftData.getCreatedAt() == null) {
                 draftData.setCreatedAt(currentTime);
             }

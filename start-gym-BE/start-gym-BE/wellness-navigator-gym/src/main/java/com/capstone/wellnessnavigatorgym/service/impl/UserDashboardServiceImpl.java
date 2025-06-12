@@ -139,84 +139,84 @@ public class UserDashboardServiceImpl implements UserDashboardService {
     public Map<String, Object> getProgressChartData(Integer customerId) {
         Map<String, Object> chartData = new HashMap<>();
         
-        // Tạo dữ liệu cho biểu đồ tiến độ (phân chia theo 3 giai đoạn)
+        // Tạo dữ liệu cho biểu đồ tiến độ theo từng day (cải thiện để dễ quan sát)
         List<Map<String, Object>> data = new ArrayList<>();
-        
-        // Nhóm theo khoảng ngày
-        Map<String, Double> progressByRange = new HashMap<>();
-        progressByRange.put("Day 1-10", 0.0);
-        progressByRange.put("Day 10-20", 0.0);
-        progressByRange.put("Day 20-30", 0.0);
         
         // Lấy danh sách khóa học của người dùng
         List<CustomerCourse> customerCourses = customerCourseRepository.findByCustomer_CustomerId(customerId);
         
-        Map<String, Integer> totalDaysByRange = new HashMap<>();
-        totalDaysByRange.put("Day 1-10", 0);
-        totalDaysByRange.put("Day 10-20", 0);
-        totalDaysByRange.put("Day 20-30", 0);
+        // Map lưu trữ tiến độ hoàn thành theo từng day
+        Map<Integer, Boolean> dayCompletionMap = new HashMap<>();
+        Set<Integer> allDaysInCourses = new HashSet<>();
         
-        Map<String, Integer> completedDaysByRange = new HashMap<>();
-        completedDaysByRange.put("Day 1-10", 0);
-        completedDaysByRange.put("Day 10-20", 0);
-        completedDaysByRange.put("Day 20-30", 0);
-        
+        // Thu thập tất cả dữ liệu completion từ các khóa học
         for (CustomerCourse customerCourse : customerCourses) {
             Integer courseId = customerCourse.getCourse().getCourseId();
             List<CustomerDayCompletion> completions = completionService.getCustomerCourseCompletions(customerId, courseId);
             
             for (CustomerDayCompletion completion : completions) {
-                // Dùng id để xác định ngày (ví dụ: day có id = 1 tương ứng với ngày 1)
-                int dayNumber = completion.getDay().getDayId();
-                String range = getRangeForDay(dayNumber);
+                Integer dayNumber = completion.getDay().getDayId(); // Sử dụng dayId để đại diện cho số thứ tự ngày
+                allDaysInCourses.add(dayNumber);
                 
-                totalDaysByRange.put(range, totalDaysByRange.get(range) + 1);
-                
-                if (completion.getIsCompleted()) {
-                    completedDaysByRange.put(range, completedDaysByRange.get(range) + 1);
+                // Chỉ ghi đè nếu day đã completed hoặc chưa có trong map
+                if (completion.getIsCompleted() || !dayCompletionMap.containsKey(dayNumber)) {
+                    dayCompletionMap.put(dayNumber, completion.getIsCompleted());
                 }
             }
         }
         
-        // Tính % hoàn thành cho mỗi khoảng
-        for (String range : progressByRange.keySet()) {
-            double completionPercentage = 0.0;
-            
-            if (totalDaysByRange.get(range) > 0) {
-                completionPercentage = (completedDaysByRange.get(range) * 100.0) / totalDaysByRange.get(range);
-            } else {
-                // Nếu không có dữ liệu, gán giá trị mặc định
-                if (range.equals("Day 1-10")) {
-                    completionPercentage = 40.0;
-                } else if (range.equals("Day 10-20")) {
-                    completionPercentage = 80.0;
-                } else {
-                    completionPercentage = 60.0;
-                }
+        // Nếu không có dữ liệu thực tế, tạo dữ liệu mẫu cho 30 days
+        if (allDaysInCourses.isEmpty()) {
+            log.info("No actual progress data for customer {}, creating sample data", customerId);
+            for (int day = 1; day <= 30; day++) {
+                allDaysInCourses.add(day);
+                // Tạo pattern tiến độ realistic: bắt đầu tốt, giảm dần, rồi tăng lại
+                boolean isCompleted = false;
+                if (day <= 7) isCompleted = day % 2 == 1; // 50% completion đầu tuần
+                else if (day <= 14) isCompleted = day % 3 == 1; // 33% completion tuần 2
+                else if (day <= 21) isCompleted = day % 4 == 1; // 25% completion tuần 3
+                else isCompleted = day % 2 == 1; // 50% completion tuần cuối
+                
+                dayCompletionMap.put(day, isCompleted);
             }
-            
-            progressByRange.put(range, completionPercentage);
+        }
+        
+        // Sắp xếp days và tạo dữ liệu biểu đồ
+        List<Integer> sortedDays = new ArrayList<>(allDaysInCourses);
+        Collections.sort(sortedDays);
+        
+        // Chỉ lấy tối đa 30 days gần nhất để biểu đồ không quá dày
+        int maxDays = Math.min(30, sortedDays.size());
+        List<Integer> displayDays = sortedDays.subList(Math.max(0, sortedDays.size() - maxDays), sortedDays.size());
+        
+        for (Integer dayNumber : displayDays) {
+            Boolean isCompleted = dayCompletionMap.get(dayNumber);
             
             Map<String, Object> item = new HashMap<>();
-            item.put("label", range);
-            item.put("value", completionPercentage);
+            item.put("label", "Day " + dayNumber);
+            item.put("day", dayNumber);
+            item.put("value", isCompleted ? 100.0 : 0.0); // 100% nếu completed, 0% nếu chưa
+            item.put("isCompleted", isCompleted);
             
             data.add(item);
         }
         
+        // Tính tổng statistics
+        long totalDays = data.size();
+        long completedDays = data.stream().mapToLong(item -> 
+            (Boolean) item.get("isCompleted") ? 1 : 0).sum();
+        double overallProgress = totalDays > 0 ? (completedDays * 100.0) / totalDays : 0.0;
+        
         chartData.put("data", data);
+        chartData.put("totalDays", totalDays);
+        chartData.put("completedDays", completedDays);
+        chartData.put("overallProgress", Math.round(overallProgress * 100.0) / 100.0);
+        chartData.put("chartType", "day-by-day"); // Indicator cho frontend biết đây là biểu đồ theo day
+        
+        log.info("Generated progress chart for customer {}: {}/{} days completed ({}%)", 
+            customerId, completedDays, totalDays, Math.round(overallProgress));
         
         return chartData;
-    }
-
-    private String getRangeForDay(int day) {
-        if (day <= 10) {
-            return "Day 1-10";
-        } else if (day <= 20) {
-            return "Day 10-20";
-        } else {
-            return "Day 20-30";
-        }
     }
 
     @Override
