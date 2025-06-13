@@ -80,7 +80,15 @@ export const getComment = async (courseId, dayId) => {
 // POST COMMENT OF EXERCISES IN A DAY
 export const postComment = async (data) => {
     try {
-        const res = await request.post(`/comment/create`, data);
+        // Đảm bảo truyền đủ trường, kể cả rating
+        const res = await request.post(`/comment/create`, {
+            commentText: data.commentText,
+            rating: data.rating,
+            customer: data.customer,
+            exercise: data.exercise,
+            course: data.course || null,
+            day: data.day || null
+        });
         return res;
     } catch (error) {
         console.log('Error posting comments', error);
@@ -158,6 +166,17 @@ export const deleteUserCourse = async (courseId) => {
         return res;
     } catch (error) {
         console.error('Error deleting user course:', error);
+        throw error;
+    }
+}
+
+// REPORT COMMENT
+export const reportComment = async ({ commentId, reportReason }) => {
+    try {
+        const res = await request.put(`/comment/${commentId}/report`, { reportReason });
+        return res;
+    } catch (error) {
+        console.log('Error reporting comment', error);
         throw error;
     }
 }

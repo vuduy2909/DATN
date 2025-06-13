@@ -372,16 +372,13 @@ const UserFormService = {
         headers['Authorization'] = `Bearer ${token}`;
       }
       
-      // Chuẩn bị dữ liệu gửi đi với enhanced validation
-      const requestData = {
-        formData: formData,
-        recommendedCourseId: validatedCourseId
-      };
+      // Đảm bảo recommendedCourseId nằm trong formData
+      if (recommendedCourseId && !formData.recommendedCourseId) {
+        formData.recommendedCourseId = recommendedCourseId;
+      }
       
-      console.log('UserFormService: Final request data:', JSON.stringify(requestData, null, 2));
-      
-      // Gọi API endpoint xác nhận
-      const response = await request.post('/track-data-ai/confirm-recommendation', requestData, { headers });
+      // Gọi API endpoint xác nhận mới
+      const response = await request.post('/track-data-ai/confirm-user-data-ai', formData, { headers });
       console.log('UserFormService: Recommendation confirmation response:', response);
       
       return response;

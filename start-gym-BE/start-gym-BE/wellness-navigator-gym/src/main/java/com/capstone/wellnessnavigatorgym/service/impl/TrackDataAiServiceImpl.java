@@ -8,6 +8,7 @@ import com.capstone.wellnessnavigatorgym.service.ITrackDataAiService;
 import lombok.SneakyThrows;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -61,5 +62,13 @@ public class TrackDataAiServiceImpl implements ITrackDataAiService {
             .filter(id -> id != null)
             .max(Integer::compareTo)
             .orElse(1000) + 1;
+    }
+
+    @Transactional
+    public TrackDataAi createNewTrackDataAi(TrackDataAi data) {
+        Integer maxId = trackDataAiRepository.findMaxTrackDataAiId();
+        int newId = (maxId != null ? maxId : 0) + 1;
+        data.setTrackDataAiId(newId);
+        return trackDataAiRepository.save(data);
     }
 }

@@ -56,6 +56,9 @@ public class Comment {
     @Column(name = "report_reason")
     private String reportReason;
 
+    @Column(name = "rating")
+    private Integer rating;
+
     public Comment(CommentDto commentDto) {
         this.commentText = commentDto.getCommentText();
         this.customer = new Customer(Integer.parseInt(commentDto.getCustomer()));
@@ -68,6 +71,10 @@ public class Comment {
         
         if (commentDto.getDay() != null && !commentDto.getDay().trim().isEmpty()) {
         this.day = new Day(Integer.parseInt(commentDto.getDay()));
+        }
+
+        if (commentDto.getRating() != null) {
+            this.rating = commentDto.getRating();
         }
     }
     

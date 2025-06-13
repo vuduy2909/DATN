@@ -6,6 +6,16 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faStar as starFull } from '@fortawesome/free-solid-svg-icons';
 import { faStar as starNon } from '@fortawesome/free-regular-svg-icons';
 import { useAuth } from '../../AuthContext';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import IconButton from '@mui/material/IconButton';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import TextField from '@mui/material/TextField';
+import Button from '@mui/material/Button';
 
 const Comments = ({ commentText, setCommentText, listComment, setListComment, rating, setRating, courseId, dayId, userData, exercise, setLengthComment }) => {
     const { user } = useAuth();
@@ -39,6 +49,10 @@ const Comments = ({ commentText, setCommentText, listComment, setListComment, ra
     }
 
     const [hoveredRating, setHoveredRating] = useState(0);
+    const [anchorEl, setAnchorEl] = useState(null);
+    const [selectedComment, setSelectedComment] = useState(null);
+    const [reportDialogOpen, setReportDialogOpen] = useState(false);
+    const [reportReason, setReportReason] = useState('');
 
     const handleStarHover = (rating) => {
         setHoveredRating(rating);
@@ -46,6 +60,36 @@ const Comments = ({ commentText, setCommentText, listComment, setListComment, ra
 
     const handleStarClick = (rating) => {
         setRating(rating);
+    };
+
+    const handleMenuOpen = (event, comment) => {
+        setAnchorEl(event.currentTarget);
+        setSelectedComment(comment);
+    };
+
+    const handleMenuClose = () => {
+        setAnchorEl(null);
+    };
+
+    const handleReportClick = () => {
+        setReportDialogOpen(true);
+        handleMenuClose();
+    };
+
+    const handleReportSubmit = async () => {
+        if (!reportReason.trim()) return;
+        try {
+            await collectionService.reportComment({
+                commentId: selectedComment.commentId,
+                reportReason
+            });
+            setReportDialogOpen(false);
+            setReportReason('');
+            setSelectedComment(null);
+            // Optionally reload comments
+        } catch (error) {
+            // handle error
+        }
     };
 
     return (
@@ -118,6 +162,30 @@ const Comments = ({ commentText, setCommentText, listComment, setListComment, ra
                                             <div className={styles.rating}>Rating: {comment.rating}/5</div>
                                         </div>
                                     </div>
+                                    <IconButton onClick={(e) => handleMenuOpen(e, comment)}>
+                                        <MoreVertIcon />
+                                    </IconButton>
+                                    <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
+                                        <MenuItem onClick={handleReportClick}>Report</MenuItem>
+                                    </Menu>
+                                    <Dialog open={reportDialogOpen} onClose={() => setReportDialogOpen(false)}>
+                                        <DialogTitle>Report Comment</DialogTitle>
+                                        <DialogContent>
+                                            <TextField
+                                                autoFocus
+                                                margin="dense"
+                                                label="Reason"
+                                                type="text"
+                                                fullWidth
+                                                value={reportReason}
+                                                onChange={e => setReportReason(e.target.value)}
+                                            />
+                                        </DialogContent>
+                                        <DialogActions>
+                                            <Button onClick={() => setReportDialogOpen(false)}>Cancel</Button>
+                                            <Button onClick={handleReportSubmit} disabled={!reportReason.trim()}>Submit</Button>
+                                        </DialogActions>
+                                    </Dialog>
                                 </li>
                             )
                         ))}

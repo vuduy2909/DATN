@@ -67,7 +67,7 @@ public class FirebaseStorageService {
         } catch (Exception e) {
             logger.warn("🔧 Firebase Storage availability check failed: {}", e.getMessage());
         return false;
-        }
+    }
     }
     
     /**
@@ -211,7 +211,7 @@ public class FirebaseStorageService {
                 logger.info("🔧 [COURSE_IMG_UPLOAD] ✅ Deleted old course image by URL: {}", oldImageUrl);
             } catch (Exception e) {
                 logger.warn("🔧 [COURSE_IMG_UPLOAD] ⚠️ Failed to delete old course image by URL: {}, error: {}", oldImageUrl, e.getMessage());
-            }
+        }
         }
         
         // Upload new course image
@@ -353,7 +353,7 @@ public class FirebaseStorageService {
             } catch (Exception e) {
                 logger.error("🔧 [FIREBASE_UPLOAD] ❌ FATAL: Blob creation failed: {}", e.getMessage());
                 throw new IOException("UPLOAD FAILED: Cannot create blob on Firebase Storage - " + e.getMessage());
-            }
+        }
             if (blob == null) {
                 logger.error("🔧 [FIREBASE_UPLOAD] ❌ FATAL: Blob creation returned null");
                 throw new IOException("UPLOAD FAILED: Blob creation returned null");
@@ -405,7 +405,7 @@ public class FirebaseStorageService {
                 logger.error("🔧 [FIREBASE_UPLOAD] 💡 Network issue - check internet connection to Firebase Storage");
             } else if (e.getMessage().contains("token") || e.getMessage().contains("credential")) {
                 logger.error("🔧 [FIREBASE_UPLOAD] 💡 Authentication issue - check service account credentials");
-            }
+    }
             // Re-throw with clear error message
             throw new IOException("🔥 FIREBASE STORAGE UPLOAD FAILED: " + e.getMessage(), e);
         }

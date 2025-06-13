@@ -19,6 +19,7 @@ import com.capstone.wellnessnavigatorgym.repository.IExerciseRepository;
 import com.capstone.wellnessnavigatorgym.repository.IAccountRepository;
 import com.capstone.wellnessnavigatorgym.service.PaymentStatusService;
 import com.capstone.wellnessnavigatorgym.service.FirebaseStorageService;
+import com.capstone.wellnessnavigatorgym.utils.ConverterMaxCode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -111,44 +112,71 @@ public class AdminController {
                 }
             };
             
-            // Thống kê người dùng - so sánh tháng này vs tháng trước
-            List<Customer> allCustomers = customerRepository.findAll().stream()
-                .filter(c -> c.getIsEnable())
-                .collect(Collectors.toList());
+            // Thống kê người dùng - đếm trực tiếp từ database  
+            Long totalActiveCustomers = 0L;
+            try {
+                String totalCustomerQuery = "SELECT COUNT(*) FROM customer c WHERE c.is_enable = true";
+                BigInteger totalResult = (BigInteger) entityManager.createNativeQuery(totalCustomerQuery).getSingleResult();
+                totalActiveCustomers = totalResult != null ? totalResult.longValue() : 0L;
+                
+                System.out.println("Total active customers from DB: " + totalActiveCustomers);
+            } catch (Exception e) {
+                System.err.println("Error counting total customers: " + e.getMessage());
+                // Fallback to old method
+                List<Customer> allCustomers = customerRepository.findAll().stream()
+                    .filter(c -> c.getIsEnable())
+                    .collect(Collectors.toList());
+                totalActiveCustomers = (long) allCustomers.size();
+            }
             
-            System.out.println("Total customers found: " + allCustomers.size());
-            
-            // Tính người dùng tháng này và tháng trước
+            // Tính người dùng tháng này và tháng trước (chỉ các customer active)
             try {
                 String currentMonthQuery = "SELECT COUNT(*) FROM customer c JOIN account a ON c.account_id = a.account_id " +
-                    "WHERE YEAR(a.create_date) = YEAR(CURDATE()) AND MONTH(a.create_date) = MONTH(CURDATE())";
+                    "WHERE c.is_enable = true AND YEAR(a.create_date) = YEAR(CURDATE()) AND MONTH(a.create_date) = MONTH(CURDATE())";
                 BigInteger currentMonthUsers = (BigInteger) entityManager.createNativeQuery(currentMonthQuery).getSingleResult();
                 
                 String previousMonthQuery = "SELECT COUNT(*) FROM customer c JOIN account a ON c.account_id = a.account_id " +
-                    "WHERE YEAR(a.create_date) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) " +
+                    "WHERE c.is_enable = true AND YEAR(a.create_date) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) " +
                     "AND MONTH(a.create_date) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))";
                 BigInteger previousMonthUsers = (BigInteger) entityManager.createNativeQuery(previousMonthQuery).getSingleResult();
                 
                 String userPercentChange = calculatePercentChange.apply(currentMonthUsers.longValue(), previousMonthUsers.longValue());
                 response.put("userTrendPercent", userPercentChange);
                 
+                System.out.println("Current month users: " + currentMonthUsers + ", Previous month users: " + previousMonthUsers + ", Change: " + userPercentChange);
+                
             } catch (Exception e) {
+                System.err.println("Error calculating user trend: " + e.getMessage());
                 response.put("userTrendPercent", "0%");
             }
             
-            // Tự động lấy tất cả customer types từ database
-            Map<String, Long> userTypeStats = allCustomers.stream()
-                .filter(c -> c.getCustomerType() != null)
-                .collect(Collectors.groupingBy(
-                    c -> c.getCustomerType().getCustomerTypeName(),
-                    Collectors.counting()
-                ));
+            // Tự động lấy tất cả customer types từ database với query tối ưu
+            Map<String, Long> userTypeStats = new HashMap<>();
+            try {
+                String customerTypeStatsQuery = "SELECT ct.customer_type_name, COUNT(c.customer_id) as customer_count " +
+                    "FROM customer_type ct " +
+                    "LEFT JOIN customer c ON ct.customer_type_id = c.customer_type_id AND c.is_enable = true " +
+                    "GROUP BY ct.customer_type_id, ct.customer_type_name " +
+                    "ORDER BY ct.price ASC";
+                
+                List<Object[]> typeStatsResults = entityManager.createNativeQuery(customerTypeStatsQuery).getResultList();
+                
+                for (Object[] result : typeStatsResults) {
+                    String typeName = (String) result[0];
+                    Long count = ((Number) result[1]).longValue();
+                    userTypeStats.put(typeName, count);
+                }
+                
+                System.out.println("Customer type stats: " + userTypeStats);
+            } catch (Exception e) {
+                System.err.println("Error getting customer type stats: " + e.getMessage());
+            }
             
             // Lấy tất cả customer types từ database để đảm bảo hiển thị đầy đủ
             List<CustomerType> allCustomerTypes = customerTypeRepository.findAllOrderByPriceAsc();
             
             Map<String, Object> userStats = new HashMap<>();
-            userStats.put("total", (long) allCustomers.size());
+            userStats.put("total", totalActiveCustomers);
             
             // Thêm thống kê cho tất cả customer types có trong database
             Map<String, Long> customerTypeBreakdown = new HashMap<>();
@@ -213,21 +241,22 @@ public class AdminController {
             // Thống kê đăng ký - tính toán thực từ customer data
             Map<String, Object> registrationStats = new HashMap<>();
             try {
-                // Count customers registered today
-                String todayQuery = "SELECT COUNT(*) FROM customer c JOIN account a ON c.account_id = a.account_id WHERE DATE(a.create_date) = CURDATE()";
+                // Count active customers registered today
+                String todayQuery = "SELECT COUNT(*) FROM customer c JOIN account a ON c.account_id = a.account_id WHERE c.is_enable = true AND DATE(a.create_date) = CURDATE()";
                 BigInteger todayRegistrations = (BigInteger) entityManager.createNativeQuery(todayQuery).getSingleResult();
                 registrationStats.put("today", todayRegistrations.longValue());
                 
-                // Count customers registered this week
-                String weekRegQuery = "SELECT COUNT(*) FROM customer c JOIN account a ON c.account_id = a.account_id WHERE a.create_date >= DATE_SUB(NOW(), INTERVAL 1 WEEK)";
+                // Count active customers registered this week
+                String weekRegQuery = "SELECT COUNT(*) FROM customer c JOIN account a ON c.account_id = a.account_id WHERE c.is_enable = true AND a.create_date >= DATE_SUB(NOW(), INTERVAL 1 WEEK)";
                 BigInteger weekRegistrations = (BigInteger) entityManager.createNativeQuery(weekRegQuery).getSingleResult();
                 registrationStats.put("thisWeek", weekRegistrations.longValue());
                 
-                // Count customers registered this month
-                String monthRegQuery = "SELECT COUNT(*) FROM customer c JOIN account a ON c.account_id = a.account_id WHERE a.create_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH)";
+                // Count active customers registered this month
+                String monthRegQuery = "SELECT COUNT(*) FROM customer c JOIN account a ON c.account_id = a.account_id WHERE c.is_enable = true AND a.create_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH)";
                 BigInteger monthRegistrations = (BigInteger) entityManager.createNativeQuery(monthRegQuery).getSingleResult();
                 registrationStats.put("thisMonth", monthRegistrations.longValue());
             } catch (Exception e) {
+                System.err.println("Error calculating registration stats: " + e.getMessage());
                 // Fallback if create_date field doesn't exist
                 registrationStats.put("today", 0L);
                 registrationStats.put("thisWeek", 0L);
@@ -281,25 +310,75 @@ public class AdminController {
                 response.put("revenueTrendPercent", "0%");
             }
             
-            // Tính doanh thu theo loại customer
-            BigDecimal vipRevenue = successPayments.stream()
-                .filter(p -> p.getCustomer() != null && p.getCustomer().getCustomerType() != null && 
-                           "VIP".equals(p.getCustomer().getCustomerType().getCustomerTypeName()))
-                .map(VipPayment::getAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+            // Tính doanh thu theo loại customer - bao gồm tất cả customer types
+            Map<String, BigDecimal> revenueByCustomerType = new HashMap<>();
             
-            BigDecimal premiumRevenue = successPayments.stream()
-                .filter(p -> p.getCustomer() != null && p.getCustomer().getCustomerType() != null && 
-                           "Premium".equals(p.getCustomer().getCustomerType().getCustomerTypeName()))
-                .map(VipPayment::getAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+            // Lấy tất cả customer types từ database
+            List<CustomerType> allCustomerTypesForRevenue = customerTypeRepository.findAllOrderByPriceAsc();
+            
+            // Khởi tạo doanh thu = 0 cho tất cả loại
+            for (CustomerType type : allCustomerTypesForRevenue) {
+                revenueByCustomerType.put(type.getCustomerTypeName(), BigDecimal.ZERO);
+            }
+            
+            // Tính doanh thu thực tế cho từng loại - Query được sửa lại
+            try {
+                // Query lấy doanh thu từ vip_payment thông qua customer và customer_type
+                String revenueByTypeQuery = "SELECT ct.customer_type_name, " +
+                    "COALESCE(SUM(CASE WHEN vp.payment_status = 'SUCCESS' THEN vp.amount ELSE 0 END), 0) as total_revenue " +
+                    "FROM customer_type ct " +
+                    "LEFT JOIN customer c ON ct.customer_type_id = c.customer_type_id AND c.is_enable = 1 " +
+                    "LEFT JOIN vip_payment vp ON c.customer_id = vp.customer_id " +
+                    "GROUP BY ct.customer_type_id, ct.customer_type_name " +
+                    "ORDER BY ct.price ASC";
+                
+                List<Object[]> revenueResults = entityManager.createNativeQuery(revenueByTypeQuery).getResultList();
+                
+                for (Object[] result : revenueResults) {
+                    String customerTypeName = (String) result[0];
+                    BigDecimal revenue = (BigDecimal) result[1];
+                    if (revenue != null) {
+                        revenueByCustomerType.put(customerTypeName, revenue);
+                        System.out.println("Customer Type: " + customerTypeName + " - Revenue: " + revenue);
+                    }
+                }
+                
+                System.out.println("Final Revenue by customer type: " + revenueByCustomerType);
+                
+                // Debug: Cũng lấy tổng số customer cho mỗi type để kiểm tra
+                String customerCountQuery = "SELECT ct.customer_type_name, COUNT(c.customer_id) as customer_count " +
+                    "FROM customer_type ct " +
+                    "LEFT JOIN customer c ON ct.customer_type_id = c.customer_type_id AND c.is_enable = 1 " +
+                    "GROUP BY ct.customer_type_id, ct.customer_type_name " +
+                    "ORDER BY ct.price ASC";
+                
+                List<Object[]> customerCountResults = entityManager.createNativeQuery(customerCountQuery).getResultList();
+                System.out.println("Customer count by type:");
+                for (Object[] result : customerCountResults) {
+                    String typeName = (String) result[0];
+                    Long count = ((Number) result[1]).longValue();
+                    System.out.println("Type: " + typeName + " - Customers: " + count);
+                }
+                
+            } catch (Exception e) {
+                System.err.println("Error calculating revenue by customer type: " + e.getMessage());
+                e.printStackTrace();
+            }
             
             Map<String, Object> revenueStats = new HashMap<>();
             revenueStats.put("total", totalRevenue.longValue());
-            revenueStats.put("vip", vipRevenue.longValue());
-            revenueStats.put("premium", premiumRevenue.longValue());
+            
+            // Thêm doanh thu cho từng loại customer
+            for (Map.Entry<String, BigDecimal> entry : revenueByCustomerType.entrySet()) {
+                revenueStats.put(entry.getKey().toLowerCase(), entry.getValue().longValue());
+            }
+            
+            // Để tương thích ngược, vẫn giữ VIP và Premium
+            revenueStats.put("vip", revenueByCustomerType.getOrDefault("VIP", BigDecimal.ZERO).longValue());
+            revenueStats.put("premium", revenueByCustomerType.getOrDefault("Premium", BigDecimal.ZERO).longValue());
             
             response.put("revenueStats", revenueStats);
+            response.put("revenueByCustomerType", revenueByCustomerType);
             
             // Thống kê đơn hàng - với so sánh tháng trước
             long pendingOrders = allPayments.stream()
@@ -383,47 +462,98 @@ public class AdminController {
             response.put("recentActivities", recentActivities);
             response.put("recentActivitiesTotal", totalRecentActivities);
             
-            // Real monthly data calculation based on payment history
+            // Real monthly data calculation với query tối ưu cho 2 tháng qua
             List<Map<String, Object>> monthlyData = new ArrayList<>();
             try {
-                // Get the last 6 months of data
-                for (int monthsBack = 5; monthsBack >= 0; monthsBack--) {
-                    Map<String, Object> monthData = new HashMap<>();
+                // Query tổng hợp dữ liệu 2 tháng qua trong một lần
+                String monthlyStatsQuery = "SELECT " +
+                    "DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL n.n MONTH), '%b') as month_name, " +
+                    "YEAR(DATE_SUB(CURDATE(), INTERVAL n.n MONTH)) as year_val, " +
+                    "MONTH(DATE_SUB(CURDATE(), INTERVAL n.n MONTH)) as month_val, " +
+                    "n.n as months_back " +
+                    "FROM (SELECT 0 as n UNION SELECT 1) n " +
+                    "ORDER BY n.n DESC";
+                
+                List<Object[]> monthResults = entityManager.createNativeQuery(monthlyStatsQuery).getResultList();
+                
+                for (Object[] monthResult : monthResults) {
+                    String monthName = (String) monthResult[0];
+                    Integer year = ((Number) monthResult[1]).intValue();
+                    Integer month = ((Number) monthResult[2]).intValue();
                     
-                    // Calculate month name
-                    LocalDateTime targetMonth = LocalDateTime.now().minusMonths(monthsBack);
-                    String monthName = targetMonth.getMonth().toString().substring(0, 3);
+                    Map<String, Object> monthData = new HashMap<>();
                     monthData.put("month", monthName);
                     
-                    // Count new users in this month
+                    // Count new customers for this month
                     String userCountQuery = "SELECT COUNT(*) FROM customer c JOIN account a ON c.account_id = a.account_id " +
-                                           "WHERE YEAR(a.create_date) = ? AND MONTH(a.create_date) = ?";
+                                           "WHERE c.is_enable = true AND YEAR(a.create_date) = ? AND MONTH(a.create_date) = ?";
                     BigInteger userCount = (BigInteger) entityManager.createNativeQuery(userCountQuery)
-                        .setParameter(1, targetMonth.getYear())
-                        .setParameter(2, targetMonth.getMonthValue())
+                        .setParameter(1, year)
+                        .setParameter(2, month)
                         .getSingleResult();
-                    monthData.put("users", userCount.longValue());
+                    monthData.put("users", userCount != null ? userCount.longValue() : 0L);
                     
-                    // Calculate revenue for this month (in millions VND)
-                    String revenueQuery = "SELECT COALESCE(SUM(amount), 0) FROM vip_payment " +
-                                         "WHERE payment_status = 'SUCCESS' AND YEAR(created_date) = ? AND MONTH(created_date) = ?";
+                    // Calculate revenue for this month
+                    String revenueQuery = "SELECT COALESCE(SUM(vp.amount), 0) FROM vip_payment vp " +
+                                         "WHERE vp.payment_status = 'SUCCESS' AND YEAR(vp.created_date) = ? AND MONTH(vp.created_date) = ?";
                     BigDecimal monthRevenue = (BigDecimal) entityManager.createNativeQuery(revenueQuery)
-                        .setParameter(1, targetMonth.getYear())
-                        .setParameter(2, targetMonth.getMonthValue())
+                        .setParameter(1, year)
+                        .setParameter(2, month)
                         .getSingleResult();
-                    monthData.put("revenue", monthRevenue.divide(BigDecimal.valueOf(1000000)).doubleValue()); // Convert to millions
+                    monthData.put("revenue", monthRevenue != null ? monthRevenue.divide(BigDecimal.valueOf(1000000)).doubleValue() : 0.0);
+                    
+                    // Count successful orders for this month
+                    String ordersQuery = "SELECT COUNT(*) FROM vip_payment vp " +
+                                        "WHERE vp.payment_status = 'SUCCESS' AND YEAR(vp.created_date) = ? AND MONTH(vp.created_date) = ?";
+                    BigInteger orderCount = (BigInteger) entityManager.createNativeQuery(ordersQuery)
+                        .setParameter(1, year)
+                        .setParameter(2, month)
+                        .getSingleResult();
+                    monthData.put("orders", orderCount != null ? orderCount.longValue() : 0L);
+                    
+                    // Revenue by customer type for this month
+                    String revenueByTypeMonthQuery = "SELECT ct.customer_type_name, COALESCE(SUM(vp.amount), 0) " +
+                        "FROM customer_type ct " +
+                        "LEFT JOIN customer c ON ct.customer_type_id = c.customer_type_id " +
+                        "LEFT JOIN vip_payment vp ON c.customer_id = vp.customer_id " +
+                        "AND vp.payment_status = 'SUCCESS' " +
+                        "AND YEAR(vp.created_date) = ? AND MONTH(vp.created_date) = ? " +
+                        "WHERE c.is_enable = true OR c.is_enable IS NULL " +
+                        "GROUP BY ct.customer_type_id, ct.customer_type_name " +
+                        "ORDER BY ct.price ASC";
+                    
+                    List<Object[]> typeRevenueResults = entityManager.createNativeQuery(revenueByTypeMonthQuery)
+                        .setParameter(1, year)
+                        .setParameter(2, month)
+                        .getResultList();
+                    
+                    Map<String, Double> revenueByType = new HashMap<>();
+                    for (Object[] typeResult : typeRevenueResults) {
+                        String typeName = (String) typeResult[0];
+                        BigDecimal typeRevenue = (BigDecimal) typeResult[1];
+                        revenueByType.put(typeName, typeRevenue != null ? typeRevenue.divide(BigDecimal.valueOf(1000000)).doubleValue() : 0.0);
+                    }
+                    monthData.put("revenueByType", revenueByType);
                     
                     monthlyData.add(monthData);
                 }
+                
+                System.out.println("Monthly data calculated for " + monthlyData.size() + " months");
+                
             } catch (Exception e) {
+                System.err.println("Error calculating monthly data: " + e.getMessage());
+                e.printStackTrace();
+                
                 // Fallback with minimal data if queries fail
-                String[] months = {"Jan", "Feb", "Mar", "Apr", "May", "Jun"};
+                String[] months = {"Dec", "Nov"};
                 monthlyData.clear();
                 for (String month : months) {
                     Map<String, Object> monthData = new HashMap<>();
                     monthData.put("month", month);
                     monthData.put("users", 0);
                     monthData.put("revenue", 0.0);
+                    monthData.put("orders", 0);
+                    monthData.put("revenueByType", new HashMap<>());
                     monthlyData.add(monthData);
                 }
             }
@@ -439,6 +569,70 @@ public class AdminController {
             System.err.println("Error in dashboard-overview: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error getting dashboard data: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Debug endpoint để kiểm tra dữ liệu thực
+     */
+    @GetMapping("/debug-revenue-data")
+    public ResponseEntity<?> debugRevenueData() {
+        try {
+            Map<String, Object> debugData = new HashMap<>();
+            
+            // 1. Kiểm tra customer types
+            List<CustomerType> allTypes = customerTypeRepository.findAll();
+            debugData.put("customerTypes", allTypes);
+            
+            // 2. Kiểm tra customers và customer types
+            String customerTypeQuery = "SELECT c.customer_id, c.customer_name, c.is_enable, " +
+                "ct.customer_type_name, ct.price " +
+                "FROM customer c " +
+                "LEFT JOIN customer_type ct ON c.customer_type_id = ct.customer_type_id " +
+                "LIMIT 10";
+            List<Object[]> customerSample = entityManager.createNativeQuery(customerTypeQuery).getResultList();
+            debugData.put("customerSample", customerSample);
+            
+            // 3. Kiểm tra vip_payment
+            String paymentQuery = "SELECT vp.payment_id, vp.customer_id, vp.amount, vp.payment_status, " +
+                "c.customer_name, ct.customer_type_name " +
+                "FROM vip_payment vp " +
+                "JOIN customer c ON vp.customer_id = c.customer_id " +
+                "LEFT JOIN customer_type ct ON c.customer_type_id = ct.customer_type_id " +
+                "WHERE vp.payment_status = 'SUCCESS' " +
+                "LIMIT 10";
+            List<Object[]> paymentSample = entityManager.createNativeQuery(paymentQuery).getResultList();
+            debugData.put("paymentSample", paymentSample);
+            
+            // 4. Test revenue query
+            String revenueTestQuery = "SELECT ct.customer_type_name, " +
+                "COUNT(c.customer_id) as customer_count, " +
+                "COUNT(vp.payment_id) as payment_count, " +
+                "COALESCE(SUM(CASE WHEN vp.payment_status = 'SUCCESS' THEN vp.amount ELSE 0 END), 0) as total_revenue " +
+                "FROM customer_type ct " +
+                "LEFT JOIN customer c ON ct.customer_type_id = c.customer_type_id AND c.is_enable = 1 " +
+                "LEFT JOIN vip_payment vp ON c.customer_id = vp.customer_id " +
+                "GROUP BY ct.customer_type_id, ct.customer_type_name " +
+                "ORDER BY ct.price ASC";
+            
+            List<Object[]> revenueTestResults = entityManager.createNativeQuery(revenueTestQuery).getResultList();
+            List<Map<String, Object>> revenueTest = new ArrayList<>();
+            for (Object[] result : revenueTestResults) {
+                Map<String, Object> row = new HashMap<>();
+                row.put("customerTypeName", result[0]);
+                row.put("customerCount", result[1]);
+                row.put("paymentCount", result[2]);
+                row.put("totalRevenue", result[3]);
+                revenueTest.add(row);
+            }
+            debugData.put("revenueTest", revenueTest);
+            
+            return ResponseEntity.ok(debugData);
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Debug error: " + e.getMessage());
         }
     }
 
@@ -1002,16 +1196,85 @@ public class AdminController {
     @PostMapping("/customers")
     public ResponseEntity<?> createCustomer(@RequestBody Map<String, Object> customerData) {
         try {
-            // TODO: Implement customer creation logic
-            // This should handle creating both Customer entity and Account if needed
-            
+            // Validate input
+            String customerName = (String) customerData.get("customerName");
+            String customerEmail = (String) customerData.get("customerEmail");
+            String customerPhone = (String) customerData.get("customerPhone");
+            String customerAddress = (String) customerData.get("customerAddress");
+            String customerGender = (String) customerData.get("customerGender");
+            String dateOfBirthStr = (String) customerData.get("dateOfBirth");
+            Integer customerTypeId = customerData.get("customerTypeId") != null ? (Integer) customerData.get("customerTypeId") : null;
+            Boolean isEnable = customerData.get("isEnable") != null ? (Boolean) customerData.get("isEnable") : true;
+            String customerImg = (String) customerData.get("customerImg");
+            // Account fields
+            String username = (String) customerData.get("username");
+            String password = (String) customerData.get("password");
+
+            if (username == null || username.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("Username is required");
+            }
+            if (password == null || password.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("Password is required");
+            }
+            if (customerEmail == null || customerEmail.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("Email is required");
+            }
+            // Check trùng username/email
+            Optional<Account> existingAccount = accountRepository.findAccountByUserName(username);
+            if (existingAccount.isPresent()) {
+                return ResponseEntity.badRequest().body("Username already exists: " + username);
+            }
+            Account existingEmailAccount = accountRepository.findByEmail(customerEmail);
+            if (existingEmailAccount != null) {
+                return ResponseEntity.badRequest().body("Email already exists: " + customerEmail);
+            }
+            // Tạo account
+            Account newAccount = new Account();
+            newAccount.setUserName(username);
+            newAccount.setEmail(customerEmail);
+            newAccount.setEncryptPassword(passwordEncoder.encode(password));
+            newAccount.setIsEnable(isEnable);
+            // Gán role mặc định
+            Role userRole = new Role(1, "ROLE_USER");
+            Set<Role> roles = new HashSet<>();
+            roles.add(userRole);
+            newAccount.setRoles(roles);
+            Account savedAccount = accountRepository.save(newAccount);
+            // Tạo customer
+            Customer customerLimit = customerRepository.findTopByOrderByCustomerIdDesc();
+            String customerCode = customerLimit != null ? ConverterMaxCode.generateNextId(customerLimit.getCustomerCode()) : "CUST-000001";
+            Customer newCustomer = new Customer();
+            newCustomer.setCustomerCode(customerCode);
+            newCustomer.setCustomerName(customerName);
+            newCustomer.setCustomerEmail(customerEmail);
+            newCustomer.setCustomerPhone(customerPhone);
+            newCustomer.setCustomerAddress(customerAddress);
+            newCustomer.setCustomerGender(customerGender);
+            newCustomer.setIsEnable(isEnable);
+            newCustomer.setCustomerImg(customerImg);
+            newCustomer.setAccount(savedAccount);
+            // Parse date
+            if (dateOfBirthStr != null && !dateOfBirthStr.isEmpty()) {
+                try {
+                    java.sql.Date dob = java.sql.Date.valueOf(dateOfBirthStr);
+                    newCustomer.setDateOfBirth(dob);
+                } catch (Exception e) {
+                    return ResponseEntity.badRequest().body("Invalid date format for dateOfBirth. Use yyyy-MM-dd");
+                }
+            }
+            // Gán customer type
+            if (customerTypeId != null) {
+                CustomerType customerType = customerTypeRepository.findById(customerTypeId).orElse(null);
+                newCustomer.setCustomerType(customerType);
+            }
+            Customer savedCustomer = customerRepository.save(newCustomer);
+            // Trả về thông tin
             Map<String, Object> response = new HashMap<>();
-            response.put("message", "Customer creation endpoint - to be implemented");
-            response.put("redirectTo", "/admin/customers"); // Navigate back to customers list
+            response.put("customer", savedCustomer);
+            response.put("account", savedAccount);
+            response.put("message", "Customer and account created successfully");
             response.put("timestamp", LocalDateTime.now());
-            
             return ResponseEntity.ok(response);
-            
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -2793,35 +3056,10 @@ public class AdminController {
                         totalDaysQuery.setParameter(1, courseId);
                         Number totalDays = (Number) totalDaysQuery.getSingleResult();
                         
-                        // Kiểm tra và khởi tạo completion records nếu cần
-                        if (totalDays.intValue() > 0) {
-                            String checkCompletionSql = "SELECT COUNT(*) FROM customer_day_completion " +
-                                "WHERE customer_id = ? AND course_id = ?";
-                            Query checkCompletionQuery = entityManager.createNativeQuery(checkCompletionSql);
-                            checkCompletionQuery.setParameter(1, customerId);
-                            checkCompletionQuery.setParameter(2, courseId);
-                            Number existingRecords = (Number) checkCompletionQuery.getSingleResult();
-                            
-                            if (existingRecords.intValue() == 0) {
-                                logger.info("No completion records found for customer {} course {}, initializing...", 
-                                    customerId, courseId);
-                                
-                                // Khởi tạo completion records từ course_days
-                                String initSql = "INSERT INTO customer_day_completion " +
-                                    "(customer_id, course_id, day_id, is_completed, completion_date) " +
-                                    "SELECT ?, ?, cd.day_id, false, NULL " +
-                                    "FROM course_days cd " +
-                                    "WHERE cd.course_id = ? AND cd.status = true";
-                                Query initQuery = entityManager.createNativeQuery(initSql);
-                                initQuery.setParameter(1, customerId);
-                                initQuery.setParameter(2, courseId);
-                                initQuery.setParameter(3, courseId);
-                                initQuery.executeUpdate();
-                                
-                                logger.info("Initialized {} completion records for customer {} course {}", 
-                                    totalDays, customerId, courseId);
-                            }
-                        }
+                        // KHÔNG khởi tạo completion records tự động nữa
+                        // Chỉ đếm những bản ghi đã thực sự được tạo khi user điểm danh
+                        logger.info("Course {} has {} total days, will count actual completion records only", 
+                                courseId, totalDays);
                         
                         // Đếm số ngày đã completed từ bảng customer_day_completion
                         String completedDaysSql = "SELECT COUNT(*) FROM customer_day_completion " +
@@ -3512,25 +3750,32 @@ public class AdminController {
             String reason = requestData != null ? (String) requestData.get("reason") : "Admin action";
             logger.info("Ban reason: {}", reason);
             
-            // Set customer is_enable = 0 (banned)
+            // Set customer is_enable = false (0 in database)
             customer.setIsEnable(false);
-            customerRepository.save(customer);
-            logger.info("✅ Customer {} banned successfully", customerId);
+            Customer savedCustomer = customerRepository.save(customer);
+            logger.info("✅ Customer {} banned - is_enable set to 0 in customer table", customerId);
             
-            // Also disable the associated account
+            // Also disable the associated account - set is_enable = false (0 in database)
             if (customer.getAccount() != null) {
                 Account account = customer.getAccount();
                 account.setIsEnable(false);
-                accountRepository.save(account);
-                logger.info("✅ Account {} for customer {} also disabled", account.getUserName(), customerId);
+                Account savedAccount = accountRepository.save(account);
+                logger.info("✅ Account {} for customer {} also disabled - is_enable set to 0 in account table", 
+                    account.getUserName(), customerId);
+            } else {
+                logger.warn("⚠️ No account found for customer {}", customerId);
             }
             
             Map<String, Object> response = new HashMap<>();
-            response.put("message", "Customer banned successfully");
+            response.put("message", "Customer banned successfully - is_enable set to 0 in both customer and account tables");
             response.put("customerId", customerId);
             response.put("customerName", customer.getCustomerName());
             response.put("reason", reason);
             response.put("bannedAt", LocalDateTime.now());
+            response.put("customerIsEnable", savedCustomer.getIsEnable());
+            if (customer.getAccount() != null) {
+                response.put("accountIsEnable", customer.getAccount().getIsEnable());
+            }
             
             return ResponseEntity.ok(response);
             
@@ -3809,6 +4054,103 @@ public class AdminController {
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("message", "Failed to toggle exercise status: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+    /**
+     * Check if email already exists in the system
+     */
+    @GetMapping("/check-email-exists")
+    public ResponseEntity<?> checkEmailExists(@RequestParam String email) {
+        try {
+            Map<String, Object> response = new HashMap<>();
+            response.put("email", email);
+            
+            // Check in Account table
+            Account existingAccount = accountRepository.findByEmail(email);
+            boolean emailExists = existingAccount != null;
+            
+            // Also check in Customer table for additional verification
+            Customer existingCustomer = customerRepository.findByCustomerEmail(email);
+            boolean emailExistsInCustomer = existingCustomer != null;
+            
+            response.put("exists", emailExists || emailExistsInCustomer);
+            response.put("existsInAccount", emailExists);
+            response.put("existsInCustomer", emailExistsInCustomer);
+            
+            if (emailExists || emailExistsInCustomer) {
+                response.put("message", "Email đã được sử dụng");
+            } else {
+                response.put("message", "Email có thể sử dụng");
+            }
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("Error checking email exists: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error checking email: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Check if username already exists in the system
+     */
+    @GetMapping("/check-username-exists")
+    public ResponseEntity<?> checkUsernameExists(@RequestParam String username) {
+        try {
+            Map<String, Object> response = new HashMap<>();
+            response.put("username", username);
+            
+            // Check in Account table
+            Optional<Account> existingAccount = accountRepository.findAccountByUserName(username);
+            boolean usernameExists = existingAccount.isPresent();
+            
+            response.put("exists", usernameExists);
+            
+            if (usernameExists) {
+                response.put("message", "Tên đăng nhập đã được sử dụng");
+            } else {
+                response.put("message", "Tên đăng nhập có thể sử dụng");
+            }
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("Error checking username exists: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error checking username: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Check if phone number already exists in the system
+     */
+    @GetMapping("/check-phone-exists")
+    public ResponseEntity<?> checkPhoneExists(@RequestParam String phone) {
+        try {
+            Map<String, Object> response = new HashMap<>();
+            response.put("phone", phone);
+            
+            // Check in Customer table
+            Customer existingCustomer = customerRepository.findByCustomerPhone(phone);
+            boolean phoneExists = existingCustomer != null;
+            
+            response.put("exists", phoneExists);
+            
+            if (phoneExists) {
+                response.put("message", "Số điện thoại đã được sử dụng");
+                response.put("customerName", existingCustomer.getCustomerName());
+            } else {
+                response.put("message", "Số điện thoại có thể sử dụng");
+            }
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("Error checking phone exists: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error checking phone: " + e.getMessage());
         }
     }
 } 

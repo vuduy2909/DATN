@@ -11,4 +11,5 @@ public interface ITrackDataAiService {
     TrackDataAi findTrackDataAiById(Integer id);
     TrackDataAi saveTrackDataAi(TrackDataAi trackDataAi);
     Integer getNextTrackDataAiId();
+    TrackDataAi createNewTrackDataAi(TrackDataAi data);
 }

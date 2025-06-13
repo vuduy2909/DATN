@@ -34,7 +34,7 @@ import {
     Group,
     LibraryBooks
 } from '@mui/icons-material';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, AreaChart, Area } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { axiosInstance } from '../../../utils/axiosInstance';
 
 const DashboardComponent = () => {
@@ -73,6 +73,8 @@ const DashboardComponent = () => {
                 
                 if (response.data) {
                     setDashboardData(response.data);
+                    console.log('Dashboard data received:', response.data);
+                    console.log('Revenue by customer type:', response.data.revenueByCustomerType);
                 } else {
                     setError('No data received from server');
                 }
@@ -95,10 +97,40 @@ const DashboardComponent = () => {
         { name: 'VIP', value: dashboardData?.userStats?.vip || 0, color: '#667eea' }
     ];
 
-    const revenueData = [
-        { name: 'VIP', revenue: (dashboardData?.revenueStats?.vip || 0) / 1000000, color: '#667eea' },
-        { name: 'Premium', revenue: (dashboardData?.revenueStats?.premium || 0) / 1000000, color: '#fa709a' }
-    ];
+    // Tạo dữ liệu biểu đồ doanh thu từ revenueByCustomerType
+    const revenueData = [];
+    if (dashboardData?.revenueByCustomerType) {
+        const colorMap = {
+            'Regular': '#4facfe',
+            'Premium': '#fa709a', 
+            'VIP': '#667eea',
+            'Super VIP': '#e74c3c',
+            'Diamond': '#9b59b6',
+            'Platinum': '#f39c12',
+            'Gold': '#f1c40f',
+            'Silver': '#95a5a6'
+        };
+        
+        // Hiển thị tất cả customer types (bao gồm cả doanh thu = 0)
+        Object.entries(dashboardData.revenueByCustomerType).forEach(([customerType, revenue]) => {
+            revenueData.push({
+                name: customerType,
+                revenue: revenue / 1000000, // Convert to millions
+                color: colorMap[customerType] || '#95a5a6' // Default color if not in map
+            });
+        });
+        
+        // Sắp xếp theo tên để hiển thị consistent
+        revenueData.sort((a, b) => a.name.localeCompare(b.name));
+        
+        console.log('Revenue data for chart:', revenueData);
+    } else {
+        // Fallback to old method nếu không có revenueByCustomerType
+        revenueData.push(
+            { name: 'VIP', revenue: (dashboardData?.revenueStats?.vip || 0) / 1000000, color: '#667eea' },
+            { name: 'Premium', revenue: (dashboardData?.revenueStats?.premium || 0) / 1000000, color: '#fa709a' }
+        );
+    }
 
     // Calculate trends - using real data from backend
     const userTrend = dashboardData?.userTrendPercent || "0%";
@@ -461,8 +493,12 @@ const DashboardComponent = () => {
                                 <CartesianGrid strokeDasharray="3 3" />
                                 <XAxis dataKey="name" />
                                 <YAxis />
-                                <Tooltip formatter={(value) => [`${value}M VNĐ`, 'Doanh thu']} />
-                                <Bar dataKey="revenue" fill="#667eea" radius={[8, 8, 0, 0]} />
+                                <Tooltip formatter={(value) => [`${value.toFixed(1)}M VNĐ`, 'Doanh thu']} />
+                                <Bar dataKey="revenue" radius={[8, 8, 0, 0]}>
+                                    {revenueData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                    ))}
+                                </Bar>
                             </BarChart>
                         </ResponsiveContainer>
                     </Card>
@@ -474,45 +510,56 @@ const DashboardComponent = () => {
                 <Grid item xs={12}>
                     <Card elevation={8} sx={{ p: 3, borderRadius: 3 }}>
                         <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold', color: '#333' }}>
-                            Xu Hướng 6 Tháng Qua
+                            Xu Hướng 2 Tháng Qua
                         </Typography>
                         <ResponsiveContainer width="100%" height={400}>
-                            <AreaChart data={dashboardData?.monthlyData || []}>
-                                <defs>
-                                    <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#667eea" stopOpacity={0.8}/>
-                                        <stop offset="95%" stopColor="#667eea" stopOpacity={0.1}/>
-                                    </linearGradient>
-                                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#fa709a" stopOpacity={0.8}/>
-                                        <stop offset="95%" stopColor="#fa709a" stopOpacity={0.1}/>
-                                    </linearGradient>
-                                </defs>
+                            <LineChart data={dashboardData?.monthlyData || []}>
                                 <CartesianGrid strokeDasharray="3 3" />
                                 <XAxis dataKey="month" />
                                 <YAxis yAxisId="left" />
                                 <YAxis yAxisId="right" orientation="right" />
-                                <Tooltip />
+                                <Tooltip 
+                                    formatter={(value, name, props) => {
+                                        if (name === 'Doanh thu (M VNĐ)') {
+                                            return [`${value.toFixed(1)}M VNĐ`, name];
+                                        }
+                                        return [value, name];
+                                    }}
+                                    labelFormatter={(label) => `Tháng: ${label}`}
+                                />
                                 <Legend />
-                                <Area 
+                                <Line 
                                     yAxisId="left"
                                     type="monotone" 
                                     dataKey="users" 
                                     stroke="#667eea" 
-                                    fillOpacity={1} 
-                                    fill="url(#colorUsers)"
+                                    strokeWidth={3}
+                                    dot={{ fill: '#667eea', strokeWidth: 2, r: 5 }}
+                                    activeDot={{ r: 7, stroke: '#667eea', strokeWidth: 2 }}
                                     name="Người dùng mới"
                                 />
-                                <Area 
+                                <Line 
                                     yAxisId="right"
                                     type="monotone" 
                                     dataKey="revenue" 
                                     stroke="#fa709a" 
-                                    fillOpacity={1} 
-                                    fill="url(#colorRevenue)"
+                                    strokeWidth={3}
+                                    dot={{ fill: '#fa709a', strokeWidth: 2, r: 5 }}
+                                    activeDot={{ r: 7, stroke: '#fa709a', strokeWidth: 2 }}
                                     name="Doanh thu (M VNĐ)"
                                 />
-                            </AreaChart>
+                                <Line 
+                                    yAxisId="left"
+                                    type="monotone" 
+                                    dataKey="orders" 
+                                    stroke="#34d399" 
+                                    strokeWidth={2}
+                                    strokeDasharray="5 5"
+                                    dot={{ fill: '#34d399', strokeWidth: 2, r: 4 }}
+                                    activeDot={{ r: 6, stroke: '#34d399', strokeWidth: 2 }}
+                                    name="Đơn hàng thành công"
+                                />
+                            </LineChart>
                         </ResponsiveContainer>
                     </Card>
                 </Grid>

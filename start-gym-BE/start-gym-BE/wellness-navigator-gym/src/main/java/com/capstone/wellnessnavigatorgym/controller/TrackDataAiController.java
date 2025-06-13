@@ -96,6 +96,8 @@ public class TrackDataAiController {
     // private static final String XML_FILE_PATH = "D:/DATN/CODE/start-gym-BE/start-gym-BE/wellness-navigator-gym/src/main/resources/static/DataTraining.xml";
     private static final String XML_FILE_PATH = "D:/DATN/CODE/start-gym-BE/start-gym-BE/wellness-navigator-gym/src/main/resources/static/DataTraining.xml";
 
+
+
     // Simple DTO classes to replace missing ones
     public static class RecommendationDTO {
         private Course recommendedCourse; // Đổi tên từ recommendedCourses
@@ -492,7 +494,7 @@ public class TrackDataAiController {
 
     private UserDataAi createUserDataAiFromDTO(UserDataDTO dto, Customer customer) {
         UserDataAi userDataAi = new UserDataAi();
-        userDataAi.setTrack_data_ai_id(1001);
+        // track_data_ai_id will be set dynamically when confirmed
         userDataAi.setAge(dto.getAge());
         userDataAi.setGender(dto.getGender());
         userDataAi.setBmi(dto.getBmi());
@@ -4476,6 +4478,38 @@ public class TrackDataAiController {
             errorResponse.put("success", false);
             errorResponse.put("error", "Error clearing analysis: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+    @PostMapping("/confirm-user-data-ai")
+    public ResponseEntity<?> confirmUserDataAi(@RequestBody UserDataDTO userDataDTO) {
+        try {
+            // Lấy customer từ DB
+            Customer customer = customerService.findById(userDataDTO.getCustomerId());
+            if (customer == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Customer not found");
+            }
+            // Tạo bản ghi TrackDataAi mới (atomic, sinh id động)
+            TrackDataAi trackDataAi = new TrackDataAi();
+            // Gán các trường cần thiết từ userDataDTO vào trackDataAi nếu cần
+            trackDataAi.setAge(userDataDTO.getAge());
+            trackDataAi.setGender(userDataDTO.getGender());
+            trackDataAi.setHeight(userDataDTO.getHeight());
+            trackDataAi.setWeight(userDataDTO.getWeight());
+            trackDataAi.setChest_circumference(userDataDTO.getChest_circumference());
+            trackDataAi.setWaist_circumference(userDataDTO.getWaist_circumference());
+            trackDataAi.setBmi(userDataDTO.getBmi());
+            // ... các trường khác nếu cần
+            TrackDataAi savedTrack = trackDataAiService.createNewTrackDataAi(trackDataAi);
+            // Tạo UserDataAi mới, gán track_data_ai_id động
+            UserDataAi userDataAi = createUserDataAiFromDTO(userDataDTO, customer);
+            userDataAi.setTrack_data_ai_id(savedTrack.getTrackDataAiId());
+            userDataAi.setEffective(true);
+            userDataAi.setCustomer(customer);
+            userDataAiService.saveUserDataAi(userDataAi);
+            return ResponseEntity.ok("UserDataAi record created successfully");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error: " + e.getMessage());
         }
     }
 

@@ -502,8 +502,17 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
         console.log('✅ Claude API returned valid body type:', result.bodyType);
         console.log('Calling onAnalysisComplete with body type:', result.bodyType);
         
-        // FIXED: Call onAnalysisComplete with proper bodyType parameter  
-        onAnalysisComplete(result.bodyType);
+        // Chuẩn bị analysisData để truyền về Step6
+        const analysisDataToSend = {
+          imageBase64: previewUrl ? previewUrl.split(',')[1] : null, // Extract base64 part only
+          analysis: result.analysis,
+          recommendations: result.recommendations,
+          bodyType: result.bodyType,
+          timestamp: Date.now()
+        };
+        
+        // Call onAnalysisComplete với đầy đủ thông tin  
+        onAnalysisComplete(result.bodyType, null, analysisDataToSend);
         
         // Update the measurements as well
         if (waistCircumference) {
@@ -514,7 +523,7 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
               value: waistCircumference,
             },
           };
-          onAnalysisComplete(result.bodyType, waistChangeEvent);
+          onAnalysisComplete(result.bodyType, waistChangeEvent, analysisDataToSend);
         }
         
         if (chestCircumference) {
@@ -525,7 +534,7 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
               value: chestCircumference,
             },
           };
-          onAnalysisComplete(result.bodyType, chestChangeEvent);
+          onAnalysisComplete(result.bodyType, chestChangeEvent, analysisDataToSend);
         }
         
         console.log('Body type update completed successfully');

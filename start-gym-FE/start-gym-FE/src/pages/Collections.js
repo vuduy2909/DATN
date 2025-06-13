@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../AuthContext';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Collections_card from '../components/Collections_card/Collections_card';
 import { request } from '../utils/axiosInstance';
 import Header from "../components/Header/Header";
 import Footer from "../components/Footer/Footer";
 import Sidebar from "../components/Sidebar/Sidebar";
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material';
 
 const Collections = () => {
   // Initialize from localStorage if available, otherwise use "All"
@@ -14,6 +15,7 @@ const Collections = () => {
   });
   const [searchTerm, setSearchTerm] = useState('');
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Extract search term from URL if present
   useEffect(() => {
@@ -36,6 +38,7 @@ const Collections = () => {
   const [userData, setUserData] = useState({ recommendedCourses: [] });
   const [myCourses, setMyCourses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loginDialogOpen, setLoginDialogOpen] = useState(false);
 
   // Function to fetch user data
     const fetchUserData = async () => {
@@ -179,6 +182,14 @@ const Collections = () => {
     }
   };
 
+  const handleRecommendClick = () => {
+    if (!user) {
+      setLoginDialogOpen(true);
+    } else {
+      navigate('/recommend');
+    }
+  };
+
   return (
     <div style={{ backgroundColor: "#f0ece8", minHeight: "100vh" }}>
       <Header />
@@ -196,6 +207,15 @@ const Collections = () => {
         </div>
       </div>
       <Footer />
+      {/* Material UI Dialog for login */}
+      <Dialog open={loginDialogOpen} onClose={() => setLoginDialogOpen(false)}>
+        <DialogTitle>Bạn cần đăng nhập</DialogTitle>
+        <DialogContent>Bạn cần đăng nhập để sử dụng tính năng nhận gợi ý khóa học. Bạn có muốn đăng nhập không?</DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLoginDialogOpen(false)}>Hủy</Button>
+          <Button variant="contained" color="primary" onClick={() => { setLoginDialogOpen(false); navigate('/login', { state: { returnUrl: '/recommend' } }); }}>Đăng nhập</Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 };

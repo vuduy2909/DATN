@@ -104,16 +104,20 @@ public class CustomerDayCompletionController {
     /**
      * Khởi tạo completion records cho customer khi bắt đầu course
      * POST /api/customer-progress/initialize
+     * @deprecated KHÔNG SỬ DỤNG - Endpoint này tạo ra nhiều bản ghi null không cần thiết
+     * Giữ lại để tương thích với code cũ, nhưng không nên sử dụng
      */
+    @Deprecated
     @PostMapping("/initialize")
     public ResponseEntity<String> initializeCompletionRecords(
             @RequestParam Integer customerId,
             @RequestParam Integer courseId) {
         
-        log.info("API: Initializing completion records for customer {} in course {}", customerId, courseId);
+        log.warn("DEPRECATED API: Initializing completion records for customer {} in course {} - NOT RECOMMENDED", 
+                customerId, courseId);
         
         completionService.initializeCompletionRecords(customerId, courseId);
-        return ResponseEntity.ok("Completion records initialized successfully");
+        return ResponseEntity.ok("Completion records initialized successfully (DEPRECATED - DO NOT USE)");
     }
     
     /**
@@ -224,6 +228,45 @@ public class CustomerDayCompletionController {
             return ResponseEntity.ok(debugInfo);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Thống kê bản ghi completion trong database
+     * GET /api/customer-progress/statistics
+     */
+    @GetMapping("/statistics")
+    public ResponseEntity<?> getCompletionStatistics() {
+        log.info("API: Getting completion records statistics");
+        
+        try {
+            Map<String, Object> stats = completionService.getCompletionRecordsStatistics();
+            return ResponseEntity.ok(stats);
+        } catch (Exception e) {
+            log.error("Error getting completion statistics", e);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", e.getMessage());
+            return ResponseEntity.status(500).body(errorResponse);
+        }
+    }
+    
+    /**
+     * Dọn dẹp tất cả bản ghi null trong database (admin only)
+     * DELETE /api/customer-progress/cleanup-null-records
+     */
+    @DeleteMapping("/cleanup-null-records")
+    public ResponseEntity<?> cleanupNullCompletionRecords() {
+        log.info("API: Starting cleanup of null completion records");
+        
+        try {
+            Map<String, Object> result = completionService.cleanupNullCompletionRecords();
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.error("Error during null records cleanup", e);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("error", e.getMessage());
+            return ResponseEntity.status(500).body(errorResponse);
         }
     }
 } 

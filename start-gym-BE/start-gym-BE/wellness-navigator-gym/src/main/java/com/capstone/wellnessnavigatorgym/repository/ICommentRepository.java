@@ -21,13 +21,14 @@ public interface ICommentRepository extends JpaRepository<Comment, Integer> {
     Optional<Comment> findCommentById(@Param("id") Integer id);
 
     @Modifying
-    @Query(value = "INSERT INTO `comments` (comment_text, customer_id, exercise_id, course_id, day_id, created_date, updated_date) " +
-            "VALUES (:comment_text, :customer_id, :exercise_id, :course_id, :day_id, NOW(), NOW())", nativeQuery = true)
+    @Query(value = "INSERT INTO `comments` (comment_text, customer_id, exercise_id, course_id, day_id, rating, created_date, updated_date) " +
+            "VALUES (:comment_text, :customer_id, :exercise_id, :course_id, :day_id, :rating, NOW(), NOW())", nativeQuery = true)
     void insertComment(@Param("comment_text") String comment_text,
                         @Param("customer_id") String customer_id,
                         @Param("exercise_id") String exercise_id,
                         @Param("course_id") String course_id,  // Can be null
-                        @Param("day_id") String day_id);       // Can be null
+                        @Param("day_id") String day_id,       // Can be null
+                        @Param("rating") Integer rating);     // Can be null
     
     // Additional queries for new Comment structure
     @Query("SELECT c FROM Comment c ORDER BY c.createdDate DESC")

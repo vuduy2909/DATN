@@ -102,14 +102,26 @@ const Step4 = ({ formData, handleChange, handleNext, handlePrevious }) => {
             <Container maxWidth="md" sx={{ py: 4 }}>
                 {/* Material UI Stepper */}
                 <Paper elevation={2} sx={{ p: 3, mb: 4, borderRadius: 3 }}>
-                    <Stepper activeStep={3} alternativeLabel>
+                    <Stepper activeStep={3} alternativeLabel
+                        sx={{
+                            '& .MuiStep-root': {
+                                '& .MuiStepIcon-root': {
+                                    color: '#e0e0e0',
+                                    '&.Mui-active': { color: '#CF4044' },
+                                    '&.Mui-completed': { color: '#CF4044' },
+                                },
+                                '& .MuiStepConnector-line': { borderColor: '#e0e0e0' },
+                                '& .Mui-active ~ .MuiStepConnector-root .MuiStepConnector-line': { borderColor: '#CF4044' },
+                                '& .Mui-completed ~ .MuiStepConnector-root .MuiStepConnector-line': { borderColor: '#CF4044' },
+                            },
+                            '& .MuiStepConnector-root': {
+                                '& .MuiStepConnector-line': { borderTopWidth: '3px', borderRadius: '1px' },
+                            },
+                        }}
+                    >
                         {steps.map((label, index) => (
                             <Step key={label}>
-                                <StepLabel>
-                                    <Typography variant="caption" sx={{ fontSize: '0.75rem' }}>
-                                        {label}
-                                    </Typography>
-                                </StepLabel>
+                                <StepLabel sx={{ '& .MuiStepLabel-label': { display: 'none' } }} />
                             </Step>
                         ))}
                     </Stepper>

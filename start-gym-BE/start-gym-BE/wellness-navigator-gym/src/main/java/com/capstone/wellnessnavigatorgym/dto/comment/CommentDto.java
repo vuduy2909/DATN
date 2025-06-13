@@ -27,4 +27,6 @@ public class CommentDto {
     private String course;
     
     private String day;
+    
+    private Integer rating;
 }

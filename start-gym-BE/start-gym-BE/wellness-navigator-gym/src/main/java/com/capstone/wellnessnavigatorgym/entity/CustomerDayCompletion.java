@@ -71,11 +71,13 @@ public class CustomerDayCompletion {
     }
     
     // Constructor với các tham số cần thiết
+    // CHỈ được sử dụng khi user thực sự điểm danh thành công
     public CustomerDayCompletion(Customer customer, Course course, Day day) {
         this.customer = customer;
         this.course = course;
         this.day = day;
         this.isCompleted = false;
+        this.completionDate = null; // Sẽ được set khi markAsCompleted() được gọi
     }
     
     // Helper method để đánh dấu hoàn thành

@@ -138,7 +138,7 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
     // Use recommendation data from props or localStorage
     const activeRecommendation = recommendationResult || localRecommendation;
 
-        const handleConfirmRecommendation = async () => {
+    const handleConfirmRecommendation = async () => {
         console.log('=== ENHANCED DEBUG CONFIRM RECOMMENDATION ===');
         console.log('handleConfirmRecommendation called with activeRecommendation:', activeRecommendation);
         
@@ -856,7 +856,7 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
                                 transition: 'all 0.3s ease-in-out'
                             }}
                         >
-                            {confirmed ? 'Đã xác nhận!' : confirmLoading ? 'Đang xử lý...' : 'Xác nhận & Bắt đầu'}
+                            {confirmed ? 'Đã xác nhận!' : confirmLoading ? 'Đang xử lý...' : 'Xác nhận và Bắt đầu'}
                                     </Button>
                     </Box>
                 </Paper>

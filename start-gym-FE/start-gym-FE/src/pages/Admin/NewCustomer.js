@@ -68,6 +68,20 @@ const NewCustomer = () => {
   // Form validation
   const [errors, setErrors] = useState({});
 
+  // Validation checking states
+  const [validationChecking, setValidationChecking] = useState({
+    email: false,
+    username: false,
+    phone: false
+  });
+
+  // Debounce timers
+  const [debounceTimers, setDebounceTimers] = useState({
+    email: null,
+    username: null,
+    phone: null
+  });
+
   const showSnackbar = (message, severity = 'info') => {
     setSnackbar({ open: true, message, severity });
   };
@@ -75,6 +89,128 @@ const NewCustomer = () => {
   const handleSnackbarClose = (event, reason) => {
     if (reason === 'clickaway') return;
     setSnackbar({ ...snackbar, open: false });
+  };
+
+  // Real-time validation functions
+  const checkEmailExists = async (email) => {
+    if (!email || !email.includes('@')) return;
+    
+    try {
+      setValidationChecking(prev => ({ ...prev, email: true }));
+      const response = await axiosInstance.get(`/admin/check-email-exists?email=${encodeURIComponent(email)}`);
+      
+      if (response.data.exists) {
+        setErrors(prev => ({
+          ...prev,
+          customerEmail: response.data.message || 'Email đã được sử dụng'
+        }));
+      } else {
+        setErrors(prev => {
+          const newErrors = { ...prev };
+          delete newErrors.customerEmail;
+          return newErrors;
+        });
+      }
+    } catch (error) {
+      console.error('Error checking email:', error);
+    } finally {
+      setValidationChecking(prev => ({ ...prev, email: false }));
+    }
+  };
+
+  const checkUsernameExists = async (username) => {
+    if (!username || username.length < 3) return;
+    
+    try {
+      setValidationChecking(prev => ({ ...prev, username: true }));
+      const response = await axiosInstance.get(`/admin/check-username-exists?username=${encodeURIComponent(username)}`);
+      
+      if (response.data.exists) {
+        setErrors(prev => ({
+          ...prev,
+          username: response.data.message || 'Tên đăng nhập đã được sử dụng'
+        }));
+      } else {
+        setErrors(prev => {
+          const newErrors = { ...prev };
+          delete newErrors.username;
+          return newErrors;
+        });
+      }
+    } catch (error) {
+      console.error('Error checking username:', error);
+    } finally {
+      setValidationChecking(prev => ({ ...prev, username: false }));
+    }
+  };
+
+  const checkPhoneExists = async (phone) => {
+    if (!phone || phone.length < 10) return;
+    
+    try {
+      setValidationChecking(prev => ({ ...prev, phone: true }));
+      const response = await axiosInstance.get(`/admin/check-phone-exists?phone=${encodeURIComponent(phone)}`);
+      
+      if (response.data.exists) {
+        setErrors(prev => ({
+          ...prev,
+          customerPhone: `${response.data.message}${response.data.customerName ? ` (${response.data.customerName})` : ''}`
+        }));
+      } else {
+        setErrors(prev => {
+          const newErrors = { ...prev };
+          delete newErrors.customerPhone;
+          return newErrors;
+        });
+      }
+    } catch (error) {
+      console.error('Error checking phone:', error);
+    } finally {
+      setValidationChecking(prev => ({ ...prev, phone: false }));
+    }
+  };
+
+  // Debounced validation functions
+  const debouncedCheckEmail = (email) => {
+    // Clear existing timer
+    if (debounceTimers.email) {
+      clearTimeout(debounceTimers.email);
+    }
+    
+    // Set new timer
+    const timerId = setTimeout(() => {
+      checkEmailExists(email);
+    }, 800); // 800ms delay
+    
+    setDebounceTimers(prev => ({ ...prev, email: timerId }));
+  };
+
+  const debouncedCheckUsername = (username) => {
+    // Clear existing timer
+    if (debounceTimers.username) {
+      clearTimeout(debounceTimers.username);
+    }
+    
+    // Set new timer
+    const timerId = setTimeout(() => {
+      checkUsernameExists(username);
+    }, 800); // 800ms delay
+    
+    setDebounceTimers(prev => ({ ...prev, username: timerId }));
+  };
+
+  const debouncedCheckPhone = (phone) => {
+    // Clear existing timer
+    if (debounceTimers.phone) {
+      clearTimeout(debounceTimers.phone);
+    }
+    
+    // Set new timer
+    const timerId = setTimeout(() => {
+      checkPhoneExists(phone);
+    }, 800); // 800ms delay
+    
+    setDebounceTimers(prev => ({ ...prev, phone: timerId }));
   };
 
   // Fetch customer types
@@ -93,6 +229,16 @@ const NewCustomer = () => {
   useEffect(() => {
     fetchCustomerTypes();
   }, []);
+
+  // Cleanup debounce timers on unmount
+  useEffect(() => {
+    return () => {
+      // Clear all debounce timers when component unmounts
+      Object.values(debounceTimers).forEach(timer => {
+        if (timer) clearTimeout(timer);
+      });
+    };
+  }, [debounceTimers]);
 
   // Password validation function
   const validatePassword = (password) => {
@@ -165,12 +311,33 @@ const NewCustomer = () => {
       [name]: value
     }));
     
-    // Clear error when user starts typing
-    if (errors[name]) {
+    // Clear error when user starts typing (except for duplicate check errors)
+    if (errors[name] && !['Email đã được sử dụng', 'Tên đăng nhập đã được sử dụng', 'Số điện thoại đã được sử dụng'].some(msg => errors[name].includes(msg))) {
       setErrors(prev => ({
         ...prev,
         [name]: ''
       }));
+    }
+
+    // Trigger real-time validation for specific fields
+    switch (name) {
+      case 'customerEmail':
+        if (value && value.includes('@')) {
+          debouncedCheckEmail(value);
+        }
+        break;
+      case 'username':
+        if (value && value.length >= 3) {
+          debouncedCheckUsername(value);
+        }
+        break;
+      case 'customerPhone':
+        if (value && value.length >= 10) {
+          debouncedCheckPhone(value);
+        }
+        break;
+      default:
+        break;
     }
   };
 
@@ -257,7 +424,7 @@ const NewCustomer = () => {
 
       console.log('Submitting customer data:', customerData);
       
-      await axiosInstance.post('/admin/customer/create', customerData);
+      await axiosInstance.post('/admin/customers', customerData);
       
       showSnackbar('Tạo khách hàng thành công! 🎉', 'success');
       
@@ -343,7 +510,10 @@ const NewCustomer = () => {
                     required
                     variant="outlined"
                     error={!!errors.customerEmail}
-                    helperText={errors.customerEmail}
+                    helperText={errors.customerEmail || (validationChecking.email ? 'Đang kiểm tra email...' : '')}
+                    InputProps={{
+                      endAdornment: validationChecking.email ? <CircularProgress size={20} /> : null
+                    }}
                   />
                 </Grid>
 
@@ -358,7 +528,10 @@ const NewCustomer = () => {
                     variant="outlined"
                     placeholder="10-11 digits"
                     error={!!errors.customerPhone}
-                    helperText={errors.customerPhone}
+                    helperText={errors.customerPhone || (validationChecking.phone ? 'Đang kiểm tra số điện thoại...' : '')}
+                    InputProps={{
+                      endAdornment: validationChecking.phone ? <CircularProgress size={20} /> : null
+                    }}
                   />
                 </Grid>
 
@@ -498,7 +671,10 @@ const NewCustomer = () => {
                     variant="outlined"
                     placeholder="Enter username for login"
                     error={!!errors.username}
-                    helperText={errors.username}
+                    helperText={errors.username || (validationChecking.username ? 'Đang kiểm tra tên đăng nhập...' : '')}
+                    InputProps={{
+                      endAdornment: validationChecking.username ? <CircularProgress size={20} /> : null
+                    }}
                   />
                 </Grid>
 

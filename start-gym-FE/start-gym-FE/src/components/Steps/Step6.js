@@ -29,8 +29,10 @@ import {
 } from '@mui/icons-material';
 import BodyImageAnalyzer from '../BodyImageAnalyzer';
 import UserFormService from '../../services/UserFormService';
+import { useAuth } from '../../AuthContext';
 
 const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
+    const { user } = useAuth();
     const [submitting, setSubmitting] = useState(false);
     const [analysisTimestamp, setAnalysisTimestamp] = useState(Date.now()); // Force re-render when analysis updates
 
@@ -44,69 +46,151 @@ const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
         '7'
     ];
     
-    // Load saved bodyType from analysis when component mounts
+    // Helper để lấy key localStorage riêng cho từng user cho kết quả phân tích
+    const getAnalysisStorageKey = () => {
+        const userId = user?.id || user?.customerId || user?.username || 'anonymous';
+        return `analysisResult_${userId}`;
+    };
+
+    // Helper để lấy key localStorage riêng cho từng user cho ảnh phân tích
+    const getImageStorageKey = () => {
+        const userId = user?.id || user?.customerId || user?.username || 'anonymous';
+        return `analysisImage_${userId}`;
+    };
+
+    // Load saved analysis result và ảnh khi component mount
     useEffect(() => {
         try {
-            const savedAnalysisData = localStorage.getItem('bodyImageAnalysisData');
-            if (savedAnalysisData) {
-                const parsedData = JSON.parse(savedAnalysisData);
-                if (parsedData.analysisResult && parsedData.analysisResult.bodyType) {
-                    const savedBodyType = parsedData.analysisResult.bodyType;
-                    
-                    // Only update if current bodyType is different and saved one is valid
-                    if (savedBodyType !== formData.bodyType && savedBodyType !== 'Unknown') {
-                        console.log('🔄 Restoring bodyType from saved analysis:', savedBodyType);
-                        handleChange({
-                            target: {
-                                name: 'bodyType',
-                                value: savedBodyType.trim(),
-                            },
-                        });
-                        setAnalysisTimestamp(Date.now());
-                    }
+            // Load analysis result
+            const analysisKey = getAnalysisStorageKey();
+            const savedAnalysis = localStorage.getItem(analysisKey);
+            if (savedAnalysis) {
+                const parsed = JSON.parse(savedAnalysis);
+                // Gọi handleChange để cập nhật lại formData nếu cần
+                if (parsed && parsed.bodyType && parsed.bodyType !== formData.bodyType) {
+                    handleChange({ target: { name: 'bodyType', value: parsed.bodyType } });
+                }
+                if (parsed && parsed.comment && parsed.comment !== formData.comment) {
+                    handleChange({ target: { name: 'comment', value: parsed.comment } });
+                }
+                if (parsed && parsed.recommendation && parsed.recommendation !== formData.recommendation) {
+                    handleChange({ target: { name: 'recommendation', value: parsed.recommendation } });
+                }
+                setAnalysisTimestamp(Date.now());
+            }
+
+            // Load saved image
+            const imageKey = getImageStorageKey();
+            const savedImageData = localStorage.getItem(imageKey);
+            if (savedImageData) {
+                const imageData = JSON.parse(savedImageData);
+                // Set saved image data để component BodyImageAnalyzer có thể sử dụng
+                if (window.setSavedAnalysisImage) {
+                    window.setSavedAnalysisImage(imageData);
                 }
             }
-        } catch (error) {
-            console.error('Error loading saved bodyType:', error);
+        } catch (e) {
+            console.error('Error loading analysis data from localStorage:', e);
         }
-    }, []); // Only run on mount
+    }, [user]);
 
     // Xử lý khi phân tích ảnh hoàn tất hoặc khi các trường đo lường được cập nhật
-    const handleAnalysisComplete = (bodyType, measurementChange = null) => {
-        console.log('=== STEP6: BODY TYPE UPDATE ===');
-        console.log('Body type received from Claude API:', bodyType);
-        console.log('Current formData.bodyType:', formData.bodyType);
-        console.log('Measurement change:', measurementChange);
+    const handleAnalysisComplete = (bodyType, measurementChange = null, analysisData = null) => {
+        console.log('=== STEP6: ANALYSIS COMPLETE ===');
+        console.log('Body type received:', bodyType);
+        console.log('Analysis data:', analysisData);
         
         // Update body type - ưu tiên kết quả từ Claude API
         if (bodyType && bodyType !== 'Unknown' && typeof bodyType === 'string') {
-            console.log('✅ Updating body type from Claude API:', bodyType);
+            console.log('✅ Updating body type from analysis:', bodyType);
             
             // Ensure the bodyType is properly updated in formData
             handleChange({
                 target: {
                     name: 'bodyType',
-                    value: bodyType.trim(), // Remove any whitespace
+                    value: bodyType.trim(),
                 },
             });
             
-            console.log('Body type updated to:', bodyType.trim());
-            
             // Force re-render of current data display
             setAnalysisTimestamp(Date.now());
-        } else {
-            console.log('❌ No valid body type from Claude API, keeping existing value:', formData.bodyType);
         }
         
         // If we have measurement changes, update those too
         if (measurementChange && measurementChange.target) {
             console.log('📏 Updating measurements:', measurementChange);
             handleChange(measurementChange);
-            // Also force re-render for measurement updates
             setAnalysisTimestamp(Date.now());
         }
+
+        // Lưu kết quả phân tích vào localStorage theo user
+        try {
+            const analysisKey = getAnalysisStorageKey();
+            const dataToSave = {
+                bodyType: bodyType || formData.bodyType,
+                comment: analysisData?.analysis || formData.comment,
+                recommendation: analysisData?.recommendations || formData.recommendation,
+                timestamp: Date.now()
+            };
+            localStorage.setItem(analysisKey, JSON.stringify(dataToSave));
+            console.log('✅ Analysis result saved to localStorage');
+        } catch (e) {
+            console.error('Error saving analysis result to localStorage:', e);
+        }
+
+        // Lưu ảnh phân tích vào localStorage theo user (nếu có)
+        if (analysisData && analysisData.imageBase64) {
+            try {
+                const imageKey = getImageStorageKey();
+                const imageDataToSave = {
+                    imageBase64: analysisData.imageBase64,
+                    bodyType: bodyType,
+                    analysis: analysisData.analysis,
+                    recommendations: analysisData.recommendations,
+                    timestamp: Date.now()
+                };
+                localStorage.setItem(imageKey, JSON.stringify(imageDataToSave));
+                console.log('✅ Analysis image saved to localStorage');
+            } catch (e) {
+                console.error('Error saving analysis image to localStorage:', e);
+            }
+        }
         
-        console.log('=== END STEP6: BODY TYPE UPDATE ===');
+        console.log('=== END STEP6: ANALYSIS COMPLETE ===');
+    };
+
+    // Hàm để xóa ảnh và kết quả phân tích đã lưu
+    const clearSavedAnalysis = () => {
+        try {
+            const analysisKey = getAnalysisStorageKey();
+            const imageKey = getImageStorageKey();
+            localStorage.removeItem(analysisKey);
+            localStorage.removeItem(imageKey);
+            
+            // Reset formData
+            handleChange({ target: { name: 'bodyType', value: '' } });
+            handleChange({ target: { name: 'comment', value: '' } });
+            handleChange({ target: { name: 'recommendation', value: '' } });
+            
+            setAnalysisTimestamp(Date.now());
+            console.log('✅ Cleared saved analysis data');
+        } catch (e) {
+            console.error('Error clearing saved analysis:', e);
+        }
+    };
+
+    // Hàm để lấy ảnh đã lưu
+    const getSavedAnalysisImage = () => {
+        try {
+            const imageKey = getImageStorageKey();
+            const savedImageData = localStorage.getItem(imageKey);
+            if (savedImageData) {
+                return JSON.parse(savedImageData);
+            }
+        } catch (e) {
+            console.error('Error getting saved analysis image:', e);
+        }
+        return null;
     };
 
     const handleSubmit = async () => {
@@ -368,6 +452,65 @@ const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
 
                             <Divider sx={{ my: 3 }} />
                             
+                            {/* Hiển thị ảnh đã lưu nếu có */}
+                            {(() => {
+                                const savedImage = getSavedAnalysisImage();
+                                return savedImage ? (
+                                    <Card elevation={2} sx={{ mb: 4, borderRadius: 3, bgcolor: '#f8f9fa' }}>
+                                        <CardContent sx={{ p: 3 }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                                                <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#2c3e50' }}>
+                                                    📸 Ảnh phân tích đã lưu
+                                                </Typography>
+                                                <Button
+                                                    variant="outlined"
+                                                    color="error"
+                                                    size="small"
+                                                    onClick={clearSavedAnalysis}
+                                                    sx={{ minWidth: 'auto' }}
+                                                >
+                                                    Xóa ảnh cũ
+                                                </Button>
+                                            </Box>
+                                            <Grid container spacing={3}>
+                                                <Grid item xs={12} md={4}>
+                                                    <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                                                        <img
+                                                            src={`data:image/jpeg;base64,${savedImage.imageBase64}`}
+                                                            alt="Ảnh phân tích đã lưu"
+                                                            style={{
+                                                                maxWidth: '100%',
+                                                                maxHeight: '300px',
+                                                                borderRadius: '8px',
+                                                                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                                                            }}
+                                                        />
+                                                    </Box>
+                                                </Grid>
+                                                <Grid item xs={12} md={8}>
+                                                    <Typography variant="body2" sx={{ mb: 1, color: '#666' }}>
+                                                        <strong>Loại hình thể:</strong> {savedImage.bodyType}
+                                                    </Typography>
+                                                    {savedImage.analysis && (
+                                                        <Typography variant="body2" sx={{ mb: 1, color: '#666' }}>
+                                                            <strong>Phân tích:</strong> {savedImage.analysis.substring(0, 200)}...
+                                                        </Typography>
+                                                    )}
+                                                    {savedImage.recommendations && (
+                                                        <Typography variant="body2" sx={{ color: '#666' }}>
+                                                            <strong>Đề xuất:</strong> {savedImage.recommendations.substring(0, 200)}...
+                                                        </Typography>
+                                                    )}
+                                                    <Typography variant="caption" sx={{ display: 'block', mt: 2, color: '#999' }}>
+                                                        Lưu lúc: {new Date(savedImage.timestamp).toLocaleString('vi-VN')}
+                                                    </Typography>
+                                                </Grid>
+                                            </Grid>
+                                        </CardContent>
+                                    </Card>
+                                ) : null;
+                            })()}
+
                             {/* Component phân tích ảnh */}
                             <BodyImageAnalyzer 
                                 formData={formData} 
@@ -379,7 +522,7 @@ const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
                     {/* Current Data Summary */}
                     {(formData.bodyType || formData.chestSize || formData.waistSize) && (
                         <Card 
-                            key={`current-data-${analysisTimestamp}`} // Force re-render when analysis updates
+                            key={`current-data-${analysisTimestamp}`}
                             elevation={2} 
                             sx={{ mb: 4, borderRadius: 3, bgcolor: '#f8f9fa' }}
                         >
@@ -387,23 +530,12 @@ const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
                                 <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#2c3e50', mb: 2, textAlign: 'center' }}>
                                     📊 Dữ liệu hiện tại
                                 </Typography>
-                                
-                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center' }}>
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center', alignItems: 'center' }}>
                                     {formData.bodyType && (
-                                        <Chip 
-                                            label={`Dáng người: ${formData.bodyType}`}
+                                        <Chip
+                                            label={`Loại hình thể: ${formData.bodyType || 'Chưa xác định'}`}
                                             color="primary"
-                                            sx={{ 
-                                                bgcolor: '#e8f5e8',
-                                                color: '#2e7d32',
-                                                fontWeight: 'bold',
-                                                animation: formData.bodyType && analysisTimestamp > Date.now() - 3000 ? 'pulse 2s ease-in-out 3' : 'none',
-                                                '@keyframes pulse': {
-                                                    '0%': { transform: 'scale(1)' },
-                                                    '50%': { transform: 'scale(1.05)' },
-                                                    '100%': { transform: 'scale(1)' }
-                                                }
-                                            }}
+                                            sx={{ fontWeight: 'bold', fontSize: 16, bgcolor: '#CF4044', color: 'white' }}
                                         />
                                     )}
                                     {formData.chestSize && (

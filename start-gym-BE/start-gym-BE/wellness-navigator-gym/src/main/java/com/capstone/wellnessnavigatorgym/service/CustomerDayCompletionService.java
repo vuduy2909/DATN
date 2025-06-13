@@ -9,6 +9,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
@@ -37,6 +40,9 @@ public class CustomerDayCompletionService {
 
     @Autowired
     private ICustomerCourseService customerCourseService;
+    
+    @PersistenceContext
+    private EntityManager entityManager;
 
     private static final LocalTime ATTENDANCE_START_TIME = LocalTime.of(7, 0); // 7:00 AM
     private static final LocalTime ATTENDANCE_END_TIME = LocalTime.of(22, 0); // 10:00 PM
@@ -69,13 +75,8 @@ public class CustomerDayCompletionService {
         }
         */
 
-        // QUAN TRỌNG: Chỉ kiểm tra điểm danh cho cụ thể (customer_id, course_id, day_id)
-        // Không giới hạn điểm danh across courses - user có thể điểm danh cùng day_id ở nhiều course khác nhau
-        Optional<CustomerDayCompletion> existingCompletion = completionRepository.findByCustomerAndCourseAndDay(customerId, courseId, dayId);
-        
-        if (existingCompletion.isPresent() && existingCompletion.get().getIsCompleted()) {
-            throw new AttendanceException("Bạn đã điểm danh Day " + dayId + " của khóa học này rồi!");
-        }
+        // QUAN TRỌNG: Kiểm tra điểm danh trùng lặp sẽ được thực hiện trong createCompletionRecordOnSuccess
+        // Ở đây chỉ cần kiểm tra các điều kiện khác
 
         // QUAN TRỌNG: Kiểm tra one-day-one-attendance per course per calendar day
         // User chỉ được điểm danh 1 lần cho mỗi khóa học trong 1 ngày
@@ -115,6 +116,7 @@ public class CustomerDayCompletionService {
     
     /**
      * Đánh dấu một buổi học là đã hoàn thành
+     * CHỈ tạo bản ghi khi user thực sự điểm danh thành công
      */
     public CustomerDayCompletion markDayAsCompleted(Integer customerId, Integer courseId, Integer dayId) {
         log.info("Marking day {} as completed for customer {} in course {}", dayId, customerId, courseId);
@@ -122,10 +124,10 @@ public class CustomerDayCompletionService {
         // Kiểm tra các điều kiện điểm danh
         validateAttendance(customerId, courseId, dayId);
         
-        // Tìm hoặc tạo completion record
-        CustomerDayCompletion completion = findOrCreateCompletion(customerId, courseId, dayId);
+        // CHỈ tạo bản ghi khi điểm danh thành công - không tạo trước
+        CustomerDayCompletion completion = createCompletionRecordOnSuccess(customerId, courseId, dayId);
         
-        // Đánh dấu hoàn thành
+        // Đánh dấu hoàn thành ngay khi tạo
         completion.markAsCompleted();
         
         CustomerDayCompletion savedCompletion = completionRepository.save(completion);
@@ -167,36 +169,30 @@ public class CustomerDayCompletionService {
     
     /**
      * Lấy tiến độ hoàn thành của customer trong một course
+     * KHÔNG tự động tạo completion records - chỉ đếm những gì đã thực sự điểm danh
      */
     public CourseProgressDTO getCourseProgress(Integer customerId, Integer courseId) {
-        // Đếm số ngày đã hoàn thành từ bảng customer_day_completion
+        // Đếm số ngày đã hoàn thành từ bảng customer_day_completion (chỉ những bản ghi thực sự có)
         Long completedDays = completionRepository.countCompletedDaysByCustomerAndCourse(customerId, courseId);
         
-        // QUAN TRỌNG: Đếm tổng số ngày từ bảng course_days, không phải từ completion records
+        // QUAN TRỌNG: Đếm tổng số ngày từ bảng course_days
         Long totalDays = courseDayRepository.countByCourseId(courseId);
         
-        // Nếu course không có ngày nào trong course_days, khởi tạo completion records
+        // Nếu course không có ngày nào trong course_days, đây là lỗi cấu hình
         if (totalDays == 0) {
-            log.warn("Course {} has no days in course_days table, initializing...", courseId);
-            initializeCompletionRecords(customerId, courseId);
-            totalDays = courseDayRepository.countByCourseId(courseId);
+            log.warn("Course {} has no days in course_days table!", courseId);
+            totalDays = 1L; // Set minimum để tránh lỗi chia cho 0
         }
         
-        // Nếu chưa có completion records cho customer này, tạo chúng
-        Long existingCompletionRecords = completionRepository.countTotalDaysByCustomerAndCourse(customerId, courseId);
-        if (existingCompletionRecords == 0 && totalDays > 0) {
-            log.info("No completion records found for customer {} in course {}, initializing...", customerId, courseId);
-            initializeCompletionRecords(customerId, courseId);
-            // Đếm lại số ngày đã hoàn thành sau khi khởi tạo
-            completedDays = completionRepository.countCompletedDaysByCustomerAndCourse(customerId, courseId);
-        }
+        // KHÔNG tự động tạo completion records nữa
+        // Chỉ tính progress dựa trên những gì user đã thực sự điểm danh
         
         Boolean isCompleted = false;
         if (totalDays > 0) {
             isCompleted = completedDays.equals(totalDays);
         }
         
-        log.info("Course progress for customer {} in course {}: {}/{} days completed", 
+        log.info("Course progress for customer {} in course {}: {}/{} days completed (no auto-initialization)", 
                 customerId, courseId, completedDays, totalDays);
         
         return new CourseProgressDTO(
@@ -210,22 +206,25 @@ public class CustomerDayCompletionService {
     
     /**
      * Lấy danh sách tất cả completion records của customer trong course
+     * CHỈ trả về những ngày đã thực sự điểm danh (có completion_date)
      */
     public List<CustomerDayCompletion> getCustomerCourseCompletions(Integer customerId, Integer courseId) {
         List<CustomerDayCompletion> completions = completionRepository.findByCustomerAndCourse(customerId, courseId);
         
-        // Nếu chưa có completion records, tạo chúng
-        if (completions.isEmpty()) {
-            initializeCompletionRecords(customerId, courseId);
-            completions = completionRepository.findByCustomerAndCourse(customerId, courseId);
-        }
+        // KHÔNG tự động tạo completion records nữa
+        // Chỉ trả về những gì user đã thực sự điểm danh
+        log.info("Found {} actual completion records for customer {} in course {}", 
+                completions.size(), customerId, courseId);
         
         return completions;
     }
     
     /**
      * Khởi tạo completion records cho customer khi bắt đầu course
+     * @deprecated KHÔNG SỬ DỤNG - Method này tạo ra nhiều bản ghi null không cần thiết
+     * Chỉ giữ lại để tương thích với code cũ, nhưng không được gọi trong logic mới
      */
+    @Deprecated
     public void initializeCompletionRecords(Integer customerId, Integer courseId) {
         log.info("Initializing completion records for customer {} in course {}", customerId, courseId);
         
@@ -291,7 +290,129 @@ public class CustomerDayCompletionService {
     }
     
     /**
-     * Tìm hoặc tạo completion record
+     * Dọn dẹp tất cả bản ghi null (completion_date = null) trong database
+     * CHỈ giữ lại những bản ghi đã thực sự điểm danh (completion_date không null)
+     */
+    @Transactional
+    public Map<String, Object> cleanupNullCompletionRecords() {
+        log.info("Starting cleanup of null completion records (completion_date = null)");
+        
+        try {
+            // Đếm số bản ghi null trước khi xóa
+            String countNullSql = "SELECT COUNT(*) FROM customer_day_completion WHERE completion_date IS NULL";
+            javax.persistence.Query countQuery = entityManager.createNativeQuery(countNullSql);
+            Number nullRecordsCount = (Number) countQuery.getSingleResult();
+            
+            // Đếm tổng số bản ghi
+            String countTotalSql = "SELECT COUNT(*) FROM customer_day_completion";
+            javax.persistence.Query countTotalQuery = entityManager.createNativeQuery(countTotalSql);
+            Number totalRecordsCount = (Number) countTotalQuery.getSingleResult();
+            
+            // Xóa tất cả bản ghi có completion_date = null
+            String deleteSql = "DELETE FROM customer_day_completion WHERE completion_date IS NULL";
+            javax.persistence.Query deleteQuery = entityManager.createNativeQuery(deleteSql);
+            int deletedCount = deleteQuery.executeUpdate();
+            
+            // Đếm số bản ghi còn lại sau khi xóa
+            Number remainingRecordsCount = (Number) countTotalQuery.getSingleResult();
+            
+            Map<String, Object> result = new HashMap<>();
+            result.put("totalRecordsBefore", totalRecordsCount.intValue());
+            result.put("nullRecordsDeleted", deletedCount);
+            result.put("remainingRecords", remainingRecordsCount.intValue());
+            result.put("cleanupTime", LocalDateTime.now());
+            result.put("success", true);
+            result.put("message", String.format("Đã xóa %d bản ghi null, còn lại %d bản ghi thực sự", 
+                    deletedCount, remainingRecordsCount.intValue()));
+            
+            log.info("Cleanup completed: Deleted {} null records, {} records remaining", 
+                    deletedCount, remainingRecordsCount.intValue());
+            
+            return result;
+            
+        } catch (Exception e) {
+            log.error("Error during cleanup of null completion records", e);
+            
+            Map<String, Object> errorResult = new HashMap<>();
+            errorResult.put("success", false);
+            errorResult.put("error", e.getMessage());
+            errorResult.put("cleanupTime", LocalDateTime.now());
+            
+            return errorResult;
+        }
+    }
+    
+    /**
+     * Thống kê số lượng bản ghi null và thực tế trong database
+     */
+    public Map<String, Object> getCompletionRecordsStatistics() {
+        try {
+            // Đếm tổng số bản ghi
+            String totalSql = "SELECT COUNT(*) FROM customer_day_completion";
+            javax.persistence.Query totalQuery = entityManager.createNativeQuery(totalSql);
+            Number totalRecords = (Number) totalQuery.getSingleResult();
+            
+            // Đếm số bản ghi null
+            String nullSql = "SELECT COUNT(*) FROM customer_day_completion WHERE completion_date IS NULL";
+            javax.persistence.Query nullQuery = entityManager.createNativeQuery(nullSql);
+            Number nullRecords = (Number) nullQuery.getSingleResult();
+            
+            // Đếm số bản ghi thực tế (có completion_date)
+            String actualSql = "SELECT COUNT(*) FROM customer_day_completion WHERE completion_date IS NOT NULL";
+            javax.persistence.Query actualQuery = entityManager.createNativeQuery(actualSql);
+            Number actualRecords = (Number) actualQuery.getSingleResult();
+            
+            Map<String, Object> stats = new HashMap<>();
+            stats.put("totalRecords", totalRecords.intValue());
+            stats.put("nullRecords", nullRecords.intValue());
+            stats.put("actualRecords", actualRecords.intValue());
+            stats.put("nullPercentage", totalRecords.intValue() > 0 ? 
+                    (nullRecords.doubleValue() / totalRecords.doubleValue() * 100) : 0);
+            stats.put("timestamp", LocalDateTime.now());
+            
+            log.info("Completion records statistics: Total={}, Null={}, Actual={}", 
+                    totalRecords.intValue(), nullRecords.intValue(), actualRecords.intValue());
+            
+            return stats;
+            
+        } catch (Exception e) {
+            log.error("Error getting completion records statistics", e);
+            Map<String, Object> errorStats = new HashMap<>();
+            errorStats.put("error", e.getMessage());
+            errorStats.put("timestamp", LocalDateTime.now());
+            return errorStats;
+        }
+    }
+    
+    /**
+     * CHỈ tạo completion record khi user điểm danh thành công
+     * Không tạo trước các bản ghi cho ngày chưa điểm danh
+     */
+    private CustomerDayCompletion createCompletionRecordOnSuccess(Integer customerId, Integer courseId, Integer dayId) {
+        // Kiểm tra xem đã có bản ghi chưa - nếu có thì báo lỗi
+        Optional<CustomerDayCompletion> existing = completionRepository
+                .findByCustomerAndCourseAndDay(customerId, courseId, dayId);
+        
+        if (existing.isPresent()) {
+            throw new AttendanceException("Bạn đã điểm danh ngày " + dayId + " của khóa học này rồi!");
+        }
+        
+        // Tạo mới bản ghi chỉ khi điểm danh thành công
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new RuntimeException("Customer not found: " + customerId));
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new RuntimeException("Course not found: " + courseId));
+        Day day = dayRepository.findById(dayId)
+                .orElseThrow(() -> new RuntimeException("Day not found: " + dayId));
+        
+        log.info("Creating new completion record for customer {} course {} day {} on successful attendance", 
+                customerId, courseId, dayId);
+        
+        return new CustomerDayCompletion(customer, course, day);
+    }
+    
+    /**
+     * Tìm hoặc tạo completion record (chỉ dùng cho markDayAsIncomplete)
      */
     private CustomerDayCompletion findOrCreateCompletion(Integer customerId, Integer courseId, Integer dayId) {
         Optional<CustomerDayCompletion> existing = completionRepository

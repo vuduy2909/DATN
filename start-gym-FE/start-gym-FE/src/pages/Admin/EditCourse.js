@@ -616,7 +616,7 @@ const EditCourse = () => {
                                                 </Avatar>
                                                 <ListItemText
                                                     primary={exercise.exerciseName}
-                                                    secondary={`Target: ${exercise.target} • Reps: ${exercise.reps || 'Not specified'}`}
+                                                    secondary={`Target: ${exercise.target} `}
                                                 />
                                                 <ListItemSecondaryAction>
                                                     <IconButton

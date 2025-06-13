@@ -29,4 +29,7 @@ public interface ITrackDataAiRepository extends JpaRepository<TrackDataAi, Integ
             "WHERE t.age = :#{#userDataDTO.age} AND " +
             "t.gender = :#{#userDataDTO.gender}")
     List<TrackDataAi> findByAgeAndGender(@Param("userDataDTO") UserDataDTO userDataDTO);
+
+    @Query(value = "SELECT COALESCE(MAX(track_data_ai_id), 0) FROM track_data_ai", nativeQuery = true)
+    Integer findMaxTrackDataAiId();
 }

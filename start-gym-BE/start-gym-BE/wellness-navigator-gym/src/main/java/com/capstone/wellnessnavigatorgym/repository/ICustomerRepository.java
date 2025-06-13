@@ -123,6 +123,10 @@ public interface ICustomerRepository extends JpaRepository<Customer, Integer> {
             "WHERE c.customer_email = :email AND c.is_enable = true", nativeQuery = true)
     Customer findByCustomerEmail(@Param("email") String email);
 
+    @Query(value = "SELECT c.* FROM customer c " +
+            "WHERE c.customer_phone = :phone", nativeQuery = true)
+    Customer findByCustomerPhone(@Param("phone") String phone);
+
     @Query(value = "SELECT a.customer_id, a.customer_name, a.customer_phone, a.customer_gender, a.customer_date_of_birth, " +
             "a.customer_address, a.is_delete, a.is_enable, u.user_id, a.create_time, " +
             "a.email, u.user_data_id, u.age, u.bmi, u.gender, u.training_goals, u.training_history, " +
@@ -214,4 +218,7 @@ public interface ICustomerRepository extends JpaRepository<Customer, Integer> {
             "HAVING suggested_type_id IS NOT NULL AND suggested_type_id != current_type_id", 
             nativeQuery = true)
     List<Tuple> findCustomersNeedingTypeUpdate();
+
+    // Lấy customer mới nhất theo id giảm dần
+    Customer findTopByOrderByCustomerIdDesc();
 }

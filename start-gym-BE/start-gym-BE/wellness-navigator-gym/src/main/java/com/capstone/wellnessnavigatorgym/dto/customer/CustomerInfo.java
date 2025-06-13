@@ -2,6 +2,7 @@ package com.capstone.wellnessnavigatorgym.dto.customer;
 
 import com.capstone.wellnessnavigatorgym.entity.Account;
 import com.capstone.wellnessnavigatorgym.entity.CustomerType;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.AllArgsConstructor;
@@ -47,9 +48,8 @@ public class CustomerInfo {
     private String customerGender;
 
     @NotNull(message = "Please enter date of birth")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
     private Date dateOfBirth;
-
-
 
     @NotBlank(message = "Please enter your address")
     @Length(min = 5,max = 100, message = "The address must be at least 5 and maximum 100 characters")

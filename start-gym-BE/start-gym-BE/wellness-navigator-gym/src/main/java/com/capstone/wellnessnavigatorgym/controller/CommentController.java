@@ -96,4 +96,27 @@ public class CommentController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
+
+    @PutMapping("/{id}/report")
+    public ResponseEntity<?> reportComment(@PathVariable Integer id, @RequestBody Map<String, String> body) {
+        try {
+            String reason = body.getOrDefault("reportReason", "");
+            Comment comment = commentService.findCommentById(id);
+            comment.setIsReported(true);
+            comment.setReportCount(comment.getReportCount() == null ? 1 : comment.getReportCount() + 1);
+            comment.setReportReason(reason);
+            commentService.saveComment(comment); // save lại comment đã update
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Comment reported successfully");
+            response.put("commentId", comment.getCommentId());
+            response.put("reportCount", comment.getReportCount());
+            response.put("isReported", comment.getIsReported());
+            response.put("reportReason", comment.getReportReason());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+        }
+    }
 }
