@@ -52,7 +52,9 @@ import {
     Done as DoneIcon,
     Cancel as CancelIcon,
     Image as ImageIcon,
-    CloudUpload as CloudUploadIcon
+    CloudUpload as CloudUploadIcon,
+    Visibility as VisibilityIcon,
+    VisibilityOff as VisibilityOffIcon
 } from '@mui/icons-material';
 import { axiosInstance, getImageUrl } from '../../utils/axiosInstance';
 import { useDialogs } from '../../components/MaterialUIDialogs';
@@ -66,6 +68,7 @@ const EditCourse = () => {
     const [course, setCourse] = useState(null);
     const [courseDays, setCourseDays] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [actionLoading, setActionLoading] = useState(false);
     const [exercises, setExercises] = useState([]);
     const [courseTypes, setCourseTypes] = useState([]);
     const [imageFile, setImageFile] = useState(null);
@@ -77,7 +80,7 @@ const EditCourse = () => {
     const [imageDialog, setImageDialog] = useState(false);
     
     // Form states
-    const [newDayName, setNewDayName] = useState('');
+    const [nextDayName, setNextDayName] = useState('');
     const [selectedExercise, setSelectedExercise] = useState('');
     const [exerciseOrder, setExerciseOrder] = useState(1);
     
@@ -98,10 +101,23 @@ const EditCourse = () => {
 
     // Fetch data
     useEffect(() => {
-        fetchCourseDetails();
-        fetchCourseDays();
-        fetchExercises();
-        fetchCourseTypes();
+        const fetchData = async () => {
+            try {
+                setLoading(true);
+                await Promise.all([
+                    fetchCourseDetails(),
+                    fetchCourseDays(),
+                    fetchExercises(),
+                    fetchCourseTypes()
+                ]);
+            } catch (error) {
+                console.error('Error fetching initial data:', error);
+                showSnackbar('Failed to load course data', 'error');
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
     }, [courseId]);
 
     const fetchCourseTypes = async () => {
@@ -116,8 +132,6 @@ const EditCourse = () => {
 
     const fetchCourseDetails = async () => {
         try {
-            setLoading(true);
-            // Use the admin API endpoint
             const response = await axiosInstance.get(`/admin/courses/${courseId}`);
             setCourse(response.data);
         } catch (error) {
@@ -128,21 +142,19 @@ const EditCourse = () => {
 
     const fetchCourseDays = async () => {
         try {
-            setLoading(true);
-            // This endpoint would need to be implemented in the backend
             const response = await axiosInstance.get(`/admin/courses/${courseId}/days`);
-            setCourseDays(response.data || []);
+            if (response.data) {
+                setCourseDays(response.data);
+            }
         } catch (error) {
             console.error('Error fetching course days:', error);
+            showSnackbar('Failed to load course days', 'error');
             setCourseDays([]);
-        } finally {
-            setLoading(false);
         }
     };
 
     const fetchExercises = async () => {
         try {
-            // Use the admin endpoint for exercises
             const response = await axiosInstance.get('/admin/exercises');
             setExercises(response.data || []);
         } catch (error) {
@@ -153,7 +165,6 @@ const EditCourse = () => {
 
     const fetchDayExercises = async (dayId) => {
         try {
-            // Use the admin endpoint instead of regular course endpoint
             const response = await axiosInstance.get(`/admin/courses/${courseId}/days/${dayId}/exercises`);
             return response.data || [];
         } catch (error) {
@@ -163,39 +174,41 @@ const EditCourse = () => {
     };
 
     // Day management
+    const openAddDayDialog = () => {
+        setNextDayName(`Day ${courseDays.length + 1}`);
+        setDayDialog({ open: true, dayData: null, isEdit: false });
+    };
+
     const handleAddDay = async () => {
         try {
-            // Auto-generate day name based on the highest day ID + 1
-            let nextDayNumber = 1;
-            if (courseDays.length > 0) {
-                // Find the highest day number in existing days
-                const dayNumbers = courseDays.map(day => {
-                    const match = day.dayName.match(/Day (\d+)/);
-                    return match ? parseInt(match[1]) : 0;
+            setActionLoading(true);
+            const res = await axiosInstance.post(`/admin/courses/${courseId}/days`);
+            
+            if (res.data && res.data.dayId) {
+                showSnackbar('Day added successfully! ✅', 'success');
+                setDayDialog({ open: false, dayData: null, isEdit: false });
+                
+                // Fetch updated days list
+                await fetchCourseDays();
+                
+                // Open add exercise dialog for new day
+                setExerciseDialog({
+                    open: true,
+                    dayId: res.data.dayId,
+                    exerciseData: null,
+                    isEdit: false
                 });
-                nextDayNumber = Math.max(...dayNumbers) + 1;
+                setSelectedExercise('');
+                setExerciseOrder(1);
+            } else {
+                throw new Error('Invalid response from server');
             }
-            
-            const dayName = newDayName.trim() || `Day ${nextDayNumber}`;
-
-            const newDay = {
-                dayName: dayName,
-                courseId: parseInt(courseId),
-                status: true
-            };
-
-            // Add the day
-            await axiosInstance.post(`/admin/courses/${courseId}/days`, newDay);
-            
-            showSnackbar('Day added successfully! ✅', 'success');
-            setDayDialog({ open: false, dayData: null, isEdit: false });
-            setNewDayName('');
-            fetchCourseDays(); // Refresh the list of days
-            
         } catch (error) {
             console.error('Error adding day:', error);
             const errorMsg = error.response?.data?.message || 'Failed to add day';
             showSnackbar(errorMsg, 'error');
+        } finally {
+            setActionLoading(false);
         }
     };
 
@@ -224,12 +237,13 @@ const EditCourse = () => {
 
     // Exercise management
     const handleAddExercise = async () => {
-        try {
-            if (!selectedExercise) {
-                showSnackbar('Please select an exercise', 'warning');
-                return;
-            }
+        if (!selectedExercise) {
+            showSnackbar('Please select an exercise', 'warning');
+            return;
+        }
 
+        try {
+            setActionLoading(true);
             const exerciseData = {
                 dayId: exerciseDialog.dayId,
                 exerciseId: selectedExercise,
@@ -238,18 +252,26 @@ const EditCourse = () => {
                 status: true
             };
 
-            // This endpoint would need to be implemented
-            await axiosInstance.post(`/admin/courses/${courseId}/days/${exerciseDialog.dayId}/exercises`, exerciseData);
-            
-            showSnackbar('Exercise added successfully! ✅', 'success');
-            setExerciseDialog({ open: false, dayId: null, exerciseData: null, isEdit: false });
-            setSelectedExercise('');
-            setExerciseOrder(1);
-            fetchCourseDays();
-            
+            const res = await axiosInstance.post(
+                `/admin/courses/${courseId}/days/${exerciseDialog.dayId}/exercises`,
+                exerciseData
+            );
+
+            if (res.data) {
+                showSnackbar('Exercise added successfully! ✅', 'success');
+                setExerciseDialog({ open: false, dayId: null, exerciseData: null, isEdit: false });
+                setSelectedExercise('');
+                setExerciseOrder(1);
+                
+                // Update days list with new exercise
+                await fetchCourseDays();
+            }
         } catch (error) {
             console.error('Error adding exercise:', error);
-            showSnackbar('Failed to add exercise', 'error');
+            const errorMsg = error.response?.data?.message || 'Failed to add exercise';
+            showSnackbar(errorMsg, 'error');
+        } finally {
+            setActionLoading(false);
         }
     };
 
@@ -283,8 +305,35 @@ const EditCourse = () => {
         );
     };
 
+    const handleToggleExerciseStatus = async (dayId, exerciseId, currentStatus) => {
+        try {
+            setActionLoading(true);
+            const res = await axiosInstance.put(
+                `/admin/courses/${courseId}/days/${dayId}/exercises/${exerciseId}/toggle-status`,
+                { status: !currentStatus }
+            );
+
+            if (res.data) {
+                showSnackbar(currentStatus ? 'Exercise hidden!' : 'Exercise shown!', 'success');
+                await fetchCourseDays();
+            }
+        } catch (error) {
+            console.error('Error toggling exercise status:', error);
+            showSnackbar('Failed to toggle exercise status', 'error');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
     const getTotalDays = () => courseDays.length;
-    const getTotalExercises = () => courseDays.reduce((total, day) => total + (day.exercises?.length || 0), 0);
+    const getTotalExercises = () => {
+        return courseDays.reduce((total, day) => {
+            if (day.exercises && Array.isArray(day.exercises)) {
+                return total + day.exercises.filter(e => e.status === true).length;
+            }
+            return total;
+        }, 0);
+    };
 
     // Image handling
     const handleImageClick = () => {
@@ -332,16 +381,10 @@ const EditCourse = () => {
             }
 
             // Upload new image with course name as filename
-            // Clean course name for filename (remove special characters)
-            const cleanCourseName = course.courseName
-                .replace(/[^a-zA-Z0-9\s]/g, '') // Remove special chars
-                .replace(/\s+/g, '_') // Replace spaces with underscores
-                .toLowerCase();
-
             const imageUrl = await uploadCourseImage(
                 imageFile, 
                 courseTypeName, 
-                cleanCourseName // Use cleaned course name as filename
+                course.courseName // Dùng tên gốc, không làm sạch
             );
             
             // Update course in database with new image URL
@@ -411,11 +454,8 @@ const EditCourse = () => {
                 <Button
                     startIcon={<AddIcon />}
                     variant="contained"
-                    onClick={() => setDayDialog({ open: true, dayData: null, isEdit: false })}
-                    sx={{ 
-                        bgcolor: '#d35255',
-                        '&:hover': { bgcolor: '#b8464a' }
-                    }}
+                    onClick={openAddDayDialog}
+                    sx={{ bgcolor: '#d35255', '&:hover': { bgcolor: '#b8464a' } }}
                 >
                     Add Day
                 </Button>
@@ -509,7 +549,7 @@ const EditCourse = () => {
                     <Button
                         startIcon={<AddIcon />}
                         variant="contained"
-                        onClick={() => setDayDialog({ open: true, dayData: null, isEdit: false })}
+                        onClick={openAddDayDialog}
                         sx={{ 
                             bgcolor: '#d35255',
                             '&:hover': { bgcolor: '#b8464a' }
@@ -581,10 +621,10 @@ const EditCourse = () => {
                                                 <ListItemSecondaryAction>
                                                     <IconButton
                                                         size="small"
-                                                        onClick={() => handleDeleteExercise(day.dayId, exercise.exerciseId, exercise.exerciseName)}
-                                                        color="error"
+                                                        onClick={() => handleToggleExerciseStatus(day.dayId, exercise.exerciseId, exercise.status)}
+                                                        color={exercise.status ? "primary" : "default"}
                                                     >
-                                                        <DeleteIcon />
+                                                        {exercise.status ? <VisibilityIcon /> : <VisibilityOffIcon />}
                                                     </IconButton>
                                                 </ListItemSecondaryAction>
                                             </ListItem>
@@ -617,29 +657,37 @@ const EditCourse = () => {
             )}
 
             {/* Add Day Dialog */}
-            <Dialog open={dayDialog.open} onClose={() => setDayDialog({ open: false, dayData: null, isEdit: false })}>
+            <Dialog 
+                open={dayDialog.open} 
+                onClose={() => !actionLoading && setDayDialog({ open: false, dayData: null, isEdit: false })}
+            >
                 <DialogTitle>Add New Day</DialogTitle>
                 <DialogContent>
                     <TextField
-                        autoFocus
                         margin="dense"
                         label="Day Name"
                         fullWidth
                         variant="outlined"
-                        value={newDayName}
-                        onChange={(e) => setNewDayName(e.target.value)}
-                        placeholder={`e.g., Day ${courseDays.length + 1}`}
+                        value={nextDayName}
+                        disabled
                     />
                     <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mt: 1 }}>
-                        Leave empty to auto-generate the day name
+                        Day name will be auto-generated
                     </Typography>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setDayDialog({ open: false, dayData: null, isEdit: false })}>
+                    <Button 
+                        onClick={() => setDayDialog({ open: false, dayData: null, isEdit: false })}
+                        disabled={actionLoading}
+                    >
                         Cancel
                     </Button>
-                    <Button onClick={handleAddDay} variant="contained">
-                        Add Day
+                    <Button 
+                        onClick={handleAddDay} 
+                        variant="contained"
+                        disabled={actionLoading}
+                    >
+                        {actionLoading ? 'Adding...' : 'Add Day'}
                     </Button>
                 </DialogActions>
             </Dialog>
@@ -647,7 +695,7 @@ const EditCourse = () => {
             {/* Add Exercise Dialog */}
             <Dialog 
                 open={exerciseDialog.open} 
-                onClose={() => setExerciseDialog({ open: false, dayId: null, exerciseData: null, isEdit: false })}
+                onClose={() => !actionLoading && setExerciseDialog({ open: false, dayId: null, exerciseData: null, isEdit: false })}
                 maxWidth="sm"
                 fullWidth
             >
@@ -662,6 +710,7 @@ const EditCourse = () => {
                                 value={selectedExercise}
                                 onChange={(e) => setSelectedExercise(e.target.value)}
                                 variant="outlined"
+                                disabled={actionLoading}
                             >
                                 <MenuItem value="">
                                     <em>Choose an exercise</em>
@@ -682,16 +731,24 @@ const EditCourse = () => {
                                 onChange={(e) => setExerciseOrder(parseInt(e.target.value) || 1)}
                                 variant="outlined"
                                 inputProps={{ min: 1 }}
+                                disabled={actionLoading}
                             />
                         </Grid>
                     </Grid>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setExerciseDialog({ open: false, dayId: null, exerciseData: null, isEdit: false })}>
+                    <Button 
+                        onClick={() => setExerciseDialog({ open: false, dayId: null, exerciseData: null, isEdit: false })}
+                        disabled={actionLoading}
+                    >
                         Cancel
                     </Button>
-                    <Button onClick={handleAddExercise} variant="contained">
-                        Add Exercise
+                    <Button 
+                        onClick={handleAddExercise} 
+                        variant="contained"
+                        disabled={actionLoading || !selectedExercise}
+                    >
+                        {actionLoading ? 'Adding...' : 'Add Exercise'}
                     </Button>
                 </DialogActions>
             </Dialog>

@@ -1327,8 +1327,8 @@ public class AdminController {
                         commentInfo.put("isReported", comment.getIsReported() != null ? comment.getIsReported() : false);
                         commentInfo.put("reportCount", comment.getReportCount() != null ? comment.getReportCount() : 0);
                         commentInfo.put("reportReason", comment.getReportReason());
-                        
-                        // Customer info
+                    
+                    // Customer info
                         Map<String, Object> customerInfo = new HashMap<>();
                         if (comment.getCustomer() != null) {
                             customerInfo.put("customerId", comment.getCustomer().getCustomerId());
@@ -1346,10 +1346,10 @@ public class AdminController {
                             customerInfo.put("customerImg", "");
                             customerInfo.put("customerEmail", "");
                             customerInfo.put("username", "");
-                        }
+                    }
                         commentInfo.put("customer", customerInfo);
-                        
-                        // Exercise info
+                    
+                    // Exercise info
                         Map<String, Object> exerciseInfo = new HashMap<>();
                         if (comment.getExercise() != null) {
                             exerciseInfo.put("exerciseId", comment.getExercise().getExerciseId());
@@ -1361,9 +1361,9 @@ public class AdminController {
                             exerciseInfo.put("exerciseName", "N/A");
                             exerciseInfo.put("bodyPart", "N/A");
                             exerciseInfo.put("target", "N/A");
-                        }
+                    }
                         commentInfo.put("exercise", exerciseInfo);
-                        
+                    
                         // Course info (optional)
                         Map<String, Object> courseInfo = new HashMap<>();
                         if (comment.getCourse() != null) {
@@ -1374,9 +1374,9 @@ public class AdminController {
                             courseInfo.put("courseId", null);
                             courseInfo.put("courseName", "N/A");
                             courseInfo.put("courseDescription", "");
-                        }
+                    }
                         commentInfo.put("course", courseInfo);
-                        
+                    
                         // Day info (optional)
                         Map<String, Object> dayInfo = new HashMap<>();
                         if (comment.getDay() != null) {
@@ -1454,8 +1454,8 @@ public class AdminController {
                         commentInfo.put("isReported", comment.getIsReported() != null ? comment.getIsReported() : false);
                         commentInfo.put("reportCount", comment.getReportCount() != null ? comment.getReportCount() : 0);
                         commentInfo.put("reportReason", comment.getReportReason());
-                        
-                        // Customer info
+                    
+                    // Customer info
                         Map<String, Object> customerInfo = new HashMap<>();
                         if (comment.getCustomer() != null) {
                             customerInfo.put("customerId", comment.getCustomer().getCustomerId());
@@ -1473,10 +1473,10 @@ public class AdminController {
                             customerInfo.put("customerImg", "");
                             customerInfo.put("customerEmail", "");
                             customerInfo.put("username", "");
-                        }
+                    }
                         commentInfo.put("customer", customerInfo);
-                        
-                        // Exercise info
+                    
+                    // Exercise info
                         Map<String, Object> exerciseInfo = new HashMap<>();
                         if (comment.getExercise() != null) {
                             exerciseInfo.put("exerciseId", comment.getExercise().getExerciseId());
@@ -1488,9 +1488,9 @@ public class AdminController {
                             exerciseInfo.put("exerciseName", "N/A");
                             exerciseInfo.put("bodyPart", "N/A");
                             exerciseInfo.put("target", "N/A");
-                        }
+                    }
                         commentInfo.put("exercise", exerciseInfo);
-                        
+                    
                         // Course info (optional)
                         Map<String, Object> courseInfo = new HashMap<>();
                         if (comment.getCourse() != null) {
@@ -1501,9 +1501,9 @@ public class AdminController {
                             courseInfo.put("courseId", null);
                             courseInfo.put("courseName", "N/A");
                             courseInfo.put("courseDescription", "");
-                        }
+                    }
                         commentInfo.put("course", courseInfo);
-                        
+                    
                         // Day info (optional)
                         Map<String, Object> dayInfo = new HashMap<>();
                         if (comment.getDay() != null) {
@@ -1860,7 +1860,7 @@ public class AdminController {
     }
     
     @PostMapping("/courses/{courseId}/days")
-    public ResponseEntity<?> addCourseDay(@PathVariable Integer courseId, @RequestBody Map<String, Object> dayData) {
+    public ResponseEntity<?> addCourseDay(@PathVariable Integer courseId) {
         try {
             // Get the current highest day number for this course to determine next day number
             String getMaxDaySQL = "SELECT MAX(CAST(SUBSTRING(d.day_name, 5) AS UNSIGNED)) as max_day_num " +
@@ -1868,45 +1868,32 @@ public class AdminController {
                                   "JOIN course_days cd ON d.day_id = cd.day_id " +
                                   "WHERE cd.course_id = :courseId AND cd.status = true " +
                                   "AND d.day_name REGEXP '^Day [0-9]+$'";
-            
             Query maxDayQuery = entityManager.createNativeQuery(getMaxDaySQL);
             maxDayQuery.setParameter("courseId", courseId);
-            
             Number maxDayNum = (Number) maxDayQuery.getSingleResult();
             int nextDayNumber = (maxDayNum != null) ? maxDayNum.intValue() + 1 : 1;
-            
-            // Auto-generate day name or use provided name
-            String dayName = (String) dayData.get("dayName");
-            if (dayName == null || dayName.trim().isEmpty()) {
-                dayName = "Day " + nextDayNumber;
-            }
-            
+            String dayName = "Day " + nextDayNumber;
             // First create a new day
             String insertDaySQL = "INSERT INTO days (day_name) VALUES (:dayName)";
             Query insertDayQuery = entityManager.createNativeQuery(insertDaySQL);
             insertDayQuery.setParameter("dayName", dayName);
             insertDayQuery.executeUpdate();
-            
             // Get the newly created day ID
             String getLastIdSQL = "SELECT LAST_INSERT_ID()";
             Number dayId = (Number) entityManager.createNativeQuery(getLastIdSQL).getSingleResult();
-            
             // Create course_days association
             String insertCourseDaySQL = "INSERT INTO course_days (course_id, day_id, status) VALUES (:courseId, :dayId, true)";
             Query insertCourseDayQuery = entityManager.createNativeQuery(insertCourseDaySQL);
             insertCourseDayQuery.setParameter("courseId", courseId);
             insertCourseDayQuery.setParameter("dayId", dayId);
             insertCourseDayQuery.executeUpdate();
-            
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Day added successfully");
             response.put("dayId", dayId);
             response.put("dayName", dayName);
             response.put("dayNumber", nextDayNumber);
             response.put("courseId", courseId);
-            
             return ResponseEntity.ok(response);
-            
         } catch (Exception e) {
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("message", "Failed to add course day: " + e.getMessage());
@@ -2328,7 +2315,7 @@ public class AdminController {
                 errorResponse.put("error_type", "firebase_upload_failure");
                 errorResponse.put("firebase_status", "NOT_WORKING");
             } else {
-                errorResponse.put("message", "Failed to upload course image: " + e.getMessage());
+            errorResponse.put("message", "Failed to upload course image: " + e.getMessage());
                 errorResponse.put("error_type", "general_error");
             }
             
@@ -3697,6 +3684,131 @@ public class AdminController {
             logger.error("Error creating account for customer {}: {}", customerId, e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body("Error creating account: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/courses/{courseId}/upload-image")
+    public ResponseEntity<?> uploadCourseImageById(
+            @PathVariable Integer courseId,
+            @RequestParam("file") MultipartFile file) {
+        try {
+            // Validate file
+            if (file.isEmpty()) {
+                Map<String, String> error = new HashMap<>();
+                error.put("message", "Please select a file to upload");
+                error.put("status", "error");
+                return ResponseEntity.badRequest().body(error);
+            }
+            
+            // Check file size (5MB limit)
+            if (file.getSize() > 5 * 1024 * 1024) {
+                Map<String, String> error = new HashMap<>();
+                error.put("message", "File size must be less than 5MB");
+                error.put("status", "error");
+                return ResponseEntity.badRequest().body(error);
+            }
+            
+            // Check file type
+            String contentType = file.getContentType();
+            if (contentType == null || !contentType.startsWith("image/")) {
+                Map<String, String> error = new HashMap<>();
+                error.put("message", "Please select an image file");
+                error.put("status", "error");
+                return ResponseEntity.badRequest().body(error);
+            }
+            
+            // Get course information
+            Course course = courseRepository.findById(courseId).orElse(null);
+            if (course == null) {
+                Map<String, String> error = new HashMap<>();
+                error.put("message", "Course not found with ID: " + courseId);
+                error.put("status", "error");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+            }
+            
+            // Get course type name for folder structure
+            String courseTypeName = firebaseStorageService.getCourseTypeFolder(
+                course.getCourseType() != null ? Long.valueOf(course.getCourseType().getCourseTypeId()) : 1L
+            );
+            
+            String courseName = course.getCourseName();
+            String oldImageUrl = course.getImage();
+            
+            logger.info("🔧 [COURSE_IMAGE_UPDATE] Updating image for course ID: {}, name: {}, type: {}", 
+                courseId, courseName, courseTypeName);
+            
+            // Upload to Firebase using the service with old image cleanup
+            String imageUrl = firebaseStorageService.uploadCourseImage(file, courseTypeName, courseName, oldImageUrl);
+            
+            // Update course image URL in database
+            course.setImage(imageUrl);
+            course.setUpdatedDate(LocalDateTime.now());
+            courseRepository.save(course);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("imageUrl", imageUrl);
+            response.put("message", "Course image updated successfully");
+            response.put("status", "success");
+            response.put("courseId", courseId);
+            response.put("courseName", courseName);
+            response.put("courseType", courseTypeName);
+            response.put("timestamp", LocalDateTime.now());
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("🔥 FAILED to upload course image for course ID {}: {}", courseId, e.getMessage(), e);
+            
+            Map<String, Object> errorResponse = new HashMap<>();
+            
+            // Check if this is a Firebase upload error specifically
+            if (e.getMessage().contains("FIREBASE UPLOAD FAILED") || 
+                e.getMessage().contains("Firebase Storage") ||
+                e.getMessage().contains("UPLOAD FAILED")) {
+                errorResponse.put("message", "❌ FIREBASE UPLOAD FAILED: " + e.getMessage());
+                errorResponse.put("error_type", "firebase_upload_failure");
+                errorResponse.put("firebase_status", "NOT_WORKING");
+            } else {
+                errorResponse.put("message", "Failed to upload course image: " + e.getMessage());
+                errorResponse.put("error_type", "general_error");
+            }
+            
+            errorResponse.put("status", "error");
+            errorResponse.put("courseId", courseId);
+            errorResponse.put("timestamp", LocalDateTime.now());
+            
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+    @PutMapping("/courses/{courseId}/days/{dayId}/exercises/{exerciseId}/toggle-status")
+    public ResponseEntity<?> toggleExerciseDayStatus(@PathVariable Integer courseId, @PathVariable Integer dayId, @PathVariable Integer exerciseId) {
+        try {
+            String getStatusSQL = "SELECT status FROM exercise_day WHERE course_id = :courseId AND day_id = :dayId AND exercise_id = :exerciseId";
+            Boolean currentStatus = (Boolean) entityManager.createNativeQuery(getStatusSQL)
+                .setParameter("courseId", courseId)
+                .setParameter("dayId", dayId)
+                .setParameter("exerciseId", exerciseId)
+                .getSingleResult();
+            Boolean newStatus = !currentStatus;
+            String updateSQL = "UPDATE exercise_day SET status = :newStatus WHERE course_id = :courseId AND day_id = :dayId AND exercise_id = :exerciseId";
+            Query updateQuery = entityManager.createNativeQuery(updateSQL);
+            updateQuery.setParameter("newStatus", newStatus);
+            updateQuery.setParameter("courseId", courseId);
+            updateQuery.setParameter("dayId", dayId);
+            updateQuery.setParameter("exerciseId", exerciseId);
+            int updatedRows = updateQuery.executeUpdate();
+            if (updatedRows == 0) {
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("message", "Exercise not found in this day");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+            }
+            // Sau khi toggle, trả về danh sách day mới nhất
+            return getCourseDays(courseId);
+        } catch (Exception e) {
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("message", "Failed to toggle exercise status: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
 } 

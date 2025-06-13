@@ -238,9 +238,9 @@ public class CustomerController {
             String currentAvatarUrl = customer.getCustomerImg();
             logger.info("🔵 Current avatar URL: {}", currentAvatarUrl);
             
-            logger.info("🔵 Starting Firebase upload...");
+            logger.info("🔵 Starting Firebase upload (will auto-delete old avatar)...");
             
-            // Upload new avatar to Firebase
+            // Upload new avatar to Firebase (automatically deletes old avatar)
             String newAvatarUrl = firebaseStorageService.uploadAvatar(file, username);
             
             if (newAvatarUrl == null || newAvatarUrl.isEmpty()) {
@@ -267,16 +267,7 @@ public class CustomerController {
                         .body("Failed to update avatar in database");
             }
             
-            // Delete old avatar from Firebase if it exists and is different
-            if (currentAvatarUrl != null && !currentAvatarUrl.isEmpty() && !currentAvatarUrl.equals(newAvatarUrl)) {
-                try {
-                    firebaseStorageService.deleteFileByUrl(currentAvatarUrl);
-                    logger.info("✅ Deleted old avatar for user: {}", username);
-                } catch (Exception e) {
-                    logger.warn("⚠️ Failed to delete old avatar: {}", e.getMessage());
-                    // Don't fail the request if old avatar deletion fails
-                }
-            }
+            // Note: Old avatar cleanup is now handled automatically by uploadAvatar method
             
             // Prepare response
             Map<String, Object> response = new HashMap<>();

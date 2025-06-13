@@ -239,7 +239,7 @@ const ViewCourse = () => {
                 selectedImage, 
                 { 
                     courseTypeId: formData.courseTypeId,
-                    courseName: formData.courseName 
+                    courseName: formData.courseName
                 }
             );
             
@@ -248,6 +248,12 @@ const ViewCourse = () => {
                 ...prev,
                 image: imageUrl
             }));
+            
+            // Gọi API update course để lưu image mới vào DB
+            await axiosInstance.put(`/admin/courses/${courseId}`, {
+                ...formData,
+                image: imageUrl
+            });
             
             showSnackbar('Image uploaded successfully! 🎉', 'success');
             setSelectedImage(null);

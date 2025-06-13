@@ -51,23 +51,17 @@ const FirebaseStorageService = {
       // Get the file extension
       const fileExtension = imageFile.name.split('.').pop();
       
-      // Sanitize course name for filename - using course_name format
+      // Sửa lại đoạn tạo sanitizedName và filename:
       const courseName = courseData.courseName || 'course';
-      const sanitizedName = courseName
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, '_')
-        .replace(/_+/g, '_')
-        .replace(/^_|_$/g, '');
-      
-      // Format should be course_name.extension (no random UUID)
-      const filename = `${sanitizedName}.${fileExtension}`;
+      // Không sanitize, giữ nguyên tên gốc
+      const filename = `${courseName}.${fileExtension}`;
       
       // Create FormData for the upload
       const formData = new FormData();
       formData.append('file', imageFile);
       formData.append('courseType', courseTypeFolder);
-      formData.append('courseName', sanitizedName); // Send sanitized course name
-      formData.append('filename', filename); // Add the specific filename to use
+      formData.append('courseName', courseName); // Truyền tên gốc
+      formData.append('filename', filename);
       
       console.log(`Uploading to course type folder: ${courseTypeFolder} with filename: ${filename}`);
       

@@ -615,16 +615,12 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
                                             </Typography>
                                             
                                             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                                                <Chip 
-                                                    label={`Cấp độ: ${recommendedCourse.level || 'Chưa xác định'}`} 
-                                                    color="primary" 
-                                                    size="small" 
-                                                />
-                                                <Chip 
+                                               
+                                               <Chip 
                                                     label={`Thời lượng: ${recommendedCourse.duration || 'N/A'}`} 
-                                                    color="secondary" 
-                                                    size="small" 
-                                                />
+                                                 color="secondary" 
+                                                  size="small" 
+                                               />
                                                 <Chip 
                                                     label={`Loại: ${recommendedCourse.courseType?.courseTypeName || recommendedCourse.courseType?.name || 'Chưa phân loại'}`} 
                                                     color="info" 

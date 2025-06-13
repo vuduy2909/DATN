@@ -208,6 +208,13 @@ const Account = () => {
             // Refresh user data and update preview
             await refreshUserData();
             
+            // Force immediate update with response URL if available
+            if (response.data?.imageUrl) {
+                // Don't add cache-busting params to Firebase URLs as they have tokens
+                setPreviewUrl(response.data.imageUrl);
+                setUserData(prev => ({ ...prev, customerImg: response.data.imageUrl }));
+            }
+            
             // Clear preview URL object to prevent memory leaks
             if (previewUrl && previewUrl.startsWith('blob:')) {
                 URL.revokeObjectURL(previewUrl);

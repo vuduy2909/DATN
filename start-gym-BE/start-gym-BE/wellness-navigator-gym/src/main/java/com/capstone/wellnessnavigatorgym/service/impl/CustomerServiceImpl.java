@@ -115,7 +115,7 @@ public class CustomerServiceImpl implements ICustomerService {
             customer.setCustomerImg(avatarUrl);
             
             try {
-                customerRepository.save(customer);
+            customerRepository.save(customer);
                 logger.info("🔧 [DB_UPDATE] ✅ Avatar updated successfully - Old: {}, New: {}", 
                     oldAvatarUrl, avatarUrl);
             } catch (Exception e) {
