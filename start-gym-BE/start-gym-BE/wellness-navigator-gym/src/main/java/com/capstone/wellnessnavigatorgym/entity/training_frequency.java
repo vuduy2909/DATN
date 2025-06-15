@@ -1,5 +1,5 @@
 package com.capstone.wellnessnavigatorgym.entity;
 
-public enum TrainingFrequency {
+public enum training_frequency {
     Never, Occasionally, Moderate, Regularly, Advanced
 } 

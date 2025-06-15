@@ -173,7 +173,7 @@ const theme = createTheme({
   },
 });
 
-const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
+const BodyImageAnalyzer = ({ formData, onAnalysisComplete, user: userProp }) => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const [loading, setLoading] = useState(false);
@@ -181,12 +181,111 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
   const [error, setError] = useState('');
   const [waistCircumference, setWaistCircumference] = useState(formData.waistSize || '');
   const [chestCircumference, setChestCircumference] = useState(formData.chestSize || '');
-  const { user } = useAuth();
+  const [waistError, setWaistError] = useState('');
+  const [chestError, setChestError] = useState('');
+  const { user: authUser } = useAuth();
+  
+  // Use passed user prop or fallback to auth user
+  const user = userProp || authUser;
+  
+  // Debug logging for user data
+  useEffect(() => {
+    console.log('BodyImageAnalyzer: User data loaded:', {
+      hasUser: !!user,
+      customerId: user?.customerId,
+      username: user?.username
+    });
+  }, [user]);
 
-  // Tạo key riêng cho từng user dựa trên userId
+  // Tạo key riêng cho từng user dựa trên customerId
   const getStorageKey = () => {
-    const userId = user?.id || 'anonymous';
+    const userId = user?.customerId || user?.id || 'anonymous';
     return `bodyImageAnalysisData_${userId}`;
+  };
+
+  // IndexedDB utilities for storing images efficiently
+  const openImageDB = () => {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open('BodyImageAnalyzer', 1);
+      
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+      
+      request.onupgradeneeded = (event) => {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains('images')) {
+          const store = db.createObjectStore('images', { keyPath: 'userId' });
+          store.createIndex('timestamp', 'timestamp', { unique: false });
+        }
+      };
+    });
+  };
+
+  const saveImageToDB = async (file, analysisResult = null) => {
+    try {
+      const db = await openImageDB();
+      const transaction = db.transaction(['images'], 'readwrite');
+      const store = transaction.objectStore('images');
+      
+      const imageData = {
+        userId: user?.customerId || user?.id || 'anonymous',
+        file: file,
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        analysisResult: analysisResult,
+        timestamp: Date.now()
+      };
+      
+      await store.put(imageData);
+      console.log('💾 Saved image to IndexedDB:', file.name, 'Size:', (file.size / 1024).toFixed(1) + 'KB');
+      return true;
+    } catch (error) {
+      console.error('❌ Failed to save image to IndexedDB:', error);
+      return false;
+    }
+  };
+
+  const loadImageFromDB = async () => {
+    try {
+      const db = await openImageDB();
+      const transaction = db.transaction(['images'], 'readonly');
+      const store = transaction.objectStore('images');
+      const userId = user?.customerId || user?.id || 'anonymous';
+      const request = store.get(userId);
+      
+      return new Promise((resolve, reject) => {
+        request.onsuccess = () => {
+          const result = request.result;
+          if (result && result.file) {
+            console.log('✅ Loaded image from IndexedDB:', result.fileName, 'Size:', (result.fileSize / 1024).toFixed(1) + 'KB');
+            resolve(result);
+          } else {
+            console.log('📷 No image found in IndexedDB for user:', userId);
+            resolve(null);
+          }
+        };
+        request.onerror = () => reject(request.error);
+      });
+    } catch (error) {
+      console.error('❌ Failed to load image from IndexedDB:', error);
+      return null;
+    }
+  };
+
+  const clearImageFromDB = async () => {
+    try {
+      const db = await openImageDB();
+      const transaction = db.transaction(['images'], 'readwrite');
+      const store = transaction.objectStore('images');
+      const userId = user?.customerId || user?.id || 'anonymous';
+      await store.delete(userId);
+      console.log('🗑️ Cleared image from IndexedDB for user:', userId);
+      return true;
+    } catch (error) {
+      console.error('❌ Failed to clear image from IndexedDB:', error);
+      return false;
+    }
   };
 
   // Initialize measurements from formData when component mounts or formData changes
@@ -198,6 +297,66 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
       setChestCircumference(formData.chestSize);
     }
   }, [formData.waistSize, formData.chestSize]);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (window.waistUpdateTimeout) {
+        clearTimeout(window.waistUpdateTimeout);
+      }
+      if (window.chestUpdateTimeout) {
+        clearTimeout(window.chestUpdateTimeout);
+      }
+      
+      // Cleanup object URLs to prevent memory leaks
+      if (previewUrl && previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(previewUrl);
+        console.log('🧹 Cleaned up object URL on unmount');
+      }
+    };
+  }, [previewUrl]);
+
+  // Validation functions
+  const validateWaist = (value) => {
+    const numValue = parseFloat(value);
+    if (!value || value.trim() === '') {
+      return 'Vui lòng nhập vòng eo';
+    }
+    if (isNaN(numValue)) {
+      return 'Vòng eo phải là số';
+    }
+    if (numValue < 50 || numValue > 140) {
+      return 'Vòng eo phải từ 50 -140 cm';
+    }
+    return '';
+  };
+
+  const validateChest = (value) => {
+    const numValue = parseFloat(value);
+    if (!value || value.trim() === '') {
+      return 'Vui lòng nhập vòng ngực';
+    }
+    if (isNaN(numValue)) {
+      return 'Vòng ngực phải là số';
+    }
+    if (numValue < 60 || numValue > 140) {
+      return 'Vòng ngực phải từ 60 - 140 cm';
+    }
+    return '';
+  };
+
+  // Update formData only when valid and after user stops typing
+  const updateFormData = (fieldName, value) => {
+    if (onAnalysisComplete) {
+      const changeEvent = {
+        target: {
+          name: fieldName,
+          value: value,
+        },
+      };
+      onAnalysisComplete(formData.bodyType, changeEvent);
+    }
+  };
 
   // Xử lý lỗi phân tích hình ảnh
   const handleAnalysisError = (error) => {
@@ -238,17 +397,19 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
         
         const analysisData = response.analysisData;
         
-        // Restore analysis result
+        // Restore analysis result only if not already loaded from localStorage
         const savedResult = {
           bodyType: analysisData.bodyType,
           analysis: analysisData.analysis,
           recommendations: analysisData.recommendations
         };
         
+        if (!analysisResult) {
         setAnalysisResult(savedResult);
+        }
         
-        // Restore image if available
-        if (analysisData.imageBase64) {
+        // Restore image if available and not already loaded
+        if (analysisData.imageBase64 && !previewUrl) {
           setPreviewUrl(analysisData.imageBase64);
         }
         
@@ -280,30 +441,57 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
     }
   };
 
-  // Load saved analysis data khi component mount (ưu tiên server, fallback localStorage)
+  // Load saved analysis data khi component mount (ưu tiên localStorage, backup server)
   useEffect(() => {
     const loadAnalysisData = async () => {
       try {
-        // Thử load từ server trước
-        await loadSavedAnalysis();
-        
-        // Nếu không có từ server, fallback đến localStorage
+        // Load từ localStorage trước (nhanh hơn)
         const storageKey = getStorageKey();
         const savedAnalysisData = localStorage.getItem(storageKey);
-        if (savedAnalysisData && !analysisResult) {
+        
+        if (savedAnalysisData) {
           const parsedData = JSON.parse(savedAnalysisData);
-          console.log('💾 Restoring from localStorage as fallback for user:', user?.id);
+          console.log('💾 Loading from localStorage for user:', user?.id);
           
           if (parsedData.analysisResult) {
             setAnalysisResult(parsedData.analysisResult);
             console.log('✅ Restored analysis result from localStorage:', parsedData.analysisResult);
           }
           
+          // Load ảnh từ localStorage nếu có (fallback)
           if (parsedData.previewUrl) {
             setPreviewUrl(parsedData.previewUrl);
-            console.log('✅ Restored image preview from localStorage');
+            console.log('✅ Restored image preview from localStorage:', parsedData.previewUrl.substring(0, 50) + '...');
           }
         }
+        
+        // Load ảnh từ IndexedDB (ưu tiên)
+        try {
+          const imageData = await loadImageFromDB();
+          if (imageData && imageData.file) {
+            // Tạo blob URL từ file trong IndexedDB
+            const blobUrl = URL.createObjectURL(imageData.file);
+            setPreviewUrl(blobUrl);
+            setSelectedFile(imageData.file);
+            
+            // Restore analysis result nếu có
+            if (imageData.analysisResult && !analysisResult) {
+              setAnalysisResult(imageData.analysisResult);
+            }
+            
+            console.log('✅ Restored image and file from IndexedDB');
+          }
+        } catch (dbError) {
+          console.warn('Could not load image from IndexedDB:', dbError);
+        }
+        
+        // Sau đó thử sync từ server (nhưng không override localStorage nếu đã có)
+        try {
+          await loadSavedAnalysis();
+        } catch (serverError) {
+          console.warn('Could not load from server, using localStorage data:', serverError);
+        }
+        
       } catch (error) {
         console.error('Error loading analysis data:', error);
       }
@@ -318,25 +506,51 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
   const saveAnalysisData = (newAnalysisResult = null, newPreviewUrl = null, fileName = null) => {
     try {
       const storageKey = getStorageKey();
+      
+      // Chỉ lưu blob URL (nhẹ) hoặc object URL, không lưu base64
+      let urlToSave = null;
+      if (newPreviewUrl && (newPreviewUrl.startsWith('blob:') || newPreviewUrl.startsWith('data:image/'))) {
+        // Nếu là blob URL thì lưu, nếu là base64 quá lớn thì không lưu
+        if (newPreviewUrl.startsWith('blob:') || newPreviewUrl.length < 50000) { // < 50KB
+          urlToSave = newPreviewUrl;
+        }
+      } else if (previewUrl && (previewUrl.startsWith('blob:') || previewUrl.length < 50000)) {
+        urlToSave = previewUrl;
+      }
+      
       const dataToSave = {
         analysisResult: newAnalysisResult || analysisResult,
-        previewUrl: newPreviewUrl || previewUrl,
+        previewUrl: urlToSave, // Lưu blob URL hoặc base64 nhỏ
         fileName: fileName,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        hasImage: !!(newPreviewUrl || previewUrl || selectedFile) // Flag để biết có ảnh
       };
       
       localStorage.setItem(storageKey, JSON.stringify(dataToSave));
-      console.log('💾 Saved analysis data to localStorage for user:', user?.id);
+      console.log('💾 Saved analysis data to localStorage for user:', user?.id, 'hasImage:', dataToSave.hasImage, 'savedUrl:', !!urlToSave);
     } catch (error) {
       console.error('Error saving analysis data:', error);
     }
   };
 
   // Clear analysis data
-  const clearAnalysisData = () => {
+  const clearAnalysisData = async () => {
     try {
       const storageKey = getStorageKey();
       localStorage.removeItem(storageKey);
+      
+      // Clear from IndexedDB
+      await clearImageFromDB();
+      
+      // Also clear from server if possible
+      if (user?.id) {
+        try {
+          await UserFormService.clearSavedAnalysis(user.id);
+          console.log('🗑️ Cleared analysis data from server');
+        } catch (serverError) {
+          console.warn('Could not clear server data, but localStorage cleared:', serverError);
+        }
+      }
       
       // Clean up preview URL to prevent memory leaks
       if (previewUrl && previewUrl.startsWith('blob:')) {
@@ -354,14 +568,14 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
         fileInput.value = '';
       }
       
-      console.log('🗑️ Cleared analysis data and reset file input for user:', user?.id);
+      console.log('🗑️ Cleared analysis data from all sources and reset file input for user:', user?.id);
     } catch (error) {
       console.error('Error clearing analysis data:', error);
     }
   };
 
   // Xử lý khi người dùng chọn file ảnh
-  const handleFileChange = (event) => {
+  const handleFileChange = async (event) => {
     const file = event.target.files[0];
     if (file) {
       // Clear previous preview URL to prevent memory leaks
@@ -374,17 +588,20 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
       // Clear previous analysis when new image is selected
       setAnalysisResult(null);
       
-      // Tạo URL preview ảnh
-      const reader = new FileReader();
-      reader.onload = () => {
-        const newPreviewUrl = reader.result;
+      // Tạo URL preview ảnh - sử dụng object URL thay vì base64 để tránh lỗi
+      try {
+        const newPreviewUrl = URL.createObjectURL(file);
         setPreviewUrl(newPreviewUrl);
         
-        // Save image preview to localStorage (clear previous analysis)
+        // Save file to IndexedDB (ưu tiên) và localStorage (backup)
+        await saveImageToDB(file);
         saveAnalysisData(null, newPreviewUrl, file.name);
-        console.log('📷 New image loaded and preview set:', file.name);
-      };
-      reader.readAsDataURL(file);
+        
+        console.log('📷 New image loaded and saved:', file.name, 'Size:', (file.size / 1024).toFixed(1) + 'KB');
+      } catch (error) {
+        console.error('🚨 Failed to create preview URL:', error);
+        setError('Không thể tạo preview cho ảnh đã chọn');
+      }
     } else {
       // If no file selected, clear preview
       setPreviewUrl('');
@@ -395,35 +612,47 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
   // Cập nhật waist_circumference vào formData
   const handleWaistChange = (event) => {
     const value = event.target.value;
+    
+    // Immediately update local state to prevent focus loss
     setWaistCircumference(value);
     
-    // Immediately save to formData with correct field name
-    if (onAnalysisComplete) {
-      const changeEvent = {
-        target: {
-          name: 'waistSize',  // Use the correct field name in formData
-          value: value,
-        },
-      };
-      onAnalysisComplete(formData.bodyType, changeEvent);
+    // Clear any existing error when user starts typing
+    if (waistError) {
+      setWaistError('');
     }
+    
+    // Debounce validation and formData update
+    clearTimeout(window.waistUpdateTimeout);
+    window.waistUpdateTimeout = setTimeout(() => {
+      const error = validateWaist(value);
+      setWaistError(error);
+      if (!error && value.trim() !== '') {
+        updateFormData('waistSize', value);
+      }
+    }, 1000); // Increased to 1 second for better UX
   };
 
   // Cập nhật chest_circumference vào formData
   const handleChestChange = (event) => {
     const value = event.target.value;
+    
+    // Immediately update local state to prevent focus loss
     setChestCircumference(value);
     
-    // Immediately save to formData with correct field name
-    if (onAnalysisComplete) {
-      const changeEvent = {
-        target: {
-          name: 'chestSize',  // Use the correct field name in formData
-          value: value,
-        },
-      };
-      onAnalysisComplete(formData.bodyType, changeEvent);
+    // Clear any existing error when user starts typing
+    if (chestError) {
+      setChestError('');
     }
+    
+    // Debounce validation and formData update
+    clearTimeout(window.chestUpdateTimeout);
+    window.chestUpdateTimeout = setTimeout(() => {
+      const error = validateChest(value);
+      setChestError(error);
+      if (!error && value.trim() !== '') {
+        updateFormData('chestSize', value);
+      }
+    }, 1000); // Increased to 1 second for better UX
   };
 
   // Helper function to update formData - keeping for backward compatibility
@@ -449,10 +678,63 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
       setError('Vui lòng chọn file ảnh để phân tích');
       return;
     }
+    
+    // Check if user data is available
+    if (!user) {
+      setError('Đang tải thông tin người dùng. Vui lòng đợi và thử lại.');
+      return;
+    }
+
+    // Validate measurements before analysis
+    const waistValidationError = validateWaist(waistCircumference);
+    const chestValidationError = validateChest(chestCircumference);
+    
+    if (waistValidationError) {
+      setWaistError(waistValidationError);
+      setError('Vui lòng nhập vòng eo hợp lệ trước khi phân tích');
+      return;
+    }
+    
+    if (chestValidationError) {
+      setChestError(chestValidationError);
+      setError('Vui lòng nhập vòng ngực hợp lệ trước khi phân tích');
+      return;
+    }
 
     try {
       setLoading(true);
       setError('');
+
+      // Get customerId for API call
+      const customerId = user?.customerId || user?.id || user?.customer_id || user?.customer?.customerId || user?.customer?.customer_id;
+      console.log('🔍 Debug user object for customerId:', {
+        user: user,
+        userType: typeof user,
+        userKeys: user ? Object.keys(user) : 'no user',
+        customerId: user?.customerId,
+        id: user?.id,
+        customer_id: user?.customer_id,
+        customer: user?.customer,
+        customerCustomerId: user?.customer?.customerId,
+        customerCustomer_id: user?.customer?.customer_id,
+        resolvedCustomerId: customerId
+      });
+      
+      if (!customerId) {
+        console.error('❌ No customerId found in user object:', user);
+        console.error('Available user properties:', user ? Object.keys(user) : 'user is null/undefined');
+        
+        // Check if user is still loading
+        if (!user) {
+          setError('Đang tải thông tin người dùng. Vui lòng thử lại sau vài giây.');
+        } else {
+          setError('Không thể xác định thông tin người dùng. Vui lòng đăng nhập lại.');
+        }
+        setLoading(false);
+        return;
+      }
+      
+      console.log('Using customerId for analysis:', customerId);
 
       // Lấy thông tin từ formData
       const { height, weight, gender } = formData;
@@ -460,9 +742,9 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
         throw new Error('Vui lòng điền đầy đủ thông tin chiều cao, cân nặng và giới tính trước khi phân tích ảnh');
       }
 
-      // Kiểm tra nếu file quá lớn
-      if (selectedFile.size > 5 * 1024 * 1024) { // 5MB
-        setError('Kích thước ảnh quá lớn. Vui lòng chọn ảnh dưới 5MB.');
+      // Kiểm tra nếu file quá lớn - giảm xuống 2MB để tránh lỗi 431
+      if (selectedFile.size > 2 * 1024 * 1024) { // 2MB
+        setError('Kích thước ảnh quá lớn. Vui lòng chọn ảnh dưới 2MB để tránh lỗi kết nối.');
         setLoading(false);
         return;
       }
@@ -476,6 +758,8 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
         chest_circumference: chestCircumference
       });
       
+      console.log('Sending image analysis request with customerId:', customerId);
+      
       const result = await UserFormService.analyzeBodyImage(
         selectedFile, 
         height, 
@@ -483,28 +767,40 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
         gender,
         waistCircumference,
         chestCircumference,
-        user?.id // Pass customerId
+        customerId // Use resolved customerId
       );
-      console.log('Received analysis result:', result);
+      console.log('✅ Analysis completed, bodyType:', result?.bodyType);
       
       setAnalysisResult(result);
       
-      // Save analysis result to localStorage
+      // Ensure previewUrl is maintained after analysis
+      let currentPreviewUrl = previewUrl;
+      if (!currentPreviewUrl && selectedFile) {
+        try {
+          currentPreviewUrl = URL.createObjectURL(selectedFile);
+          setPreviewUrl(currentPreviewUrl);
+          console.log('Created new preview URL after analysis:', currentPreviewUrl);
+        } catch (error) {
+          console.error('Failed to create preview URL after analysis:', error);
+        }
+      }
+      
+      // Save analysis result to IndexedDB (ưu tiên) và localStorage (backup)
+      console.log('🖼️ Saving analysis result, selectedFile:', selectedFile?.name);
+      if (selectedFile) {
+        await saveImageToDB(selectedFile, result);
+      }
       saveAnalysisData(result, previewUrl, selectedFile?.name);
       
-      console.log('=== BODY IMAGE ANALYZER: CLAUDE RESULT ===');
-      console.log('Received analysis result:', result);
-      console.log('Body type from Claude:', result?.bodyType);
-      console.log('Current formData.bodyType:', formData.bodyType);
+      // Đảm bảo ảnh vẫn hiển thị sau khi phân tích
+      console.log('🖼️ Current previewUrl after analysis:', !!previewUrl);
+      console.log('🖼️ Current selectedFile after analysis:', !!selectedFile);
       
       // Cập nhật body type trong form dựa trên kết quả phân tích
       if (result && result.bodyType && result.bodyType !== 'Unknown' && onAnalysisComplete) {
-        console.log('✅ Claude API returned valid body type:', result.bodyType);
-        console.log('Calling onAnalysisComplete with body type:', result.bodyType);
-        
-        // Chuẩn bị analysisData để truyền về Step6
+        // Chuẩn bị analysisData để truyền về Step6 - không gửi base64 để tránh lỗi 431
         const analysisDataToSend = {
-          imageBase64: previewUrl ? previewUrl.split(',')[1] : null, // Extract base64 part only
+          imageBase64: null, // Không gửi base64 để tránh request quá lớn
           analysis: result.analysis,
           recommendations: result.recommendations,
           bodyType: result.bodyType,
@@ -516,7 +812,6 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
         
         // Update the measurements as well
         if (waistCircumference) {
-          console.log('📏 Also updating waist circumference:', waistCircumference);
           const waistChangeEvent = {
             target: {
               name: 'waistSize',
@@ -527,7 +822,6 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
         }
         
         if (chestCircumference) {
-          console.log('📏 Also updating chest circumference:', chestCircumference);
           const chestChangeEvent = {
             target: {
               name: 'chestSize',
@@ -536,33 +830,17 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
           };
           onAnalysisComplete(result.bodyType, chestChangeEvent, analysisDataToSend);
         }
-        
-        console.log('Body type update completed successfully');
-      } else {
-        console.log('❌ No valid body type from Claude API or onAnalysisComplete not available');
-        console.log('Result:', result);
-        console.log('Body type:', result?.bodyType);
-        console.log('onAnalysisComplete:', !!onAnalysisComplete);
       }
-      
-      console.log('=== END BODY IMAGE ANALYZER: CLAUDE RESULT ===');
     } catch (err) {
-      console.error('Failed to analyze image:', err);
-      console.error('Error details:', {
-        message: err.message,
-        response: err.response,
-        status: err.response?.status,
-        data: err.response?.data,
-        headers: err.response?.headers,
-        config: err.config
-      });
+      console.error('Failed to analyze image:', err.message);
       
       if (err.response) {
         // Lỗi HTTP có phản hồi từ máy chủ
         console.log('Response status:', err.response.status);
-        console.log('Response data:', err.response.data);
         
-        if (err.response.status === 401) {
+        if (err.response.status === 431) {
+          setError('Kích thước yêu cầu quá lớn. Vui lòng chọn ảnh nhỏ hơn (dưới 1MB) và thử lại.');
+        } else if (err.response.status === 401) {
           setError('Lỗi xác thực: Bạn cần đăng nhập để sử dụng tính năng này.');
         } else if (err.response.status === 403) {
           setError('Bạn không có quyền truy cập tính năng này.');
@@ -595,17 +873,23 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
 
   // Format recommendations to have clear numbered sections with proper paragraph breaks
   const formatRecommendations = (htmlContent) => {
-    if (!htmlContent) return '';
+    if (!htmlContent) {
+      console.log('🎯 formatRecommendations: No content provided');
+      return '';
+    }
     
-    console.log('🔍 Raw AI content:', htmlContent);
+    console.log('🎯 formatRecommendations input:', htmlContent);
+    console.log('🎯 formatRecommendations input type:', typeof htmlContent);
+    console.log('🎯 formatRecommendations input length:', htmlContent.length);
+    
+    // Không filter ra content nào cả, backend đã xử lý tốt rồi
+    console.log('✅ Processing recommendation content for display');
     
     // Clean up any extra spacing or unnecessary line breaks
     let cleanedContent = htmlContent
       .replace(/(\r\n|\n|\r)/gm, " ") // Replace line breaks with spaces
       .replace(/\s+/g, " ") // Replace multiple spaces with single space
       .trim();
-    
-    console.log('🧹 Cleaned content:', cleanedContent);
     
     // Regular expressions to match various forms of section titles - cập nhật để match chính xác
     const sectionPatterns = [
@@ -644,20 +928,25 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
     
     console.log(`📊 Total sections found: ${sectionsFound}/4`);
     
-    // Xử lý đặc biệt - nếu không tìm thấy pattern tiêu chuẩn, thử tìm theo số thứ tự
+    // Xử lý đặc biệt - nếu không tìm thấy pattern tiêu chuẩn, hiển thị raw content
     if (!cleanedContent.match(/(?:1\.?\s*)?(?:KHÓA\s*TẬP\s*LUYỆN|Khóa\s*học)/gi)) {
-      console.log('🔄 Using fallback patterns for section detection');
-      // Fallback patterns - tìm theo số thứ tự đơn giản (chỉ 4 phần)
-      const fallbackPatterns = [
-        { pattern: /1\.\s*/gi, replacement: '<div class="section-break"></div><div class="section-title">1. KHÓA TẬP LUYỆN:</div><div class="section-content">' },
-        { pattern: /2\.\s*/gi, replacement: '</div><div class="section-break"></div><div class="section-title">2. BÀI TẬP CHỦ YẾU:</div><div class="section-content">' },
-        { pattern: /3\.\s*/gi, replacement: '</div><div class="section-break"></div><div class="section-title">3. CHẾ ĐỘ DINH DƯỠNG:</div><div class="section-content">' },
-        { pattern: /4\.\s*/gi, replacement: '</div><div class="section-break"></div><div class="section-title">4. TẦN SUẤT VÀ LỊCH TẬP:</div><div class="section-content">' }
-      ];
+      console.log('🔄 No structured sections found, displaying raw content');
+      // Không parse nếu không có cấu trúc rõ ràng, tránh cắt sai text
+      console.log('📝 Raw content will be displayed as-is');
       
-      fallbackPatterns.forEach(({ pattern, replacement }) => {
-        cleanedContent = cleanedContent.replace(pattern, replacement);
-      });
+      // Chỉ format cơ bản cho raw content
+      let rawFormatted = cleanedContent
+        // Format exercise names
+        .replace(/(Squat|Deadlift|Bench\s*Press|Pull-ups?|Push-ups?|Plank|Cable\s*Row):?\s*/gi, '<strong>$1:</strong> ')
+        .replace(/(\d+\s*hiệp\s*x\s*\d+(?:-\d+)?\s*(?:lần|giây))/gi, '<strong>$1</strong>')
+        // Format nutrition percentages  
+        .replace(/(Protein|Carbs|Chất\s*béo):?\s*(\d+%)/gi, '<strong>$1: $2</strong>')
+        .replace(/(\d+g\/kg)/gi, '<strong>$1</strong>')
+        // Add line breaks for readability
+        .replace(/\.\s+/g, '.<br/><br/>');
+      
+      console.log('🎨 Final raw formatted content:', rawFormatted);
+      return `<div class="recommendation-container"><div class="raw-content">${rawFormatted}</div></div>`;
     } else {
       // Apply main section pattern replacements
       sectionPatterns.forEach(({ pattern, replacement }) => {
@@ -727,14 +1016,19 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
                     Vòng eo (cm)
                   </Typography>
                   <TextField
+                    key="waist-input"
                     type="number"
                     fullWidth
                     value={waistCircumference}
                     onChange={handleWaistChange}
                     placeholder="Nhập vòng eo (cm)"
                     variant="outlined"
-                    InputProps={{
-                      inputProps: { min: 0 }
+                    error={!!waistError}
+                    helperText={waistError}
+                    inputProps={{ 
+                      min: 50,
+                      max: 200,
+                      step: "0.1"
                     }}
                     sx={{ 
                       '& .MuiOutlinedInput-root': {
@@ -776,14 +1070,19 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
                     Vòng ngực (cm)
                   </Typography>
                   <TextField
+                    key="chest-input"
                     type="number"
                     fullWidth
                     value={chestCircumference}
                     onChange={handleChestChange}
                     placeholder="Nhập vòng ngực (cm)"
                     variant="outlined"
-                    InputProps={{
-                      inputProps: { min: 0 }
+                    error={!!chestError}
+                    helperText={chestError}
+                    inputProps={{ 
+                      min: 60,
+                      max: 200,
+                      step: "0.1"
                     }}
                     sx={{ 
                       '& .MuiOutlinedInput-root': {
@@ -855,25 +1154,96 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
             )}
           </Box>
           
-          {previewUrl && (
+          {(previewUrl || selectedFile) && (
             <Box 
               sx={{ 
                 mb: 2, 
                 mt: 2, 
                 textAlign: 'center', 
                 maxWidth: 300, 
-                margin: '0 auto'
+                margin: '0 auto',
+                position: 'relative',
+                zIndex: 10,
+                backgroundColor: 'white',
+                padding: 1,
+                borderRadius: 2,
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
               }}
             >
+              <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
+                Ảnh đã chọn:
+              </Typography>
               <img 
-                src={previewUrl} 
+                src={(() => {
+                  // Ưu tiên blob URL (nhẹ và persistent)
+                  if (previewUrl && previewUrl.startsWith('blob:')) {
+                    console.log('🖼️ Using blob URL for display');
+                    return previewUrl;
+                  }
+                  
+                  // Nếu có base64 hợp lệ (nhỏ)
+                  if (previewUrl && previewUrl.startsWith('data:image/') && previewUrl.length > 100) {
+                    console.log('🖼️ Using base64 URL for display');
+                    return previewUrl;
+                  }
+                  
+                  // Nếu có selectedFile, tạo blob URL mới
+                  if (selectedFile) {
+                    console.log('🖼️ Creating new blob URL for selectedFile');
+                    try {
+                      const newUrl = URL.createObjectURL(selectedFile);
+                      // Cập nhật previewUrl và lưu vào localStorage
+                      setPreviewUrl(newUrl);
+                      saveAnalysisData(analysisResult, newUrl, selectedFile.name);
+                      return newUrl;
+                    } catch (error) {
+                      console.error('🚨 Failed to create object URL:', error);
+                      return '';
+                    }
+                  }
+                  
+                  console.log('🖼️ No valid image source available');
+                  return '';
+                })()} 
                 alt="Preview" 
                 style={{ 
                   maxWidth: '100%', 
                   maxHeight: 300, 
                   borderRadius: 8,
-                  border: '1px solid #ddd'
+                  border: '1px solid #ddd',
+                  objectFit: 'contain',
+                  display: 'block'
                 }} 
+                onError={(e) => {
+                  console.error('🚨 Image load error, src:', e.target.src);
+                  console.error('🚨 Attempting to recover with selectedFile');
+                  
+                  // Nếu có selectedFile, thử tạo URL mới
+                  if (selectedFile && !e.target.dataset.recovered) {
+                    try {
+                      e.target.dataset.recovered = 'true'; // Prevent infinite loop
+                      const recoveryUrl = URL.createObjectURL(selectedFile);
+                      console.log('🔄 Created recovery URL:', recoveryUrl);
+                      e.target.src = recoveryUrl;
+                      setPreviewUrl(recoveryUrl);
+                      // Lưu URL mới vào localStorage
+                      saveAnalysisData(analysisResult, recoveryUrl, selectedFile.name);
+                    } catch (error) {
+                      console.error('🚨 Recovery failed:', error);
+                      // Thay vì ẩn, hiển thị placeholder
+                      e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkFuaCBraG9uZyB0YWkgZHVvYzwvdGV4dD48L3N2Zz4=';
+                      e.target.style.opacity = '0.5';
+                    }
+                  } else {
+                    console.error('🚨 No recovery option available');
+                    // Hiển thị placeholder thay vì ẩn
+                    e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkFuaCBraG9uZyB0YWkgZHVvYzwvdGV4dD48L3N2Zz4=';
+                    e.target.style.opacity = '0.5';
+                  }
+                }}
+                onLoad={() => {
+                  console.log('✅ Image loaded successfully');
+                }}
               />
             </Box>
           )}
@@ -884,7 +1254,15 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
             </Alert>
           )}
           
-          {analysisResult && analysisResult.bodyType !== 'Unknown' && (
+          {(waistError || chestError) && (
+            <Alert severity="warning" sx={{ mt: 2, mb: 2 }}>
+              <Typography variant="body2">
+                <strong>Lưu ý:</strong> Vui lòng kiểm tra lại thông tin vòng eo và vòng ngực trước khi phân tích ảnh.
+              </Typography>
+            </Alert>
+          )}
+          
+          {analysisResult && (
             <Paper 
               elevation={2} 
               sx={{ 
@@ -925,15 +1303,50 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
               <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
                 Đề xuất:
               </Typography>
-              {analysisResult.recommendations ? (
-                <Box className="analysis-content">
-                  <div dangerouslySetInnerHTML={{ __html: formatRecommendations(analysisResult.recommendations) }} />
-                </Box>
-              ) : (
-                <Typography variant="body2">
-                  Không có đề xuất tập luyện.
-                </Typography>
-              )}
+              {(() => {
+                console.log('🎯 Rendering recommendations:', analysisResult.recommendations);
+                console.log('🎯 Recommendations type:', typeof analysisResult.recommendations);
+                console.log('🎯 Recommendations length:', analysisResult.recommendations?.length);
+                console.log('🔍 Full analysisResult object:', analysisResult);
+                
+                if (!analysisResult.recommendations) {
+                  console.log('❌ No recommendations available, analysisResult:', analysisResult);
+                  return (
+                    <Typography variant="body2" sx={{ 
+                      fontStyle: 'italic', 
+                      color: 'text.secondary',
+                      p: 2,
+                      bgcolor: '#f5f5f5',
+                      borderRadius: 1,
+                      border: '1px dashed #ccc'
+                    }}>
+                      Chưa có đề xuất tập luyện. Vui lòng thử phân tích lại hoặc kiểm tra kết nối mạng.
+                    </Typography>
+                  );
+                }
+                
+                const formattedRecommendations = formatRecommendations(analysisResult.recommendations);
+                console.log('🎨 Formatted recommendations result:', formattedRecommendations);
+                console.log('🎨 Formatted recommendations length:', formattedRecommendations?.length);
+                
+                if (!formattedRecommendations || formattedRecommendations.trim() === '') {
+                  console.log('⚠️ formatRecommendations returned empty, showing raw content');
+                  // If formatRecommendations returns empty, show raw content
+                  return (
+                    <Box className="analysis-content">
+                      <Typography variant="body2" component="div" sx={{ whiteSpace: 'pre-wrap' }}>
+                        {analysisResult.recommendations}
+                      </Typography>
+                    </Box>
+                  );
+                }
+                
+                return (
+                  <Box className="analysis-content">
+                    <div dangerouslySetInnerHTML={{ __html: formattedRecommendations }} />
+                  </Box>
+                );
+              })()}
             </Paper>
           )}
           
@@ -941,7 +1354,52 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete }) => {
             Lưu ý: Ảnh của bạn sẽ được phân tích bởi hệ thống AI để xác định loại hình thể và đề xuất chương trình tập luyện phù hợp. 
             Thông tin và hình ảnh của bạn được bảo mật theo chính sách của chúng tôi.
           </Typography>
+          
+
         </Box>
+        
+        {/* Add CSS styles for better recommendations display */}
+        <style jsx>{`
+          .analysis-content {
+            line-height: 1.6;
+          }
+          .analysis-content .section-title {
+            font-weight: bold;
+            color: #1976d2;
+            margin: 16px 0 8px 0;
+            padding: 8px 0;
+            border-bottom: 2px solid #e3f2fd;
+          }
+          .analysis-content .section-content {
+            margin-bottom: 16px;
+            padding-left: 8px;
+          }
+          .analysis-content .section-break {
+            margin: 16px 0;
+          }
+          .analysis-content strong {
+            color: #1565c0;
+          }
+          .recommendation-container {
+            background: #fafafa;
+            padding: 16px;
+            border-radius: 8px;
+            border-left: 4px solid #1976d2;
+          }
+          .raw-content {
+            background: #f8f9fa;
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+            line-height: 1.8;
+            font-size: 14px;
+            color: #333;
+          }
+          .raw-content strong {
+            color: #1976d2;
+            font-weight: 600;
+          }
+        `}</style>
       </Box>
     </ThemeProvider>
   );

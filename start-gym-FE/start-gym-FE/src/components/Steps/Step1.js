@@ -4,6 +4,7 @@ import occasionally from '../../images/occasionally.png'
 import moderate from '../../images/moderate.png'
 import advanced from '../../images/advanced.png'
 import regularly from '../../images/regularly.png'
+import useKeyboardNavigation from '../../hooks/useKeyboardNavigation';
 
 import {
     Box,
@@ -27,7 +28,10 @@ import {
 } from '@mui/icons-material';
 
 const Step1 = ({ formData, handleChange, handleNext }) => {
-    const [selectedFrequency, setSelectedFrequency] = useState(formData.trainingFrequency || '');
+    const [selectedFrequency, setSelectedFrequency] = useState(formData.training_frequency || '');
+
+    // Thêm keyboard navigation
+    useKeyboardNavigation(handleNext, null, !selectedFrequency, 1, 7);
 
     const steps = [
         '1',
@@ -51,7 +55,7 @@ const Step1 = ({ formData, handleChange, handleNext }) => {
         setSelectedFrequency(frequency);
         handleChange({
             target: {
-                name: 'trainingFrequency',
+                name: 'training_frequency',
                 value: frequency,
             },
         });

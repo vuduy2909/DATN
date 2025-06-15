@@ -75,32 +75,60 @@ export const AuthProvider = ({ children }) => {
             setIsAdmin(storedIsAdmin);
             
             // Sử dụng axiosInstance thay vì axios trực tiếp để đi qua interceptor
-            axiosInstance.get('/users/info', {
-                validateStatus: function(status) {
-                    return status < 500; // Accept 2xx, 3xx, 4xx but not 5xx
-                }
-            })
-            .then(response => {
-                // Skip if response is error
-                if (response.status >= 400) {
-                    console.log(`AuthContext - User info returned status ${response.status}, skipping`);
+            Promise.all([
+                axiosInstance.get('/users/info', {
+                    validateStatus: function(status) {
+                        return status < 500; // Accept 2xx, 3xx, 4xx but not 5xx
+                    }
+                }),
+                axiosInstance.get('/customer/detail', {
+                    validateStatus: function(status) {
+                        return status < 500; // Accept 2xx, 3xx, 4xx but not 5xx
+                    }
+                })
+            ])
+            .then(([userResponse, customerResponse]) => {
+                // Skip if user response is error
+                if (userResponse.status >= 400) {
+                    console.log(`AuthContext - User info returned status ${userResponse.status}, skipping`);
                     setIsAuthChecked(true);
                     return;
                 }
                 
-                console.log("AuthContext - User info response:", response.data);
+                console.log("AuthContext - User info response:", userResponse.data);
+                console.log("AuthContext - Customer detail response:", customerResponse.data);
                 
-                // Set user data from API response
-                setUser(response.data);
+                // Combine user and customer data
+                const combinedUserData = {
+                    ...userResponse.data,
+                    // Add customer data if available
+                    ...(customerResponse.status < 400 && customerResponse.data ? {
+                        customerId: customerResponse.data.customerId,
+                        customerName: customerResponse.data.customerName,
+                        customerPhone: customerResponse.data.customerPhone,
+                        customerEmail: customerResponse.data.customerEmail,
+                        customerAddress: customerResponse.data.customerAddress,
+                        customerImg: customerResponse.data.customerImg,
+                        customerGender: customerResponse.data.customerGender,
+                        dateOfBirth: customerResponse.data.dateOfBirth,
+                        customerTypeName: customerResponse.data.customerTypeName,
+                        customer: customerResponse.data // Keep full customer object as well
+                    } : {})
+                };
+                
+                console.log("AuthContext - Combined user data:", combinedUserData);
+                
+                // Set combined user data
+                setUser(combinedUserData);
                 
                 // Check customer is_enable status on each render
-                const customerData = response.data;
+                const customerData = customerResponse.status < 400 && customerResponse.data ? customerResponse.data : {};
                 const directIsEnable = customerData.is_enable !== false && customerData.isEnable !== false;
                 const nestedIsEnable = customerData.customer?.is_enable !== false && 
                                       customerData.customer?.isEnable !== false;
                 
                 // Get admin status
-                const isAdminUser = response.data.roles === 'ROLE_ADMIN';
+                const isAdminUser = userResponse.data.roles === 'ROLE_ADMIN';
                 
                 // If customer is banned (is_enable = false), redirect to contact page
                 // BUT ONLY if the user is NOT an admin

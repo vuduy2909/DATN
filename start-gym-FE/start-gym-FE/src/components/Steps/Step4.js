@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import useKeyboardNavigation from '../../hooks/useKeyboardNavigation';
 
 import twice from '../../images/beginner.png'
 import three from '../../images/occasionally.png'
@@ -30,6 +31,9 @@ import {
 
 const Step4 = ({ formData, handleChange, handleNext, handlePrevious }) => {
     const [selectedFrequency, setSelectedFrequency] = useState(formData.desiredFrequency || '');
+
+    // Thêm keyboard navigation
+    useKeyboardNavigation(handleNext, handlePrevious, !selectedFrequency, 4, 7);
 
     const steps = [
         '1',

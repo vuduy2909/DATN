@@ -64,7 +64,7 @@ public class TrackDataAi {
                 ", age=" + age +
                 ", gender='" + gender + '\'' +
                 ", bmi=" + bmi +
-                ", trainingGoals='" + training_goals + '\'' +
+                ", training_goals='" + training_goals + '\'' +
                 ", trainingHistory='" + training_history +
                 '}';
     }

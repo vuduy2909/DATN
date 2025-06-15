@@ -1,6 +1,6 @@
 package com.capstone.wellnessnavigatorgym.entity;
 
-public enum TrainingGoals {
+public enum training_goals {
     STRENGTH_TRAINING("1, Strength Training"),
     CARDIOVASCULAR_TRAINING("2, Cardiovascular Training"),
     FLEXIBILITY_AND_BALANCE("3, Flexibility and Balance"),
@@ -11,7 +11,7 @@ public enum TrainingGoals {
     
     private final String databaseValue;
     
-    TrainingGoals(String databaseValue) {
+    training_goals(String databaseValue) {
         this.databaseValue = databaseValue;
     }
     
@@ -19,10 +19,10 @@ public enum TrainingGoals {
         return databaseValue;
     }
     
-    public static TrainingGoals fromDatabaseValue(String value) {
+    public static training_goals fromDatabaseValue(String value) {
         if (value == null) return WEIGHT_LOSS;
         
-        for (TrainingGoals goal : values()) {
+        for (training_goals goal : values()) {
             if (goal.databaseValue.equals(value.trim())) {
                 return goal;
             }

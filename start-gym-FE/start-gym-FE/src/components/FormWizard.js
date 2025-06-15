@@ -20,13 +20,13 @@ const FormWizard = () => {
   
   // Khởi tạo formData với các trường cần thiết
   const [formData, setFormData] = useState({
-    trainingFrequency: '',
+    training_frequency: '',
     gender: '',
     age: '',
     height: '',
     weight: '',
     bodyType: '',
-    trainingGoal: '',
+    training_goal: '',
     desiredFrequency: '',
     occupation: '',
     workEnvironment: '',
@@ -100,14 +100,14 @@ const FormWizard = () => {
       
       // Đảm bảo đúng tên trường với backend (chestSize -> bust, waistSize -> waist)
       const apiFormData = {
-        training_history: formData.trainingFrequency, // Lịch sử tập luyện hiện tại
-        training_frequency: formData.desiredFrequency, // Tần suất tập luyện mong muốn (renamed from trainingFrequency)
+        training_history: formData.training_frequency, // Lịch sử tập luyện hiện tại
+        training_frequency: formData.desiredFrequency, // Tần suất tập luyện mong muốn (renamed from training_frequency)
         age: formData.age,
         gender: formData.gender,
         height: formData.height,
         weight: formData.weight,
         bmi: Math.round((formData.weight / Math.pow(formData.height/100, 2)) * 100) / 100, // Tính BMI và làm tròn 2 chữ số thập phân
-        training_goals: formData.trainingGoal,
+        training_goals: formData.training_goal,
         occupation: formData.occupation,
         work_environment: formData.workEnvironment,
         chest_circumference: formData.chestSize, 
@@ -334,7 +334,7 @@ const FormWizard = () => {
     <Container maxWidth="md" sx={{ py: 1 }}>
       <Paper elevation={3} sx={{ p: 2, borderRadius: 2 }}>
         <Typography variant="h4" align="center" gutterBottom color="primary">
-          KYO-GYM Assessment
+          START-GYM Assessment
         </Typography>
         
         <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 2 }}>

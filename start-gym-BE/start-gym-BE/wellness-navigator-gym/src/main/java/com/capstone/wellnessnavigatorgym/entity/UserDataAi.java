@@ -69,13 +69,13 @@ public class UserDataAi {
     private String work_environment; // VARCHAR in database
     
     @Column(name = "training_goals")
-    @Convert(converter = TrainingGoalsConverter.class)
-    private TrainingGoals training_goals;
+    @Convert(converter = training_goalsConverter.class)
+    private training_goals training_goals;
     
-    // Use standard TrainingFrequency enum (now synchronized with database)
+    // Use standard training_frequency enum (now synchronized with database)
     @Enumerated(EnumType.STRING)
     @Column(name = "training_frequency")
-    private TrainingFrequency training_frequency;
+    private training_frequency training_frequency;
     
     // Body type uses enum with converter
     @Column(name = "body_type")

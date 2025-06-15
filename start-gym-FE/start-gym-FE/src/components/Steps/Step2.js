@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import useKeyboardNavigation from '../../hooks/useKeyboardNavigation';
 
 import {
     Box,
@@ -90,6 +91,9 @@ const Step2 = ({ formData, handleChange, handleNext, handlePrevious }) => {
                weight >= 40 && weight <= 150 &&
                age >= 15 && age <= 80;
     };
+
+    // Thêm keyboard navigation
+    useKeyboardNavigation(handleNext, handlePrevious, !isFormValid(), 2, 7);
 
     const calculateBMI = () => {
         const heightValue = parseFloat(height);

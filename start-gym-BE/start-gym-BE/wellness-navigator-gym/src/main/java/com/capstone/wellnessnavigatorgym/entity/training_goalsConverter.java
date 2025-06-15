@@ -4,10 +4,10 @@ import javax.persistence.AttributeConverter;
 import javax.persistence.Converter;
 
 @Converter
-public class TrainingGoalsConverter implements AttributeConverter<TrainingGoals, String> {
+public class training_goalsConverter implements AttributeConverter<training_goals, String> {
 
     @Override
-    public String convertToDatabaseColumn(TrainingGoals attribute) {
+    public String convertToDatabaseColumn(training_goals attribute) {
         if (attribute == null) {
             return null;
         }
@@ -15,11 +15,11 @@ public class TrainingGoalsConverter implements AttributeConverter<TrainingGoals,
     }
 
     @Override
-    public TrainingGoals convertToEntityAttribute(String dbData) {
+    public training_goals convertToEntityAttribute(String dbData) {
         if (dbData == null || dbData.trim().isEmpty()) {
-            return TrainingGoals.WEIGHT_LOSS; // Default value
+            return training_goals.WEIGHT_LOSS; // Default value
         }
         
-        return TrainingGoals.fromDatabaseValue(dbData.trim());
+        return training_goals.fromDatabaseValue(dbData.trim());
     }
 } 

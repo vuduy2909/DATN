@@ -13,7 +13,7 @@ public class CourseDetail {
     private Integer age;
     private Double bmi;
     private String gender;
-    private String trainingGoals;
+    private String training_goals;
     private String trainingHistory;
     
     // Recommendation status

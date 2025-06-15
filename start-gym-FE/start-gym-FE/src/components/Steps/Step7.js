@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import useKeyboardNavigation from '../../hooks/useKeyboardNavigation';
 import {
     Box,
     Container,
@@ -56,6 +57,9 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
         '6',
         '7'
     ];
+
+    // Thêm keyboard navigation
+    useKeyboardNavigation(null, handlePrevious, confirmLoading || loading, 7, 7);
 
     // Tạo key riêng cho từng user dựa trên userId
     const getStorageKey = () => {
@@ -139,7 +143,8 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
     const activeRecommendation = recommendationResult || localRecommendation;
 
     const handleConfirmRecommendation = async () => {
-        console.log('=== ENHANCED DEBUG CONFIRM RECOMMENDATION ===');
+        console.log('=== STEP 7: USER CLICKED "XÁC NHẬN VÀ BẮT ĐẦU" ===');
+        console.log('🎯 This is the ONLY place where user_data_ai record should be created');
         console.log('handleConfirmRecommendation called with activeRecommendation:', activeRecommendation);
         
         // Lấy dữ liệu chính xác nhất có thể
@@ -399,7 +404,7 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
     console.log('=== END ENHANCED DEBUG Step7 RENDER ===');
 
     // Helper functions to map data
-        const mapTrainingFrequency = (value) => {
+        const maptraining_frequency = (value) => {
         if (!value) return "Không xác định";
                 switch(value) {
             case "Never": return "Chưa từng tập";
@@ -411,7 +416,7 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
                 }
     };
 
-        const mapTrainingGoal = (value) => {
+        const maptraining_goal = (value) => {
         if (!value) return "Không xác định";
         if (value.includes("Weight Loss")) return "Giảm cân";
         if (value.includes("Strength Training")) return "Tăng cơ bắp";
@@ -724,19 +729,19 @@ const Step7 = ({ formData, handlePrevious, handleGoToCollections, recommendation
                                             <Grid item xs={12} sm={6} md={3}>
                                                 <Typography variant="body2">
                                                     <strong>Kinh nghiệm:</strong><br/>
-                                                    {mapTrainingFrequency(userMetrics.training_history)}
+                                                    {maptraining_frequency(userMetrics.training_history)}
                                                 </Typography>
                                             </Grid>
                                             <Grid item xs={12} sm={6} md={3}>
                                                 <Typography variant="body2">
                                                     <strong>Tần suất mong muốn:</strong><br/>
-                                                    {mapTrainingFrequency(userMetrics.training_frequency)}
+                                                    {maptraining_frequency(userMetrics.training_frequency)}
                                                 </Typography>
                                             </Grid>
                                             <Grid item xs={12} sm={6} md={3}>
                                                 <Typography variant="body2">
                                                     <strong>Mục tiêu:</strong><br/>
-                                                    {mapTrainingGoal(userMetrics.training_goals)}
+                                                    {maptraining_goal(userMetrics.training_goals)}
                                                 </Typography>
                                             </Grid>
                                             <Grid item xs={12} sm={6} md={3}>

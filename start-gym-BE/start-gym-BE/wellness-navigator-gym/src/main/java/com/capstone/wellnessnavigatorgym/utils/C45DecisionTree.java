@@ -554,7 +554,7 @@ public class C45DecisionTree {
     public Course traverseDecisionTree(TreeNode root, Map<String, Object> userData) {
         if (root == null) {
             logger.warn("Decision tree root is null");
-            return getDefaultCourseByTrainingGoals(userData);
+            return getDefaultCourseBytraining_goals(userData);
         }
         
         // Chuẩn hóa dữ liệu người dùng
@@ -604,7 +604,7 @@ public class C45DecisionTree {
         
         // Fallback: sử dụng training goals để đưa ra gợi ý
         logger.warn("Decision tree traversal failed at depth {}, using training goals fallback", traversalDepth);
-        return getDefaultCourseByTrainingGoals(userData);
+        return getDefaultCourseBytraining_goals(userData);
     }
     
     /**
@@ -670,21 +670,21 @@ public class C45DecisionTree {
      */
     private void normalizeUserData(Map<String, Object> userData) {
         // Đảm bảo training_goals có format chuẩn
-        Object trainingGoals = userData.get("training_goals");
-        if (trainingGoals != null) {
-            String goals = trainingGoals.toString();
+        Object training_goals = userData.get("training_goals");
+        if (training_goals != null) {
+            String goals = training_goals.toString();
             // Nếu chỉ có số, thêm mô tả
             if (goals.matches("\\d+")) {
-                userData.put("training_goals", mapNumberToTrainingGoal(goals));
+                userData.put("training_goals", mapNumberTotraining_goal(goals));
             }
         }
         
         // Chuẩn hóa training_frequency với mapping chính xác
-        Object trainingFrequency = userData.get("training_frequency");
-        if (trainingFrequency != null) {
-            String frequency = trainingFrequency.toString().trim();
+        Object training_frequency = userData.get("training_frequency");
+        if (training_frequency != null) {
+            String frequency = training_frequency.toString().trim();
             // Map các giá trị training_frequency về format chuẩn trong database
-            String normalizedFrequency = normalizeTrainingFrequency(frequency);
+            String normalizedFrequency = normalizetraining_frequency(frequency);
             userData.put("training_frequency", normalizedFrequency);
             logger.debug("🔄 Normalized training_frequency: {} -> {}", frequency, normalizedFrequency);
         }
@@ -723,7 +723,7 @@ public class C45DecisionTree {
     /**
      * Chuẩn hóa training_frequency về format chuẩn
      */
-    private String normalizeTrainingFrequency(String frequency) {
+    private String normalizetraining_frequency(String frequency) {
         if (frequency == null || frequency.trim().isEmpty()) {
             return "Moderate";
         }
@@ -750,7 +750,7 @@ public class C45DecisionTree {
     /**
      * Map số thành training goal description
      */
-    private String mapNumberToTrainingGoal(String number) {
+    private String mapNumberTotraining_goal(String number) {
         switch (number) {
             case "1": return "1, Strength Training";
             case "2": return "2, Cardiovascular Training";
@@ -767,21 +767,21 @@ public class C45DecisionTree {
      * Lấy khóa học mặc định dựa trên training goals với logic thông minh
      * Ưu tiên training_goals và training_frequency
      */
-    private Course getDefaultCourseByTrainingGoals(Map<String, Object> userData) {
-        Object trainingGoals = userData.get("training_goals");
-        String trainingFrequency = (String) userData.get("training_frequency");
+    private Course getDefaultCourseBytraining_goals(Map<String, Object> userData) {
+        Object training_goals = userData.get("training_goals");
+        String training_frequency = (String) userData.get("training_frequency");
         
-        logger.info("🎯 Getting default course for goals: '{}', frequency: '{}'", trainingGoals, trainingFrequency);
+        logger.info("🎯 Getting default course for goals: '{}', frequency: '{}'", training_goals, training_frequency);
         
-        if (trainingGoals != null) {
-            String goals = trainingGoals.toString();
+        if (training_goals != null) {
+            String goals = training_goals.toString();
             
             // Thử tìm với key trực tiếp trước
             List<Integer> suggestedCourseIds = TRAINING_GOALS_MAPPING.get(goals);
             
             // Nếu không tìm thấy, thử các key alternative
             if (suggestedCourseIds == null || suggestedCourseIds.isEmpty()) {
-                String normalizedGoals = normalizeTrainingGoals(goals);
+                String normalizedGoals = normalizetraining_goals(goals);
                 suggestedCourseIds = TRAINING_GOALS_MAPPING.get(normalizedGoals);
                 logger.debug("Normalized goals '{}' -> '{}', found {} courses", 
                     goals, normalizedGoals, suggestedCourseIds != null ? suggestedCourseIds.size() : 0);
@@ -794,7 +794,7 @@ public class C45DecisionTree {
                 Course selectedCourse = selectBestCourseFromSuggestions(suggestedCourseIds, userData);
                 if (selectedCourse != null) {
                     logger.info("🎯 Selected smart course: {} - {} (goals: {}, frequency: {})", 
-                        selectedCourse.getCourseId(), selectedCourse.getCourseName(), goals, trainingFrequency);
+                        selectedCourse.getCourseId(), selectedCourse.getCourseName(), goals, training_frequency);
                     return selectedCourse;
                 }
             } else {
@@ -803,9 +803,9 @@ public class C45DecisionTree {
         }
         
         // Fallback logic với training_frequency nếu không có training_goals
-        if (trainingFrequency != null) {
-            logger.info("🔄 Using training_frequency fallback: {}", trainingFrequency);
-                         Course frequencyBasedCourse = getCourseBasedOnFrequency(trainingFrequency, userData);
+        if (training_frequency != null) {
+            logger.info("🔄 Using training_frequency fallback: {}", training_frequency);
+                         Course frequencyBasedCourse = getCourseBasedOnFrequency(training_frequency, userData);
             if (frequencyBasedCourse != null) {
                 logger.info("🎯 Selected frequency-based course: {} - {}", 
                     frequencyBasedCourse.getCourseId(), frequencyBasedCourse.getCourseName());
@@ -828,10 +828,10 @@ public class C45DecisionTree {
     /**
      * Chuẩn hóa training goals để mapping chính xác
      */
-    private String normalizeTrainingGoals(String trainingGoals) {
-        if (trainingGoals == null) return "";
+    private String normalizetraining_goals(String training_goals) {
+        if (training_goals == null) return "";
         
-        String goals = trainingGoals.trim();
+        String goals = training_goals.trim();
         String lowerGoals = goals.toLowerCase();
         
         // Thử mapping trực tiếp trước
@@ -857,17 +857,17 @@ public class C45DecisionTree {
         }
         
         // Default fallback to Weight Loss cho safe
-        logger.warn("Cannot normalize training goals '{}', using Weight Loss as fallback", trainingGoals);
+        logger.warn("Cannot normalize training goals '{}', using Weight Loss as fallback", training_goals);
         return "7, Weight Loss";
     }
     
     /**
      * Lấy course dựa trên training_frequency khi không có training_goals
      */
-    private Course getCourseBasedOnFrequency(String trainingFrequency, Map<String, Object> userData) {
+    private Course getCourseBasedOnFrequency(String training_frequency, Map<String, Object> userData) {
         List<Integer> frequencyBasedCourses = new ArrayList<>();
         
-        switch (trainingFrequency) {
+        switch (training_frequency) {
             case "Never":
             case "Occasionally":
                 // Người mới: đề xuất các khóa học cơ bản, weight loss
@@ -893,15 +893,15 @@ public class C45DecisionTree {
      */
     private Course selectBestCourseFromSuggestions(List<Integer> courseIds, Map<String, Object> userData) {
         String trainingHistory = (String) userData.get("training_history");
-        String trainingFrequency = (String) userData.get("training_frequency");
+        String training_frequency = (String) userData.get("training_frequency");
         String bodyType = (String) userData.get("body_type");
-        String trainingGoals = (String) userData.get("training_goals");
+        String training_goals = (String) userData.get("training_goals");
         
         logger.debug("🎯 Selecting course from {} options based on profile: frequency={}, history={}, bodyType={}", 
-            courseIds.size(), trainingFrequency, trainingHistory, bodyType);
+            courseIds.size(), training_frequency, trainingHistory, bodyType);
         
         // BƯỚC 1: Lọc courses dựa trên training_frequency (thuộc tính quan trọng thứ 2)
-        List<Integer> filteredByFrequency = filterCoursesByTrainingFrequency(courseIds, trainingFrequency);
+        List<Integer> filteredByFrequency = filterCoursesBytraining_frequency(courseIds, training_frequency);
         
         // BƯỚC 2: Từ danh sách đã lọc, chọn course phù hợp nhất với profile
         List<Integer> targetCourseIds = filteredByFrequency.isEmpty() ? courseIds : filteredByFrequency;
@@ -910,7 +910,7 @@ public class C45DecisionTree {
             Course course = findCourseById(courseId);
             if (course != null) {
                 // Logic chọn course dựa trên profile tổng hợp
-                if (isCourseSuitableForProfile(course, trainingHistory, bodyType, trainingFrequency)) {
+                if (isCourseSuitableForProfile(course, trainingHistory, bodyType, training_frequency)) {
                     logger.info("🎯 Selected course {} - {} based on comprehensive profile matching", 
                         course.getCourseId(), course.getCourseName());
                     return course;
@@ -944,15 +944,15 @@ public class C45DecisionTree {
     /**
      * Lọc courses dựa trên training_frequency (thuộc tính quan trọng thứ 2)
      */
-    private List<Integer> filterCoursesByTrainingFrequency(List<Integer> courseIds, String trainingFrequency) {
-        if (trainingFrequency == null) {
+    private List<Integer> filterCoursesBytraining_frequency(List<Integer> courseIds, String training_frequency) {
+        if (training_frequency == null) {
             return courseIds;
         }
         
         List<Integer> filtered = new ArrayList<>();
         
         // Mapping frequency với độ khó khóa học
-        switch (trainingFrequency) {
+        switch (training_frequency) {
             case "Never":
             case "Occasionally":
                 // Người mới hoặc ít tập: chọn courses cơ bản (ID thấp hơn hoặc specific beginner courses)
@@ -979,7 +979,7 @@ public class C45DecisionTree {
         
         if (!filtered.isEmpty()) {
             logger.debug("🎯 Filtered {} courses to {} based on training frequency: {}", 
-                courseIds.size(), filtered.size(), trainingFrequency);
+                courseIds.size(), filtered.size(), training_frequency);
         }
         
         return filtered.isEmpty() ? courseIds : filtered;
@@ -1011,26 +1011,26 @@ public class C45DecisionTree {
      * Kiểm tra xem khóa học có phù hợp với profile người dùng không
      * Tích hợp training_frequency như thuộc tính quan trọng thứ 2
      */
-    private boolean isCourseSuitableForProfile(Course course, String trainingHistory, String bodyType, String trainingFrequency) {
+    private boolean isCourseSuitableForProfile(Course course, String trainingHistory, String bodyType, String training_frequency) {
         if (course == null) return false;
         
         Integer courseId = course.getCourseId();
         
         // LOGIC 1: Kiểm tra theo training_frequency (thuộc tính quan trọng thứ 2)
-        if (trainingFrequency != null) {
-            switch (trainingFrequency) {
+        if (training_frequency != null) {
+            switch (training_frequency) {
                 case "Never":
                 case "Occasionally":
                     // Người mới/ít tập nên chọn courses cơ bản
                     if (courseId > 30 && !isBeginnerCourse(courseId)) {
-                        logger.debug("Course {} too advanced for frequency: {}", courseId, trainingFrequency);
+                        logger.debug("Course {} too advanced for frequency: {}", courseId, training_frequency);
                         return false;
                     }
                     break;
                 case "Advanced":
                     // Người advanced có thể cần courses thách thức hơn
                     if (courseId <= 15 && !isAdvancedCourse(courseId)) {
-                        logger.debug("Course {} too basic for frequency: {}", courseId, trainingFrequency);
+                        logger.debug("Course {} too basic for frequency: {}", courseId, training_frequency);
                         return false;
                     }
                     break;
@@ -1074,7 +1074,7 @@ public class C45DecisionTree {
         }
         
         logger.debug("✅ Course {} suitable for profile: frequency={}, history={}, bodyType={}", 
-            courseId, trainingFrequency, trainingHistory, bodyType);
+            courseId, training_frequency, trainingHistory, bodyType);
         return true;
     }
 } 

@@ -123,9 +123,9 @@ public class AdminController {
             } catch (Exception e) {
                 System.err.println("Error counting total customers: " + e.getMessage());
                 // Fallback to old method
-                List<Customer> allCustomers = customerRepository.findAll().stream()
-                    .filter(c -> c.getIsEnable())
-                    .collect(Collectors.toList());
+            List<Customer> allCustomers = customerRepository.findAll().stream()
+                .filter(c -> c.getIsEnable())
+                .collect(Collectors.toList());
                 totalActiveCustomers = (long) allCustomers.size();
             }
             

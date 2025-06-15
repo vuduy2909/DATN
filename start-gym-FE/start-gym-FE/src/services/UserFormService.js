@@ -6,18 +6,41 @@ const UserFormService = {
   submitFormData: async (formData) => {
     try {
       console.log('UserFormService: Submitting form data:', formData);
+      console.log('UserFormService: Original data keys:', Object.keys(formData));
+      console.log('=== CHECKING FOR PROBLEMATIC FIELDS IN SERVICE ===');
+      console.log('formData.trainingGoal (camelCase):', formData.trainingGoal);
+      console.log('formData.training_goal (underscore):', formData.training_goal);
+      console.log('formData.training_goals (plural):', formData.training_goals);
       
       // Sanitize data to ensure only expected fields are sent to the backend
       const sanitizedData = { ...formData };
       
       // Remove any fields that might cause conflicts with backend DTO
-      const fieldsToDelete = ['trainingFrequency', 'desiredFrequency', 'trainingGoal', 
+      const fieldsToDelete = ['desiredFrequency', 'training_goal', 'trainingGoal',
                               'waistSize', 'chestSize', 'bodyImage', 'workEnvironment'];
       
+      console.log('UserFormService: Fields to delete:', fieldsToDelete);
       fieldsToDelete.forEach(field => {
         if (sanitizedData.hasOwnProperty(field)) {
           console.log(`UserFormService: Removing field '${field}' to prevent backend DTO conflicts`);
           delete sanitizedData[field];
+        }
+      });
+      
+      console.log('UserFormService: Data after field deletion:', Object.keys(sanitizedData));
+      
+      // Additional cleanup to ensure no unexpected fields
+      console.log('UserFormService: Data before cleanup:', Object.keys(sanitizedData));
+      const allowedFields = ['training_history', 'training_frequency', 'age', 'gender', 'height', 
+                            'weight', 'bmi', 'chest_circumference', 'waist_circumference', 
+                            'training_goals', 'body_type', 'occupation', 'work_environment', 
+                            'customerId', 'recommendedCourseId'];
+      
+      // Keep only allowed fields
+      Object.keys(sanitizedData).forEach(key => {
+        if (!allowedFields.includes(key)) {
+          console.log(`UserFormService: Removing unexpected field '${key}'`);
+          delete sanitizedData[key];
         }
       });
       
@@ -114,7 +137,10 @@ const UserFormService = {
       
       // Add customerId if provided
       if (customerId) {
+        console.log('Adding customerId to FormData:', customerId);
         formData.append('customerId', customerId);
+      } else {
+        console.warn('No customerId provided to analyzeBodyImage - analysis will not be persisted');
       }
       
       // Add waist and chest circumference if provided
@@ -126,16 +152,7 @@ const UserFormService = {
         formData.append('chest_circumference', chestCircumference);
       }
 
-      console.log('Sending data to analyze image:', { 
-        height, 
-        weight, 
-        gender, 
-        waist_circumference: waistCircumference || 'not provided',
-        chest_circumference: chestCircumference || 'not provided',
-        customerId: customerId || 'not provided',
-        fileName: imageFile.name, 
-        fileSize: imageFile.size 
-      });
+      console.log('🔍 UserFormService: Analyzing image:', imageFile.name, imageFile.size, 'bytes');
       
       // Lấy token từ localStorage (hoặc vị trí lưu trữ khác)
       const token = localStorage.getItem('token');
@@ -152,7 +169,7 @@ const UserFormService = {
         headers,
         timeout: 30000  // 30 seconds timeout for image analysis
       });
-      console.log('Received response from image analysis:', response);
+      console.log('✅ UserFormService: Analysis complete, bodyType:', response?.bodyType);
       
       // Kiểm tra nếu phản hồi là lỗi
       if (response && response.bodyType === 'Unknown') {
@@ -373,12 +390,39 @@ const UserFormService = {
       }
       
       // Đảm bảo recommendedCourseId nằm trong formData
-      if (recommendedCourseId && !formData.recommendedCourseId) {
-        formData.recommendedCourseId = recommendedCourseId;
+      if (validatedCourseId && !formData.recommendedCourseId) {
+        formData.recommendedCourseId = validatedCourseId;
       }
       
+              // Clean formData để loại bỏ các field không cần thiết
+        const cleanedFormData = { ...formData };
+        const fieldsToDelete = ['desiredFrequency', 'training_goal', 'trainingGoal',
+                               'waistSize', 'chestSize', 'bodyImage', 'workEnvironment'];
+      
+      fieldsToDelete.forEach(field => {
+        if (cleanedFormData.hasOwnProperty(field)) {
+          console.log(`UserFormService: Removing field '${field}' from confirm data`);
+          delete cleanedFormData[field];
+        }
+      });
+      
+      // Keep only expected fields
+      const allowedFields = ['training_history', 'training_frequency', 'age', 'gender', 'height', 
+                            'weight', 'bmi', 'chest_circumference', 'waist_circumference', 
+                            'training_goals', 'body_type', 'occupation', 'work_environment', 
+                            'customerId', 'recommendedCourseId'];
+      
+      Object.keys(cleanedFormData).forEach(key => {
+        if (!allowedFields.includes(key)) {
+          console.log(`UserFormService: Removing unexpected field '${key}' from confirm data`);
+          delete cleanedFormData[key];
+        }
+      });
+      
+      console.log('UserFormService: Final cleaned data for confirmation:', JSON.stringify(cleanedFormData, null, 2));
+      
       // Gọi API endpoint xác nhận mới
-      const response = await request.post('/track-data-ai/confirm-user-data-ai', formData, { headers });
+      const response = await request.post('/track-data-ai/confirm-user-data-ai', cleanedFormData, { headers });
       console.log('UserFormService: Recommendation confirmation response:', response);
       
       return response;
@@ -396,6 +440,26 @@ const UserFormService = {
         console.error('UserFormService: Error in request setup:', error.message);
       }
       
+      throw error;
+    }
+  },
+
+  // Clear saved analysis data for a user
+  clearSavedAnalysis: async (customerId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = {};
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      console.log('UserFormService: Clearing saved analysis for customer:', customerId);
+      
+      const response = await request.delete(`/track-data-ai/clear-saved-analysis/${customerId}`, { headers });
+      return response.data;
+    } catch (error) {
+      console.error('UserFormService: Error clearing saved analysis:', error);
       throw error;
     }
   }

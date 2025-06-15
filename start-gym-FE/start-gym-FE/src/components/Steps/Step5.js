@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import useKeyboardNavigation from '../../hooks/useKeyboardNavigation';
 
 import {
     Box,
@@ -61,6 +62,9 @@ const Step5 = ({ formData, handleChange, handleNext, handlePrevious }) => {
     const isFormValid = () => {
         return occupation && workEnvironment;
     };
+
+    // Thêm keyboard navigation
+    useKeyboardNavigation(handleNext, handlePrevious, !isFormValid(), 5, 7);
 
     const handleSubmit = () => {
         if (!isFormValid()) return;

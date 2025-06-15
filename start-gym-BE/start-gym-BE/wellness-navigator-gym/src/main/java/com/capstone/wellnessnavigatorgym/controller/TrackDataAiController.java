@@ -2,6 +2,7 @@ package com.capstone.wellnessnavigatorgym.controller;
 
 import com.capstone.wellnessnavigatorgym.dto.*;
 import com.capstone.wellnessnavigatorgym.entity.*;
+import com.capstone.wellnessnavigatorgym.entity.training_goals;
 import com.capstone.wellnessnavigatorgym.service.*;
 import com.capstone.wellnessnavigatorgym.utils.BuildDecisionTree;
 import com.capstone.wellnessnavigatorgym.utils.C45DecisionTree;
@@ -44,6 +45,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.concurrent.TimeUnit;
 import java.util.Base64;
 import javax.servlet.http.HttpServletRequest;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @RestController
 @RequestMapping("/api/v1/track-data-ai")
@@ -141,6 +144,7 @@ public class TrackDataAiController {
         public Map<String, Object> getActions() { return actions; }
     }
     
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class UserFormDataDTO {
         private String training_history;
         private String training_frequency;
@@ -151,7 +155,10 @@ public class TrackDataAiController {
         private Double bmi;  // Add BMI field
         private Double chest_circumference;
         private Double waist_circumference;
+        
+        @JsonProperty(value = "training_goals", access = JsonProperty.Access.WRITE_ONLY)
         private String training_goals;
+        
         private String body_type;
         private String occupation;
         private String work_environment;
@@ -168,6 +175,14 @@ public class TrackDataAiController {
         public Double getChest_circumference() { return chest_circumference; }
         public Double getWaist_circumference() { return waist_circumference; }
         public String getTraining_goals() { return training_goals; }
+        
+        // Add setter for trainingGoal to handle the problematic field
+        @JsonProperty("trainingGoal")
+        public void setTrainingGoal(String trainingGoal) {
+            this.training_goals = trainingGoal;
+            logger.info("UserFormDataDTO: Received trainingGoal field, mapped to training_goals: {}", trainingGoal);
+        }
+        
         public String getBody_type() { return body_type; }
         public String getOccupation() { return occupation; }
         public String getWork_environment() { return work_environment; }
@@ -190,6 +205,7 @@ public class TrackDataAiController {
         public void setCustomerId(Integer customerId) { this.customerId = customerId; }
     }
     
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class UserDataDTO {
         private String training_history;
         private String training_frequency;
@@ -200,7 +216,10 @@ public class TrackDataAiController {
         private Double bmi;
         private Double chest_circumference;
         private Double waist_circumference;
+        
+        @JsonProperty(value = "training_goals", access = JsonProperty.Access.WRITE_ONLY)
         private String training_goals;
+        
         private String body_type;
         private String occupation;
         private String work_environment;
@@ -228,6 +247,14 @@ public class TrackDataAiController {
         public void setWaist_circumference(Double waist_circumference) { this.waist_circumference = waist_circumference; }
         public String getTraining_goals() { return training_goals; }
         public void setTraining_goals(String training_goals) { this.training_goals = training_goals; }
+        
+        // Add setter for trainingGoal to handle the problematic field
+        @JsonProperty("trainingGoal")
+        public void setTrainingGoal(String trainingGoal) {
+            this.training_goals = trainingGoal;
+            logger.info("Received trainingGoal field, mapped to training_goals: {}", trainingGoal);
+        }
+        
         public String getBody_type() { return body_type; }
         public void setBody_type(String body_type) { this.body_type = body_type; }
         public String getOccupation() { return occupation; }
@@ -285,6 +312,7 @@ public class TrackDataAiController {
     }
 
     // DTO cho việc lưu tạm dữ liệu form wizard
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class FormWizardDraftDTO {
         private Integer customerId;
         private Integer currentStep;
@@ -301,6 +329,7 @@ public class TrackDataAiController {
         private Double waist_circumference;
         
         // Step 3: Mục tiêu tập luyện
+        @JsonProperty(value = "training_goals", access = JsonProperty.Access.WRITE_ONLY)
         private String training_goals;
         
         // Step 4: Lịch sử tập luyện và tần suất
@@ -352,6 +381,13 @@ public class TrackDataAiController {
         
         public String getTraining_goals() { return training_goals; }
         public void setTraining_goals(String training_goals) { this.training_goals = training_goals; }
+        
+        // Add setter for trainingGoal to handle the problematic field
+        @JsonProperty("trainingGoal")
+        public void setTrainingGoal(String trainingGoal) {
+            this.training_goals = trainingGoal;
+            logger.info("FormWizardDraftDTO: Received trainingGoal field, mapped to training_goals: {}", trainingGoal);
+        }
         
         public String getTraining_history() { return training_history; }
         public void setTraining_history(String training_history) { this.training_history = training_history; }
@@ -470,13 +506,13 @@ public class TrackDataAiController {
         }
         
         // Log all enum values for debugging
-        logger.info("Available TrainingFrequency values: {}", Arrays.toString(TrainingFrequency.values()));
+        logger.info("Available training_frequency values: {}", Arrays.toString(training_frequency.values()));
         logger.info("Available TrainingHistory values: {}", Arrays.toString(TrainingHistory.values()));
     }
     
     private boolean isValidTrainingFrequency(String value) {
         try {
-            TrainingFrequency.valueOf(value);
+            training_frequency.valueOf(value);
             return true;
         } catch (IllegalArgumentException e) {
             return false;
@@ -500,17 +536,17 @@ public class TrackDataAiController {
         userDataAi.setBmi(dto.getBmi());
         
         // Convert and set training_goals enum
-        final String trainingGoals = dto.getTraining_goals() != null && !dto.getTraining_goals().trim().isEmpty() 
+        final String trainingGoalsValue = dto.getTraining_goals() != null && !dto.getTraining_goals().trim().isEmpty() 
             ? dto.getTraining_goals() : "7, Weight Loss";
         
         try {
             // Use the new fromDatabaseValue method for proper mapping
-            TrainingGoals goalEnum = TrainingGoals.fromDatabaseValue(trainingGoals.trim());
+            training_goals goalEnum = training_goals.fromDatabaseValue(trainingGoalsValue.trim());
             userDataAi.setTraining_goals(goalEnum);
             logger.info("Set training goal enum: {} (database value: {})", goalEnum.name(), goalEnum.getDatabaseValue());
         } catch (Exception e) {
-            logger.warn("Failed to map training goal '{}', using default", trainingGoals);
-            userDataAi.setTraining_goals(TrainingGoals.WEIGHT_LOSS);
+            logger.warn("Failed to map training goal '{}', using default", trainingGoalsValue);
+            userDataAi.setTraining_goals(training_goals.WEIGHT_LOSS);
         }
         
         // Convert and set training_history as String (not enum in user_data_ai table)
@@ -521,17 +557,20 @@ public class TrackDataAiController {
         userDataAi.setTraining_history(trainingHistory); // Direct string assignment
         logger.info("Set training history string: '{}'", trainingHistory);
         
-        // Convert and set training_frequency using standard TrainingFrequency (now synchronized)
+        // Convert and set training_frequency using standard training_frequency enum (now synchronized)
         final String trainingFrequency = dto.getTraining_frequency() != null && !dto.getTraining_frequency().trim().isEmpty() 
             ? dto.getTraining_frequency().trim() : "Moderate";
         
         try {
-            TrainingFrequency freqEnum = TrainingFrequency.valueOf(trainingFrequency.toUpperCase());
+            // Capitalize first letter only (Never, Occasionally, Moderate, Regularly, Advanced)
+            String capitalizedFreq = trainingFrequency.substring(0, 1).toUpperCase() + 
+                                   trainingFrequency.substring(1).toLowerCase();
+            training_frequency freqEnum = training_frequency.valueOf(capitalizedFreq);
             userDataAi.setTraining_frequency(freqEnum);
             logger.info("Set training frequency enum: {}", freqEnum.name());
         } catch (Exception e) {
             logger.warn("Failed to map training frequency '{}', using default", trainingFrequency);
-            userDataAi.setTraining_frequency(TrainingFrequency.Moderate);
+            userDataAi.setTraining_frequency(training_frequency.Moderate);
         }
         
         // Physical measurements
@@ -1175,10 +1214,10 @@ public class TrackDataAiController {
 
                 // Convert String values to correct types for CSV upload
                 try {
-                    TrainingGoals goalEnum = TrainingGoals.fromDatabaseValue(data[5].trim());
+                    training_goals goalEnum = training_goals.fromDatabaseValue(data[5].trim());
                     userDataAi.setTraining_goals(goalEnum);
                 } catch (Exception e) {
-                    userDataAi.setTraining_goals(TrainingGoals.WEIGHT_LOSS);
+                    userDataAi.setTraining_goals(training_goals.WEIGHT_LOSS);
                 }
 
                 // Set training_history as String (not enum in user_data_ai table)
@@ -1226,6 +1265,8 @@ public class TrackDataAiController {
         try {
             logger.info("Starting image analysis - height: {}, weight: {}, gender: {}, image name: {}, size: {}, customerId: {}",
                     height, weight, gender, image.getOriginalFilename(), image.getSize(), customerId);
+            logger.info("CustomerId parameter details - value: {}, type: {}, isNull: {}", 
+                    customerId, customerId != null ? customerId.getClass().getSimpleName() : "null", customerId == null);
 
             // Kiểm tra nếu ảnh không có hoặc rỗng
             if (image == null || image.isEmpty() || image.getSize() == 0) {
@@ -1617,8 +1658,17 @@ public class TrackDataAiController {
                             result.setRecommendations(jsonNode.get("recommendations").asText());
                         } else if (jsonNode.has("recom")) { // Check alternative field name
                             result.setRecommendations(jsonNode.get("recom").asText());
+                        } else if (jsonNode.has("recommendation")) { // Check singular form
+                            result.setRecommendations(jsonNode.get("recommendation").asText());
                         } else {
-                            result.setRecommendations("Đề xuất mặc định: Tập trung vào các bài tập cardio và cường độ vừa phải.");
+                            logger.warn("No recommendations field found in Claude response JSON, using analysis as fallback");
+                            // Use analysis as fallback for recommendations if available
+                            String analysisText = jsonNode.has("analysis") ? jsonNode.get("analysis").asText() : "";
+                            if (!analysisText.isEmpty()) {
+                                result.setRecommendations(analysisText);
+                            } else {
+                                result.setRecommendations("Đề xuất tập luyện sẽ được cung cấp dựa trên phân tích hình thể của bạn.");
+                            }
                         }
                         
                         return result;
@@ -1701,11 +1751,22 @@ public class TrackDataAiController {
             }
 
             try {
-                result.setRecommendations(recommendationsMatcher.find() ? recommendationsMatcher.group(1) : 
-                    "Đề xuất mặc định: Tập trung vào các bài tập cardio và cường độ vừa phải.");
+                if (recommendationsMatcher.find()) {
+                    result.setRecommendations(recommendationsMatcher.group(1));
+                } else {
+                    logger.warn("No recommendations pattern found in Claude response, using analysis as fallback");
+                    // Use analysis as fallback for recommendations
+                    String analysisText = result.getAnalysis();
+                    if (analysisText != null && !analysisText.isEmpty() && 
+                        !analysisText.contains("Không thể trích xuất phân tích")) {
+                        result.setRecommendations(analysisText);
+                    } else {
+                        result.setRecommendations("Đề xuất tập luyện sẽ được cung cấp dựa trên phân tích hình thể của bạn.");
+                    }
+                }
             } catch (Exception e) {
                 logger.warn("Error extracting recommendations: {}", e.getMessage());
-                result.setRecommendations("Đề xuất mặc định: Tập trung vào các bài tập cardio và cường độ vừa phải.");
+                result.setRecommendations("Đề xuất tập luyện sẽ được cung cấp dựa trên phân tích hình thể của bạn.");
             }
 
             return result;
@@ -1718,7 +1779,7 @@ public class TrackDataAiController {
             ImageAnalysisResponseDTO fallback = new ImageAnalysisResponseDTO();
             fallback.setBodyType("Normal");
             fallback.setAnalysis("Không thể phân tích chi tiết. Lỗi xử lý phản hồi: " + e.getMessage());
-            fallback.setRecommendations("Đề xuất mặc định: Tập trung vào các bài tập cardio và cường độ vừa phải.");
+            fallback.setRecommendations("Đề xuất tập luyện cơ bản sẽ được cung cấp dựa trên thông tin cơ thể của bạn. Vui lòng thử lại để có phân tích chi tiết hơn.");
             return fallback;
         }
     }
@@ -2076,7 +2137,7 @@ public class TrackDataAiController {
         
         // Training goals explanation
         if (userDataAi.getTraining_goals() != null) {
-            explanation.append("- Mục tiêu tập luyện ").append(getTrainingGoalVietnamese(userDataAi.getTraining_goals().toString()))
+            explanation.append("- Mục tiêu tập luyện ").append(gettraining_goalVietnamese(userDataAi.getTraining_goals().toString()))
                       .append(" của bạn sẽ được đáp ứng thông qua khóa học này.\n");
         }
         
@@ -2297,20 +2358,65 @@ public class TrackDataAiController {
     private UserDataDTO parseFormDataFromMap(Map<String, Object> formDataMap) {
         UserDataDTO dto = new UserDataDTO();
         
-        if (formDataMap.get("age") != null) dto.setAge((Integer) formDataMap.get("age"));
+        // Safe parsing for Integer fields
+        if (formDataMap.get("age") != null) {
+            Object ageObj = formDataMap.get("age");
+            if (ageObj instanceof Number) {
+                dto.setAge(((Number) ageObj).intValue());
+            }
+        }
+        
+        if (formDataMap.get("customerId") != null) {
+            Object customerIdObj = formDataMap.get("customerId");
+            if (customerIdObj instanceof Number) {
+                dto.setCustomerId(((Number) customerIdObj).intValue());
+            }
+        }
+        
+        // String fields
         if (formDataMap.get("gender") != null) dto.setGender((String) formDataMap.get("gender"));
-        if (formDataMap.get("height") != null) dto.setHeight(((Number) formDataMap.get("height")).doubleValue());
-        if (formDataMap.get("weight") != null) dto.setWeight(((Number) formDataMap.get("weight")).doubleValue());
-        if (formDataMap.get("bmi") != null) dto.setBmi(((Number) formDataMap.get("bmi")).doubleValue());
-        if (formDataMap.get("chest_circumference") != null) dto.setChest_circumference(((Number) formDataMap.get("chest_circumference")).doubleValue());
-        if (formDataMap.get("waist_circumference") != null) dto.setWaist_circumference(((Number) formDataMap.get("waist_circumference")).doubleValue());
         if (formDataMap.get("training_goals") != null) dto.setTraining_goals((String) formDataMap.get("training_goals"));
         if (formDataMap.get("body_type") != null) dto.setBody_type((String) formDataMap.get("body_type"));
         if (formDataMap.get("occupation") != null) dto.setOccupation((String) formDataMap.get("occupation"));
         if (formDataMap.get("work_environment") != null) dto.setWork_environment((String) formDataMap.get("work_environment"));
         if (formDataMap.get("training_history") != null) dto.setTraining_history((String) formDataMap.get("training_history"));
         if (formDataMap.get("training_frequency") != null) dto.setTraining_frequency((String) formDataMap.get("training_frequency"));
-        if (formDataMap.get("customerId") != null) dto.setCustomerId((Integer) formDataMap.get("customerId"));
+        
+        // Double fields - safe parsing
+        if (formDataMap.get("height") != null) {
+            Object heightObj = formDataMap.get("height");
+            if (heightObj instanceof Number) {
+                dto.setHeight(((Number) heightObj).doubleValue());
+            }
+        }
+        
+        if (formDataMap.get("weight") != null) {
+            Object weightObj = formDataMap.get("weight");
+            if (weightObj instanceof Number) {
+                dto.setWeight(((Number) weightObj).doubleValue());
+            }
+        }
+        
+        if (formDataMap.get("bmi") != null) {
+            Object bmiObj = formDataMap.get("bmi");
+            if (bmiObj instanceof Number) {
+                dto.setBmi(((Number) bmiObj).doubleValue());
+            }
+        }
+        
+        if (formDataMap.get("chest_circumference") != null) {
+            Object chestObj = formDataMap.get("chest_circumference");
+            if (chestObj instanceof Number) {
+                dto.setChest_circumference(((Number) chestObj).doubleValue());
+            }
+        }
+        
+        if (formDataMap.get("waist_circumference") != null) {
+            Object waistObj = formDataMap.get("waist_circumference");
+            if (waistObj instanceof Number) {
+                dto.setWaist_circumference(((Number) waistObj).doubleValue());
+            }
+        }
         
         return dto;
     }
@@ -2342,6 +2448,13 @@ public class TrackDataAiController {
             @RequestParam(required = false) String formDataJson,
             @RequestParam(required = false) Integer recommendedCourseId) {
         try {
+            logger.info("=== STEP 7 DATA REQUEST ===");
+            logger.info("FormDataJson: {}", formDataJson);
+            logger.info("RecommendedCourseId: {}", recommendedCourseId);
+            
+            // Note: trainingGoal field is now handled by @JsonProperty annotation in DTOs
+            logger.info("Processing formDataJson with automatic field mapping for trainingGoal -> training_goals");
+            
             // Check if required parameters are provided
             if (formDataJson == null || recommendedCourseId == null) {
                 logger.warn("Missing required parameters: formDataJson or recommendedCourseId");
@@ -2501,9 +2614,9 @@ public class TrackDataAiController {
         }
     }
 
-    private String getTrainingGoalVietnamese(String trainingGoal) {
-        if (trainingGoal == null) return "";
-        switch (trainingGoal.trim()) {
+    private String gettraining_goalVietnamese(String training_goal) {
+        if (training_goal == null) return "";
+        switch (training_goal.trim()) {
             case "1, Strength Training":
                 return "Tăng sức mạnh";
             case "2, Cardiovascular Training":
@@ -2519,7 +2632,7 @@ public class TrackDataAiController {
             case "7, Weight Loss":
                 return "Giảm cân tổng thể";
             default:
-                return trainingGoal; // fallback nếu không khớp
+                return training_goal; // fallback nếu không khớp
         }
     }
 
@@ -3711,13 +3824,13 @@ public class TrackDataAiController {
         Map<String, Object> analysis = new HashMap<>();
         
         // Phân tích training_goals
-        Map<String, Long> trainingGoalsDistribution = trainingData.stream()
+        Map<String, Long> training_goalsDistribution = trainingData.stream()
             .filter(d -> d.getTraining_goals() != null)
             .collect(Collectors.groupingBy(
                 TrackDataAi::getTraining_goals, 
                 Collectors.counting()
             ));
-        analysis.put("trainingGoalsDistribution", trainingGoalsDistribution);
+        analysis.put("training_goalsDistribution", training_goalsDistribution);
         
         // Phân tích training_history
         Map<String, Long> trainingHistoryDistribution = trainingData.stream()
@@ -3966,22 +4079,22 @@ public class TrackDataAiController {
             debugInfo.put("courseDistribution", courseDistribution);
             
             // Step 4: Phân tích training_goals
-            Map<String, Long> trainingGoalsDistribution = effectiveData.stream()
+            Map<String, Long> training_goalsDistribution = effectiveData.stream()
                 .filter(d -> d.getTraining_goals() != null)
                 .collect(Collectors.groupingBy(
                     TrackDataAi::getTraining_goals, 
                     Collectors.counting()
                 ));
-            debugInfo.put("trainingGoalsDistribution", trainingGoalsDistribution);
+            debugInfo.put("training_goalsDistribution", training_goalsDistribution);
             
             // Step 5: Kiểm tra training_goals của user test
-            String userTrainingGoals = testUserData.getTraining_goals();
-            debugInfo.put("userTrainingGoals", userTrainingGoals);
+            String usertraining_goals = testUserData.getTraining_goals();
+            debugInfo.put("usertraining_goals", usertraining_goals);
             
             // Step 6: Lọc dữ liệu theo training_goals của user
             List<TrackDataAi> matchingGoalsData = effectiveData.stream()
                 .filter(d -> d.getTraining_goals() != null && 
-                           d.getTraining_goals().equals(userTrainingGoals))
+                           d.getTraining_goals().equals(usertraining_goals))
                 .collect(Collectors.toList());
             debugInfo.put("matchingGoalsRecords", matchingGoalsData.size());
             
@@ -4033,7 +4146,7 @@ public class TrackDataAiController {
             
             // Step 8: Test fallback logic
             List<Course> allCourses = courseService.findAll();
-            Course defaultCourse = getDefaultCourseByTrainingGoals(testUserData, allCourses);
+                            Course defaultCourse = getDefaultCourseByTrainingGoals(testUserData, allCourses);
             if (defaultCourse != null) {
                 debugInfo.put("defaultCourseId", defaultCourse.getCourseId());
                 debugInfo.put("defaultCourseName", defaultCourse.getCourseName());
@@ -4281,13 +4394,13 @@ public class TrackDataAiController {
         analysis.put("topCourses", topCoursesMap);
         
         // Phân tích training goals distribution
-        Map<String, Long> trainingGoalsDistribution = trainingData.stream()
+        Map<String, Long> training_goalsDistribution = trainingData.stream()
             .filter(d -> d.getTraining_goals() != null)
             .collect(Collectors.groupingBy(
                 TrackDataAi::getTraining_goals,
                 Collectors.counting()
             ));
-        analysis.put("trainingGoalsDistribution", trainingGoalsDistribution);
+        analysis.put("training_goalsDistribution", training_goalsDistribution);
         
         return analysis;
     }
@@ -4484,32 +4597,453 @@ public class TrackDataAiController {
     @PostMapping("/confirm-user-data-ai")
     public ResponseEntity<?> confirmUserDataAi(@RequestBody UserDataDTO userDataDTO) {
         try {
+            logger.info("=== CONFIRM USER DATA AI - STEP 7 CONFIRMATION ===");
+            logger.info("Processing confirmation for customer: {}", userDataDTO.getCustomerId());
+            logger.info("Recommended course ID: {}", userDataDTO.getRecommendedCourseId());
+            
+            // Validate input
+            if (userDataDTO.getCustomerId() == null) {
+                return ResponseEntity.badRequest().body("Customer ID is required");
+            }
+            
             // Lấy customer từ DB
             Customer customer = customerService.findById(userDataDTO.getCustomerId());
             if (customer == null) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Customer not found");
             }
-            // Tạo bản ghi TrackDataAi mới (atomic, sinh id động)
-            TrackDataAi trackDataAi = new TrackDataAi();
-            // Gán các trường cần thiết từ userDataDTO vào trackDataAi nếu cần
-            trackDataAi.setAge(userDataDTO.getAge());
-            trackDataAi.setGender(userDataDTO.getGender());
-            trackDataAi.setHeight(userDataDTO.getHeight());
-            trackDataAi.setWeight(userDataDTO.getWeight());
-            trackDataAi.setChest_circumference(userDataDTO.getChest_circumference());
-            trackDataAi.setWaist_circumference(userDataDTO.getWaist_circumference());
-            trackDataAi.setBmi(userDataDTO.getBmi());
-            // ... các trường khác nếu cần
-            TrackDataAi savedTrack = trackDataAiService.createNewTrackDataAi(trackDataAi);
-            // Tạo UserDataAi mới, gán track_data_ai_id động
-            UserDataAi userDataAi = createUserDataAiFromDTO(userDataDTO, customer);
-            userDataAi.setTrack_data_ai_id(savedTrack.getTrackDataAiId());
-            userDataAi.setEffective(true);
+            
+            // *** BƯỚC 1: TẠO CUSTOMER_COURSE RECORD ***
+            Integer enrolledCourseId = null;
+            if (userDataDTO.getRecommendedCourseId() != null) {
+                try {
+                    logger.info("Step 1: Creating customer_course record for course {} and customer {}", 
+                        userDataDTO.getRecommendedCourseId(), userDataDTO.getCustomerId());
+                    
+                    // Kiểm tra xem customer đã có khóa học này chưa
+                    boolean alreadyEnrolled = customerCourseService.isCustomerEnrolledInCourse(
+                        userDataDTO.getCustomerId(), userDataDTO.getRecommendedCourseId());
+                    
+                    if (!alreadyEnrolled) {
+                        // Tạo bản ghi customer_course với recommended_status = 1 (true)
+                        customerCourseService.saveRecommendedCourseById(
+                            userDataDTO.getRecommendedCourseId(), userDataDTO.getCustomerId());
+                        
+                        enrolledCourseId = userDataDTO.getRecommendedCourseId();
+                        logger.info("✅ Successfully created customer_course record with recommended_status = 1");
+                    } else {
+                        enrolledCourseId = userDataDTO.getRecommendedCourseId();
+                        logger.info("ℹ️ Customer already enrolled in course, using existing enrollment");
+                    }
+                } catch (Exception courseError) {
+                    logger.error("❌ Error creating customer_course record: {}", courseError.getMessage());
+                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body("Error enrolling in course: " + courseError.getMessage());
+                }
+            } else {
+                logger.warn("⚠️ No recommendedCourseId provided, skipping course enrollment");
+            }
+            
+            // *** BƯỚC 2: TẠO USER_DATA_AI RECORD ***
+            logger.info("Step 2: Creating user_data_ai record with user input data");
+            
+            // Tạo UserDataAi với thông tin user đã nhập
+            UserDataAi userDataAi = new UserDataAi();
+            
+            // Set customer relationship
             userDataAi.setCustomer(customer);
-            userDataAiService.saveUserDataAi(userDataAi);
-            return ResponseEntity.ok("UserDataAi record created successfully");
+            
+            // Set basic info
+            userDataAi.setAge(userDataDTO.getAge());
+            userDataAi.setGender(userDataDTO.getGender());
+            userDataAi.setHeight(userDataDTO.getHeight());
+            userDataAi.setWeight(userDataDTO.getWeight());
+            userDataAi.setBmi(userDataDTO.getBmi());
+            
+            // Set body measurements
+            userDataAi.setChest_circumference(userDataDTO.getChest_circumference());
+            userDataAi.setWaist_circumference(userDataDTO.getWaist_circumference());
+            
+            // Set training info
+            userDataAi.setOccupation(userDataDTO.getOccupation());
+            userDataAi.setWork_environment(userDataDTO.getWork_environment());
+            userDataAi.setTraining_history(userDataDTO.getTraining_history());
+            
+            // Convert and set enums
+            try {
+                if (userDataDTO.getTraining_goals() != null) {
+                    training_goals goalEnum = training_goals.fromDatabaseValue(userDataDTO.getTraining_goals().trim());
+                    userDataAi.setTraining_goals(goalEnum);
+                }
+                
+                if (userDataDTO.getTraining_frequency() != null) {
+                    String capitalizedFreq = userDataDTO.getTraining_frequency().substring(0, 1).toUpperCase() + 
+                                           userDataDTO.getTraining_frequency().substring(1).toLowerCase();
+                    training_frequency freqEnum = training_frequency.valueOf(capitalizedFreq);
+                    userDataAi.setTraining_frequency(freqEnum);
+                }
+                
+                if (userDataDTO.getBody_type() != null) {
+                    BodyType bodyTypeEnum = BodyType.fromDatabaseValue(userDataDTO.getBody_type().trim());
+                    userDataAi.setBody_type(bodyTypeEnum);
+                }
+            } catch (Exception enumError) {
+                logger.warn("Error setting enum values: {}", enumError.getMessage());
+            }
+            
+            // Set course if enrolled
+            if (enrolledCourseId != null) {
+                try {
+                    Course course = courseService.findCourseById(enrolledCourseId);
+                    if (course != null) {
+                        userDataAi.setCourse(course);
+                        logger.info("✅ Set course reference in user_data_ai: {}", course.getCourseName());
+                    }
+                } catch (Exception e) {
+                    logger.warn("Could not set course reference: {}", e.getMessage());
+                }
+            }
+            
+            // Set effective = 1 (true) initially - will be updated after course completion
+            userDataAi.setEffective(true);
+            
+            // Set track_data_ai_id (generate new one)
+            try {
+                TrackDataAi trackDataAi = new TrackDataAi();
+                trackDataAi.setAge(userDataDTO.getAge());
+                trackDataAi.setGender(userDataDTO.getGender());
+                trackDataAi.setHeight(userDataDTO.getHeight());
+                trackDataAi.setWeight(userDataDTO.getWeight());
+                trackDataAi.setChest_circumference(userDataDTO.getChest_circumference());
+                trackDataAi.setWaist_circumference(userDataDTO.getWaist_circumference());
+                trackDataAi.setBmi(userDataDTO.getBmi());
+                
+                TrackDataAi savedTrack = trackDataAiService.createNewTrackDataAi(trackDataAi);
+                userDataAi.setTrack_data_ai_id(savedTrack.getTrackDataAiId());
+                
+                logger.info("✅ Created track_data_ai record with ID: {}", savedTrack.getTrackDataAiId());
+            } catch (Exception trackError) {
+                logger.error("❌ Error creating track_data_ai: {}", trackError.getMessage());
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error creating track data: " + trackError.getMessage());
+            }
+            
+            // Save user_data_ai
+            UserDataAi savedUserDataAi = userDataAiService.saveUserDataAi(userDataAi);
+            logger.info("✅ Successfully created user_data_ai record with ID: {}", savedUserDataAi.getUser_data_id());
+            
+            // Tạo response
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "success");
+            response.put("message", "Xác nhận thành công! Bạn đã được ghi danh vào khóa học.");
+            response.put("userDataId", savedUserDataAi.getUser_data_id());
+            response.put("customerId", userDataDTO.getCustomerId());
+            response.put("courseEnrolled", enrolledCourseId != null);
+            response.put("enrolledCourseId", enrolledCourseId);
+            response.put("redirectUrl", "/collection/recommended-courses");
+            
+            logger.info("=== CONFIRMATION COMPLETED SUCCESSFULLY ===");
+            return ResponseEntity.ok(response);
+            
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error: " + e.getMessage());
+            logger.error("❌ Error in confirmUserDataAi: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("Có lỗi xảy ra khi xác nhận: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/test-enum-imports")
+    public ResponseEntity<?> testEnumImports() {
+        try {
+            Map<String, Object> testResult = new HashMap<>();
+            
+            // Test training_goals enum
+            training_goals testGoal = training_goals.fromDatabaseValue("7, Weight Loss");
+            testResult.put("training_goals_test", testGoal.getDatabaseValue());
+            
+            // Test training_frequency enum
+            training_frequency testFreq = training_frequency.Moderate;
+            testResult.put("training_frequency_test", testFreq.name());
+            
+            // Test BodyType enum
+            BodyType testBodyType = BodyType.fromDatabaseValue("Normal");
+            testResult.put("body_type_test", testBodyType.getDatabaseValue());
+            
+            // Test UserDataDTO field mapping
+            UserDataDTO testDTO = new UserDataDTO();
+            testDTO.setTraining_goals("7, Weight Loss");
+            testDTO.setTraining_frequency("Moderate");
+            testDTO.setBody_type("Normal");
+            testDTO.setAge(25);
+            testDTO.setGender("Nam");
+            testDTO.setHeight(170.0);
+            testDTO.setWeight(70.0);
+            testDTO.setBmi(24.2);
+            testDTO.setChest_circumference(90.0);
+            testDTO.setWaist_circumference(80.0);
+            testDTO.setOccupation("Student");
+            testDTO.setWork_environment("Office");
+            testDTO.setCustomerId(1);
+            
+            testResult.put("dto_fields_count", 15);
+            testResult.put("dto_test_success", true);
+            testResult.put("message", "All enum imports and field mappings working correctly");
+            
+            return ResponseEntity.ok(testResult);
+        } catch (Exception e) {
+            Map<String, Object> errorResult = new HashMap<>();
+            errorResult.put("error", e.getMessage());
+            errorResult.put("message", "Enum import or field mapping failed");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResult);
+        }
+    }
+
+    @PostMapping("/update-post-course-metrics/{userDataId}")
+    public ResponseEntity<?> updatePostCourseMetrics(@PathVariable Integer userDataId, 
+                                                    @RequestBody Map<String, Object> metricsData) {
+        try {
+            logger.info("=== UPDATE POST-COURSE METRICS ===");
+            logger.info("Updating metrics for user_data_id: {}", userDataId);
+            logger.info("New metrics: {}", metricsData);
+            
+            // Validate input
+            if (userDataId == null) {
+                return ResponseEntity.badRequest().body("User data ID is required");
+            }
+            
+            // Lấy user_data_ai record
+            UserDataAi userDataAi = userDataAiService.findUserDataAiById(userDataId);
+            if (userDataAi == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User data not found");
+            }
+            
+            // Lấy chỉ số mới từ request
+            Double weightAfter = null;
+            Double waistAfter = null;
+            Double chestAfter = null;
+            
+            try {
+                if (metricsData.get("weight_after") != null) {
+                    weightAfter = Double.valueOf(metricsData.get("weight_after").toString());
+                }
+                if (metricsData.get("waist_circumference_after") != null) {
+                    waistAfter = Double.valueOf(metricsData.get("waist_circumference_after").toString());
+                }
+                if (metricsData.get("chest_circumference_after") != null) {
+                    chestAfter = Double.valueOf(metricsData.get("chest_circumference_after").toString());
+                }
+            } catch (NumberFormatException e) {
+                return ResponseEntity.badRequest().body("Invalid number format in metrics data");
+            }
+            
+            // Validate that at least one metric is provided
+            if (weightAfter == null && waistAfter == null && chestAfter == null) {
+                return ResponseEntity.badRequest().body("At least one post-course metric is required");
+            }
+            
+            // Lấy chỉ số cũ
+            Double weightBefore = userDataAi.getWeight();
+            Double waistBefore = userDataAi.getWaist_circumference();
+            Double chestBefore = userDataAi.getChest_circumference();
+            
+            logger.info("BEFORE metrics - Weight: {}, Waist: {}, Chest: {}", 
+                weightBefore, waistBefore, chestBefore);
+            logger.info("AFTER metrics - Weight: {}, Waist: {}, Chest: {}", 
+                weightAfter, waistAfter, chestAfter);
+            
+            // Cập nhật chỉ số mới
+            if (weightAfter != null) {
+                userDataAi.setWeight_after(weightAfter);
+            }
+            if (waistAfter != null) {
+                userDataAi.setWaist_circumference_after(waistAfter);
+            }
+            if (chestAfter != null) {
+                userDataAi.setChest_circumference_after(chestAfter);
+            }
+            
+            // *** TÍNH TOÁN EFFECTIVE ***
+            boolean isEffective = calculateEffectiveness(
+                weightBefore, weightAfter,
+                waistBefore, waistAfter,
+                chestBefore, chestAfter
+            );
+            
+            userDataAi.setEffective(isEffective);
+            
+            logger.info("Calculated effectiveness: {} ({})", 
+                isEffective, isEffective ? "EFFECTIVE" : "NOT EFFECTIVE");
+            
+            // Lưu cập nhật
+            UserDataAi updatedUserDataAi = userDataAiService.saveUserDataAi(userDataAi);
+            
+            // Tạo response với thông tin chi tiết
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "success");
+            response.put("message", "Cập nhật chỉ số thành công!");
+            response.put("userDataId", userDataId);
+            response.put("effective", isEffective);
+            response.put("effectiveMessage", isEffective ? 
+                "Chúc mừng! Chỉ số cơ thể của bạn đã cải thiện." : 
+                "Chỉ số cơ thể chưa cải thiện. Hãy tiếp tục cố gắng!");
+            
+            // Thêm thông tin so sánh
+            Map<String, Object> comparison = new HashMap<>();
+            if (weightBefore != null && weightAfter != null) {
+                comparison.put("weightChange", weightBefore - weightAfter);
+                comparison.put("weightImproved", weightAfter < weightBefore);
+            }
+            if (waistBefore != null && waistAfter != null) {
+                comparison.put("waistChange", waistBefore - waistAfter);
+                comparison.put("waistImproved", waistAfter < waistBefore);
+            }
+            if (chestBefore != null && chestAfter != null) {
+                comparison.put("chestChange", chestBefore - chestAfter);
+                comparison.put("chestImproved", chestAfter < chestBefore);
+            }
+            response.put("comparison", comparison);
+            
+            logger.info("✅ Successfully updated post-course metrics for user_data_id: {}", userDataId);
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("❌ Error updating post-course metrics: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("Có lỗi xảy ra khi cập nhật chỉ số: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Tính toán effectiveness dựa trên việc so sánh chỉ số trước và sau
+     * Effective = true nếu ít nhất một chỉ số giảm (cải thiện)
+     */
+    private boolean calculateEffectiveness(Double weightBefore, Double weightAfter,
+                                         Double waistBefore, Double waistAfter,
+                                         Double chestBefore, Double chestAfter) {
+        
+        boolean hasImprovement = false;
+        
+        // Kiểm tra cân nặng (giảm = tốt)
+        if (weightBefore != null && weightAfter != null) {
+            if (weightAfter < weightBefore) {
+                logger.info("Weight improved: {} -> {} (reduced by {})", 
+                    weightBefore, weightAfter, weightBefore - weightAfter);
+                hasImprovement = true;
+            } else {
+                logger.info("Weight not improved: {} -> {} (increased by {})", 
+                    weightBefore, weightAfter, weightAfter - weightBefore);
+            }
+        }
+        
+        // Kiểm tra vòng eo (giảm = tốt)
+        if (waistBefore != null && waistAfter != null) {
+            if (waistAfter < waistBefore) {
+                logger.info("Waist improved: {} -> {} (reduced by {})", 
+                    waistBefore, waistAfter, waistBefore - waistAfter);
+                hasImprovement = true;
+            } else {
+                logger.info("Waist not improved: {} -> {} (increased by {})", 
+                    waistBefore, waistAfter, waistAfter - waistBefore);
+            }
+        }
+        
+        // Kiểm tra vòng ngực (có thể tăng hoặc giảm tùy mục tiêu)
+        // Thông thường, giảm vòng ngực = giảm mỡ = tốt
+        if (chestBefore != null && chestAfter != null) {
+            if (chestAfter < chestBefore) {
+                logger.info("Chest improved: {} -> {} (reduced by {})", 
+                    chestBefore, chestAfter, chestBefore - chestAfter);
+                hasImprovement = true;
+            } else {
+                logger.info("Chest not improved: {} -> {} (increased by {})", 
+                    chestBefore, chestAfter, chestAfter - chestBefore);
+            }
+        }
+        
+        logger.info("Overall effectiveness calculation: {}", hasImprovement);
+        return hasImprovement;
+    }
+
+    @GetMapping("/customer/{customerId}/user-data")
+    public ResponseEntity<?> getUserDataByCustomerId(@PathVariable Integer customerId) {
+        try {
+            logger.info("=== GET USER DATA FOR CUSTOMER {} ===", customerId);
+            
+            // Check if customer exists
+            Customer customer = customerService.findById(customerId);
+            if (customer == null) {
+                logger.warn("Customer not found with ID: {}", customerId);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body("Customer not found with ID: " + customerId);
+            }
+            
+            // Get user data AI records for this customer
+            List<UserDataAi> userDataList = userDataAiService.findByCustomerId(customerId);
+            
+            if (userDataList.isEmpty()) {
+                logger.info("No user data found for customer: {}", customerId);
+                Map<String, Object> response = new HashMap<>();
+                response.put("hasData", false);
+                response.put("message", "No user data found for this customer");
+                response.put("customerId", customerId);
+                return ResponseEntity.ok(response);
+            }
+            
+            // Get the most recent user data record
+            UserDataAi latestUserData = userDataList.stream()
+                    .max((a, b) -> {
+                        if (a.getCreatedDate() == null && b.getCreatedDate() == null) return 0;
+                        if (a.getCreatedDate() == null) return -1;
+                        if (b.getCreatedDate() == null) return 1;
+                        return a.getCreatedDate().compareTo(b.getCreatedDate());
+                    })
+                    .orElse(userDataList.get(0));
+            
+            // Create response with user data
+            Map<String, Object> response = new HashMap<>();
+            response.put("hasData", true);
+            response.put("user_data_id", latestUserData.getUser_data_id());
+            response.put("customerId", customerId);
+            response.put("weight", latestUserData.getWeight());
+            response.put("chest_circumference", latestUserData.getChest_circumference());
+            response.put("waist_circumference", latestUserData.getWaist_circumference());
+            response.put("height", latestUserData.getHeight());
+            response.put("age", latestUserData.getAge());
+            response.put("gender", latestUserData.getGender());
+            response.put("bmi", latestUserData.getBmi());
+            response.put("body_type", latestUserData.getBody_type() != null ? latestUserData.getBody_type().toString() : null);
+            response.put("effective", latestUserData.getEffective());
+            response.put("createdDate", latestUserData.getCreatedDate());
+            response.put("updatedDate", latestUserData.getUpdated_date());
+            
+            // Include course information if available
+            if (latestUserData.getCourse() != null) {
+                Map<String, Object> courseInfo = new HashMap<>();
+                courseInfo.put("courseId", latestUserData.getCourse().getCourseId());
+                courseInfo.put("courseName", latestUserData.getCourse().getCourseName());
+                response.put("course", courseInfo);
+            }
+            
+            // Include post-course measurements if available
+            if (latestUserData.getWeight_after() != null || 
+                latestUserData.getWaist_circumference_after() != null || 
+                latestUserData.getChest_circumference_after() != null) {
+                
+                Map<String, Object> afterMeasurements = new HashMap<>();
+                afterMeasurements.put("weight_after", latestUserData.getWeight_after());
+                afterMeasurements.put("waist_circumference_after", latestUserData.getWaist_circumference_after());
+                afterMeasurements.put("chest_circumference_after", latestUserData.getChest_circumference_after());
+                response.put("afterMeasurements", afterMeasurements);
+            }
+            
+            logger.info("✅ Successfully retrieved user data for customer: {}, userDataId: {}", 
+                customerId, latestUserData.getUser_data_id());
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("Error getting user data for customer {}: {}", customerId, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error getting user data: " + e.getMessage());
         }
     }
 

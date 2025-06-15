@@ -97,6 +97,12 @@ const Question = () => {
                         const formDataJson = JSON.stringify(resultFromStep6.formData);
                         const recommendedCourseId = resultFromStep6.recommendedCourses.courseId;
                         
+                        console.log('Question.js: resultFromStep6.formData keys:', Object.keys(resultFromStep6.formData));
+                        console.log('Question.js: resultFromStep6.formData:', resultFromStep6.formData);
+                        console.log('=== QUESTION.JS: CHECKING FOR PROBLEMATIC FIELDS ===');
+                        console.log('resultFromStep6.formData.trainingGoal:', resultFromStep6.formData.trainingGoal);
+                        console.log('resultFromStep6.formData.training_goal:', resultFromStep6.formData.training_goal);
+                        console.log('resultFromStep6.formData.training_goals:', resultFromStep6.formData.training_goals);
                         console.log('Question.js: Calling Step7 with formData and courseId:', formDataJson, recommendedCourseId);
                         
                         // Get complete recommendation data with userMetrics including vòng eo/ngực

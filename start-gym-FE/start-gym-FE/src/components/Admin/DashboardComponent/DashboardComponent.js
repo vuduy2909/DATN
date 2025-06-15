@@ -127,8 +127,8 @@ const DashboardComponent = () => {
     } else {
         // Fallback to old method nếu không có revenueByCustomerType
         revenueData.push(
-            { name: 'VIP', revenue: (dashboardData?.revenueStats?.vip || 0) / 1000000, color: '#667eea' },
-            { name: 'Premium', revenue: (dashboardData?.revenueStats?.premium || 0) / 1000000, color: '#fa709a' }
+        { name: 'VIP', revenue: (dashboardData?.revenueStats?.vip || 0) / 1000000, color: '#667eea' },
+        { name: 'Premium', revenue: (dashboardData?.revenueStats?.premium || 0) / 1000000, color: '#fa709a' }
         );
     }
 

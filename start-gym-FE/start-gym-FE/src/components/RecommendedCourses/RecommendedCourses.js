@@ -57,9 +57,12 @@ const RecommendedCourses = ({ customerId }) => {
   useEffect(() => {
     const fetchData = async () => {
       if (!customerId) {
-        console.error('No customerId provided');
+        console.error('No customerId provided to RecommendedCourses:', customerId);
+        setLoading(false);
         return;
       }
+      
+      console.log('RecommendedCourses: Starting fetchData with customerId:', customerId);
       
       try {
         setLoading(true);
@@ -126,21 +129,27 @@ const RecommendedCourses = ({ customerId }) => {
         
         // Get user data from the user_data_ai table
         try {
+          console.log('Fetching user data for customerId:', customerId);
           const userDataResponse = await request.get(`/track-data-ai/customer/${customerId}/user-data`);
-          console.log('User data from AI:', userDataResponse);
+          console.log('User data from AI response:', userDataResponse);
           
           if (userDataResponse && userDataResponse.user_data_id) {
-            setUserData({
+            const userData = {
               userDataId: userDataResponse.user_data_id,
               weight: userDataResponse.weight,
               chest_circumference: userDataResponse.chest_circumference,
               waist_circumference: userDataResponse.waist_circumference
-            });
+            };
+            console.log('Setting userData:', userData);
+            setUserData(userData);
           } else {
-            console.log('No user data found for this customer');
+            console.log('No user data found for this customer, response:', userDataResponse);
+            setUserData({});
           }
         } catch (userDataError) {
-          console.error('Error fetching user data:', userDataError);
+          console.error('Error fetching user data for customerId', customerId, ':', userDataError);
+          console.error('Error details:', userDataError.response?.data);
+          setUserData({});
         }
         
       } catch (err) {

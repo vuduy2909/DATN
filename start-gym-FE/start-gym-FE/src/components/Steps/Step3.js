@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import useKeyboardNavigation from '../../hooks/useKeyboardNavigation';
 
 import {
     Box,
@@ -24,7 +25,10 @@ import {
 } from '@mui/icons-material';
 
 const Step3 = ({ formData, handleChange, handleNext, handlePrevious }) => {
-    const [selectedGoal, setSelectedGoal] = useState(formData.trainingGoal || '');
+    const [selectedGoal, setSelectedGoal] = useState(formData.training_goal || '');
+
+    // Thêm keyboard navigation
+    useKeyboardNavigation(handleNext, handlePrevious, !selectedGoal, 3, 7);
 
     const steps = [
         '1',
@@ -36,7 +40,7 @@ const Step3 = ({ formData, handleChange, handleNext, handlePrevious }) => {
         '7'
     ];
 
-    const trainingGoals = [
+    const training_goals = [
         { 
             value: 'Giảm cân tổng thể',
             icon: '🏃‍♀️',
@@ -85,7 +89,7 @@ const Step3 = ({ formData, handleChange, handleNext, handlePrevious }) => {
         setSelectedGoal(goal);
         handleChange({
             target: {
-                name: 'trainingGoal',
+                name: 'training_goal',
                 value: goal,
             },
         });
@@ -176,13 +180,13 @@ const Step3 = ({ formData, handleChange, handleNext, handlePrevious }) => {
 
                     {/* Options Grid */}
                     <Grid container spacing={2} sx={{ mb: 4 }}>
-                        {trainingGoals.map((goal, index) => (
+                        {training_goals.map((goal, index) => (
                             <Grid 
                                 item 
                                 xs={12} 
                                 sm={6} 
                                 key={goal.value}
-                                sx={index === trainingGoals.length - 1 ? {
+                                sx={index === training_goals.length - 1 ? {
                                     display: 'flex',
                                     justifyContent: 'center'
                                 } : {}}
@@ -191,8 +195,8 @@ const Step3 = ({ formData, handleChange, handleNext, handlePrevious }) => {
                                     elevation={selectedGoal === goal.value ? 8 : 2}
                                     sx={{ 
                                         height: '100%',
-                                        width: index === trainingGoals.length - 1 ? { xs: '100%', sm: '70%' } : '100%',
-                                        maxWidth: index === trainingGoals.length - 1 ? '350px' : 'none',
+                                        width: index === training_goals.length - 1 ? { xs: '100%', sm: '70%' } : '100%',
+                                        maxWidth: index === training_goals.length - 1 ? '350px' : 'none',
                                         border: selectedGoal === goal.value ? '3px solid #CF4044' : '1px solid #e0e0e0',
                                         backgroundColor: selectedGoal === goal.value ? 'linear-gradient(135deg, #ffebee 0%, #fce4ec 100%)' : '#ffffff',
                                         transform: selectedGoal === goal.value ? 'scale(1.02)' : 'scale(1)',

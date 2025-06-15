@@ -30,11 +30,16 @@ import {
 import BodyImageAnalyzer from '../BodyImageAnalyzer';
 import UserFormService from '../../services/UserFormService';
 import { useAuth } from '../../AuthContext';
+import useKeyboardNavigation from '../../hooks/useKeyboardNavigation';
 
 const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
     const { user } = useAuth();
     const [submitting, setSubmitting] = useState(false);
     const [analysisTimestamp, setAnalysisTimestamp] = useState(Date.now()); // Force re-render when analysis updates
+    const [error, setError] = useState('');
+
+    // Thêm keyboard navigation
+    useKeyboardNavigation(handleNext, handlePrevious, submitting, 6, 7);
 
     const steps = [
         '1',
@@ -48,51 +53,98 @@ const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
     
     // Helper để lấy key localStorage riêng cho từng user cho kết quả phân tích
     const getAnalysisStorageKey = () => {
-        const userId = user?.id || user?.customerId || user?.username || 'anonymous';
+        const userId = user?.customerId || user?.id || user?.username || 'anonymous';
         return `analysisResult_${userId}`;
     };
 
     // Helper để lấy key localStorage riêng cho từng user cho ảnh phân tích
     const getImageStorageKey = () => {
-        const userId = user?.id || user?.customerId || user?.username || 'anonymous';
+        const userId = user?.customerId || user?.id || user?.username || 'anonymous';
         return `analysisImage_${userId}`;
     };
 
     // Load saved analysis result và ảnh khi component mount
     useEffect(() => {
-        try {
-            // Load analysis result
-            const analysisKey = getAnalysisStorageKey();
-            const savedAnalysis = localStorage.getItem(analysisKey);
-            if (savedAnalysis) {
-                const parsed = JSON.parse(savedAnalysis);
-                // Gọi handleChange để cập nhật lại formData nếu cần
-                if (parsed && parsed.bodyType && parsed.bodyType !== formData.bodyType) {
-                    handleChange({ target: { name: 'bodyType', value: parsed.bodyType } });
+        const loadSavedData = async () => {
+            try {
+                console.log('Step6: Loading saved analysis data for user:', user?.customerId || user?.id);
+                
+                // Load analysis result
+                const analysisKey = getAnalysisStorageKey();
+                const savedAnalysis = localStorage.getItem(analysisKey);
+                if (savedAnalysis) {
+                    const parsed = JSON.parse(savedAnalysis);
+                    console.log('Loading saved analysis data:', parsed);
+                    
+                    let hasChanges = false;
+                    
+                    // Gọi handleChange để cập nhật lại formData nếu cần
+                    if (parsed && parsed.bodyType && parsed.bodyType !== formData.bodyType) {
+                        console.log('Restoring bodyType:', parsed.bodyType);
+                        handleChange({ target: { name: 'bodyType', value: parsed.bodyType } });
+                        hasChanges = true;
+                    }
+                    if (parsed && parsed.comment && parsed.comment !== formData.comment) {
+                        console.log('Restoring comment:', parsed.comment);
+                        handleChange({ target: { name: 'comment', value: parsed.comment } });
+                        hasChanges = true;
+                    }
+                    if (parsed && parsed.recommendation && parsed.recommendation !== formData.recommendation) {
+                        console.log('Restoring recommendation:', parsed.recommendation);
+                        handleChange({ target: { name: 'recommendation', value: parsed.recommendation } });
+                        hasChanges = true;
+                    }
+                    
+                    if (hasChanges) {
+                        // Delay để đảm bảo formData được cập nhật trước khi re-render
+                        setTimeout(() => {
+                        setAnalysisTimestamp(Date.now());
+                        }, 100);
                 }
-                if (parsed && parsed.comment && parsed.comment !== formData.comment) {
-                    handleChange({ target: { name: 'comment', value: parsed.comment } });
-                }
-                if (parsed && parsed.recommendation && parsed.recommendation !== formData.recommendation) {
-                    handleChange({ target: { name: 'recommendation', value: parsed.recommendation } });
-                }
-                setAnalysisTimestamp(Date.now());
             }
 
-            // Load saved image
-            const imageKey = getImageStorageKey();
-            const savedImageData = localStorage.getItem(imageKey);
-            if (savedImageData) {
-                const imageData = JSON.parse(savedImageData);
-                // Set saved image data để component BodyImageAnalyzer có thể sử dụng
-                if (window.setSavedAnalysisImage) {
-                    window.setSavedAnalysisImage(imageData);
+                // Load saved image
+                const imageKey = getImageStorageKey();
+                const savedImageData = localStorage.getItem(imageKey);
+                if (savedImageData) {
+                    const imageData = JSON.parse(savedImageData);
+                    console.log('Loading saved image data for BodyImageAnalyzer');
+                    // Set saved image data để component BodyImageAnalyzer có thể sử dụng
+                    if (window.setSavedAnalysisImage) {
+                        window.setSavedAnalysisImage(imageData);
+                    }
                 }
+            } catch (e) {
+                console.error('Error loading analysis data from localStorage:', e);
             }
-        } catch (e) {
-            console.error('Error loading analysis data from localStorage:', e);
+        };
+        
+        if (user?.customerId || user?.id) {
+            loadSavedData();
         }
-    }, [user]);
+    }, [user?.customerId, user?.id]); // Phụ thuộc vào customerId hoặc id để tránh infinite loop
+
+    // Effect riêng để trigger re-render khi có dữ liệu trong formData (khi quay lại step)
+    useEffect(() => {
+        console.log('Step6: Checking formData on mount/update:', {
+            bodyType: formData.bodyType,
+            comment: formData.comment,
+            recommendation: formData.recommendation,
+            chestSize: formData.chestSize,
+            waistSize: formData.waistSize
+        });
+        
+        if (formData.bodyType || formData.comment || formData.recommendation) {
+            console.log('Step6: Detected existing data in formData, triggering re-render');
+            setAnalysisTimestamp(Date.now());
+        }
+    }, [formData.bodyType, formData.comment, formData.recommendation]); // Theo dõi các field quan trọng
+
+    // Effect để force reload khi component mount lại (user quay về step 6)
+    useEffect(() => {
+        console.log('Step6: Component mounted/remounted, forcing analysis timestamp update');
+        setAnalysisTimestamp(Date.now());
+    }, []); // Chỉ chạy khi component mount
 
     // Xử lý khi phân tích ảnh hoàn tất hoặc khi các trường đo lường được cập nhật
     const handleAnalysisComplete = (bodyType, measurementChange = null, analysisData = null) => {
@@ -122,7 +174,7 @@ const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
             handleChange(measurementChange);
             setAnalysisTimestamp(Date.now());
         }
-
+        
         // Lưu kết quả phân tích vào localStorage theo user
         try {
             const analysisKey = getAnalysisStorageKey();
@@ -198,6 +250,7 @@ const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
         if (submitting) return;
         
         setSubmitting(true);
+        setError(''); // Clear previous errors
         console.log('Step6: handleSubmit called');
         
         console.log('Submitting form with body analysis data:', {
@@ -206,9 +259,13 @@ const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
             chest_circumference: formData.chestSize
         });
         
+        // Prepare API data format outside try block for error handling
+        let apiFormData = null;
+        let finalApiData = null;
+        
         try {
             // Simplified and more reliable mapping function
-            const mapTrainingFrequency = (value) => {
+            const maptraining_frequency = (value) => {
                 if (!value) return 'Moderate'; // Default to exact enum value
                 
                 // Ensure clean string before mapping (no extra spaces)
@@ -264,7 +321,7 @@ const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
             // Map training goals values to database ENUM values
             // ENUM('1, Strength Training','2, Cardiovascular Training','3, Flexibility and Balance',
             //      '4, Train strength and endurance','5, Mind-Body Wellness','6, Functional Training','7, Weight Loss')
-            const trainingGoalMap = {
+            const training_goalMap = {
                 'Giảm cân tổng thể': '7, Weight Loss',
                 'Giảm mỡ, giữ cơ': '7, Weight Loss',
                 'Tăng cơ bắp': '1, Strength Training',
@@ -274,18 +331,18 @@ const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
                 'Duy trì vóc dáng': '6, Functional Training'
             };
 
-            // Prepare API data format
-            const apiFormData = {
+            // Prepare API data format - match exactly with BE UserDataDTO fields
+            apiFormData = {
                 // Apply trim() to ensure no whitespace issues for ENUM fields
-                training_history: mapTrainingFrequency(formData.trainingFrequency).trim(),
-                training_frequency: mapTrainingFrequency(formData.desiredFrequency).trim(),
+                training_history: maptraining_frequency(formData.training_frequency).trim(),
+                training_frequency: maptraining_frequency(formData.desiredFrequency).trim(),
                 age: formData.age,
                 gender: formData.gender,
                 height: formData.height,
                 weight: formData.weight,
                 bmi: Math.round((formData.weight / Math.pow(formData.height/100, 2)) * 100) / 100, // Tính BMI và làm tròn 2 chữ số thập phân
                 body_type: formData.bodyType || 'Normal',
-                training_goals: (trainingGoalMap[formData.trainingGoal] || '7, Weight Loss').trim(),
+                training_goals: (training_goalMap[formData.training_goal] || '7, Weight Loss').trim(), // BE expects training_goals
                 occupation: (occupationMap[formData.occupation] || 'Student').trim(),
                 work_environment: (workEnvironmentMap[formData.workEnvironment] || 'Office').trim(),
                 chest_circumference: formData.chestSize, 
@@ -293,17 +350,21 @@ const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
                 customerId: formData.customerId
             };
             
-            // Ensure that any direct trainingFrequency properties are not included
-            // The backend is only expecting training_history and training_frequency
-            if (apiFormData.hasOwnProperty('trainingFrequency')) {
-                delete apiFormData.trainingFrequency;
-            }
+            // Ensure training_frequency is properly mapped
+            // Backend expects both training_history and training_frequency
+            apiFormData.training_frequency = maptraining_frequency(formData.desiredFrequency).trim();
             
             console.log('=== STEP6: API DATA PREPARATION ===');
+            console.log('Original formData keys:', Object.keys(formData));
+            console.log('Original formData:', formData);
+            console.log('=== CHECKING FOR PROBLEMATIC FIELDS ===');
+            console.log('formData.trainingGoal (camelCase):', formData.trainingGoal);
+            console.log('formData.training_goal (underscore):', formData.training_goal);
+            console.log('formData.training_goals (plural):', formData.training_goals);
             console.log('FormData.bodyType from form:', formData.bodyType);
             console.log('Body type in API data:', apiFormData.body_type);
             console.log('Calling API directly from Step6 with data:', apiFormData);
-            console.log('Original training history:', formData.trainingFrequency);
+            console.log('Original training history:', formData.training_frequency);
             console.log('Mapped training history:', apiFormData.training_history);
             console.log('Original desired frequency:', formData.desiredFrequency);
             console.log('Mapped training frequency:', apiFormData.training_frequency);
@@ -312,7 +373,7 @@ const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
             console.log('Mapped occupation:', apiFormData.occupation);
             console.log('Original work environment:', formData.workEnvironment);
             console.log('Mapped work environment:', apiFormData.work_environment);
-            console.log('Original training goal:', formData.trainingGoal);
+            console.log('Original training goal:', formData.training_goal);
             console.log('Mapped training goal:', apiFormData.training_goals);
             console.log('Database enum values must match exactly what is defined in the schema');
             console.log('Check for: 1. Exact case matching 2. No whitespace 3. No special characters');
@@ -321,20 +382,41 @@ const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
             console.log('=== FINAL API REQUEST DATA ===');
             console.log('API endpoint: /track-data-ai/recommend-course');
             console.log('Request method: POST');
-            console.log('Complete request data:', JSON.stringify(apiFormData));
+            console.log('Complete request data:', JSON.stringify(apiFormData, null, 2));
             console.log('Expected backend fields only:', Object.keys(apiFormData).join(', '));
+            console.log('=== BACKEND EXPECTED FIELDS ===');
+            console.log('UserDataDTO fields: training_history, training_frequency, age, gender, height, weight, bmi, chest_circumference, waist_circumference, training_goals, body_type, occupation, work_environment, customerId, recommendedCourseId');
             console.log('=== END API REQUEST DATA ===');
             
+            // Final validation - ensure no unexpected fields
+            const allowedFields = ['training_history', 'training_frequency', 'age', 'gender', 'height', 
+                                  'weight', 'bmi', 'chest_circumference', 'waist_circumference', 
+                                  'training_goals', 'body_type', 'occupation', 'work_environment', 
+                                  'customerId', 'recommendedCourseId'];
+            
+            finalApiData = {};
+            allowedFields.forEach(field => {
+                if (apiFormData.hasOwnProperty(field)) {
+                    finalApiData[field] = apiFormData[field];
+                }
+            });
+            
+            console.log('Final API data after field filtering:', finalApiData);
+            console.log('Final API data keys:', Object.keys(finalApiData));
+            console.log('=== STEP6: FINAL VALIDATION BEFORE API CALL ===');
+            console.log('finalApiData.trainingGoal:', finalApiData.trainingGoal);
+            console.log('finalApiData.training_goal:', finalApiData.training_goal);
+            console.log('finalApiData.training_goals:', finalApiData.training_goals);
+            console.log('JSON.stringify(finalApiData):', JSON.stringify(finalApiData));
+            
             // Call API directly from here
-            const result = await UserFormService.submitFormData(apiFormData);
+            const result = await UserFormService.submitFormData(finalApiData);
             console.log('Step6: API response received:', result);
             
             // Make sure the result has the necessary properties for step 7
             if (result && result.recommendedCourses) {
-                // Ensure recommendedCourseId is explicitly set in both formData and at top level
-                if (!result.formData) {
-                    result.formData = { ...apiFormData };
-                }
+                // ALWAYS use finalApiData (sanitized) for formData, never the original result.formData
+                result.formData = { ...finalApiData };
                 
                 if (result.recommendedCourses.courseId) {
                     // Add recommendedCourseId to formData object
@@ -344,6 +426,9 @@ const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
                     
                     console.log('Step6: Added recommendedCourseId to result:', result.recommendedCourses.courseId);
                 }
+                
+                console.log('Step6: Final result.formData keys:', Object.keys(result.formData));
+                console.log('Step6: Final result.formData:', result.formData);
             }
             
             // IMMEDIATELY navigate to next step
@@ -361,8 +446,18 @@ const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
             }
         } catch (error) {
             console.error('Error submitting form:', error);
-            // Even on error, try to navigate to next step
-            handleNext();
+            console.error('Error details:', error.response?.data || error.message);
+            
+            // Show error to user but still try to navigate
+            setError(`Có lỗi xảy ra: ${error.response?.data?.message || error.message}`);
+            
+            // Even on error, try to navigate to next step with basic data
+            const fallbackResult = {
+                formData: finalApiData || apiFormData,
+                recommendedCourses: null,
+                error: error.message
+            };
+            handleNext(fallbackResult);
         } finally {
             setSubmitting(false);
         }
@@ -378,14 +473,39 @@ const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
             <Container maxWidth="md" sx={{ py: 4 }}>
                 {/* Material UI Stepper */}
                 <Paper elevation={2} sx={{ p: 3, mb: 4, borderRadius: 3 }}>
-                    <Stepper activeStep={5} alternativeLabel>
+                    <Stepper activeStep={5} alternativeLabel
+                        sx={{
+                            '& .MuiStep-root': {
+                                '& .MuiStepIcon-root': {
+                                    color: '#e0e0e0', // Inactive step color
+                                    '&.Mui-active': {
+                                        color: '#CF4044', // Active step color (red)
+                                    },
+                                    '&.Mui-completed': {
+                                        color: '#CF4044', // Completed step color (red)
+                                    },
+                                },
+                                '& .MuiStepConnector-line': {
+                                    borderColor: '#e0e0e0', // Connector line color
+                                },
+                                '& .Mui-active ~ .MuiStepConnector-root .MuiStepConnector-line': {
+                                    borderColor: '#CF4044', // Active connector color
+                                },
+                                '& .Mui-completed ~ .MuiStepConnector-root .MuiStepConnector-line': {
+                                    borderColor: '#CF4044', // Completed connector color
+                                },
+                            },
+                            '& .MuiStepConnector-root': {
+                                '& .MuiStepConnector-line': {
+                                    borderTopWidth: '3px',
+                                    borderRadius: '1px',
+                                },
+                            },
+                        }}
+                    >
                         {steps.map((label, index) => (
                             <Step key={label}>
-                                <StepLabel>
-                                    <Typography variant="caption" sx={{ fontSize: '0.75rem' }}>
-                                        {label}
-                                    </Typography>
-                                </StepLabel>
+                                <StepLabel sx={{ '& .MuiStepLabel-label': { display: 'none' } }} />
                             </Step>
                         ))}
                     </Stepper>
@@ -440,7 +560,7 @@ const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
                                 <Avatar sx={{ bgcolor: '#2196f3', mr: 2, width: 50, height: 50 }}>
                                     <CameraAlt />
                                 </Avatar>
-                                <Box>
+                                <Box sx={{ flex: 1 }}>
                                     <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#2c3e50' }}>
                                         Phân tích hình ảnh thông minh
                                     </Typography>
@@ -448,73 +568,31 @@ const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
                                         Upload ảnh để AI phân tích dáng người và đưa ra khuyến nghị
                                     </Typography>
                                 </Box>
+                                <Button
+                                    variant="outlined"
+                                    size="small"
+                                    onClick={clearSavedAnalysis}
+                                    sx={{ 
+                                        color: '#CF4044', 
+                                        borderColor: '#CF4044',
+                                        '&:hover': {
+                                            borderColor: '#B8363C',
+                                            backgroundColor: 'rgba(207, 64, 68, 0.04)'
+                                        }
+                                    }}
+                                >
+                                    Xóa dữ liệu cũ
+                                </Button>
                             </Box>
 
                             <Divider sx={{ my: 3 }} />
                             
-                            {/* Hiển thị ảnh đã lưu nếu có */}
-                            {(() => {
-                                const savedImage = getSavedAnalysisImage();
-                                return savedImage ? (
-                                    <Card elevation={2} sx={{ mb: 4, borderRadius: 3, bgcolor: '#f8f9fa' }}>
-                                        <CardContent sx={{ p: 3 }}>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                                                <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#2c3e50' }}>
-                                                    📸 Ảnh phân tích đã lưu
-                                                </Typography>
-                                                <Button
-                                                    variant="outlined"
-                                                    color="error"
-                                                    size="small"
-                                                    onClick={clearSavedAnalysis}
-                                                    sx={{ minWidth: 'auto' }}
-                                                >
-                                                    Xóa ảnh cũ
-                                                </Button>
-                                            </Box>
-                                            <Grid container spacing={3}>
-                                                <Grid item xs={12} md={4}>
-                                                    <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                                                        <img
-                                                            src={`data:image/jpeg;base64,${savedImage.imageBase64}`}
-                                                            alt="Ảnh phân tích đã lưu"
-                                                            style={{
-                                                                maxWidth: '100%',
-                                                                maxHeight: '300px',
-                                                                borderRadius: '8px',
-                                                                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                                                            }}
-                                                        />
-                                                    </Box>
-                                                </Grid>
-                                                <Grid item xs={12} md={8}>
-                                                    <Typography variant="body2" sx={{ mb: 1, color: '#666' }}>
-                                                        <strong>Loại hình thể:</strong> {savedImage.bodyType}
-                                                    </Typography>
-                                                    {savedImage.analysis && (
-                                                        <Typography variant="body2" sx={{ mb: 1, color: '#666' }}>
-                                                            <strong>Phân tích:</strong> {savedImage.analysis.substring(0, 200)}...
-                                                        </Typography>
-                                                    )}
-                                                    {savedImage.recommendations && (
-                                                        <Typography variant="body2" sx={{ color: '#666' }}>
-                                                            <strong>Đề xuất:</strong> {savedImage.recommendations.substring(0, 200)}...
-                                                        </Typography>
-                                                    )}
-                                                    <Typography variant="caption" sx={{ display: 'block', mt: 2, color: '#999' }}>
-                                                        Lưu lúc: {new Date(savedImage.timestamp).toLocaleString('vi-VN')}
-                                                    </Typography>
-                                                </Grid>
-                                            </Grid>
-                                        </CardContent>
-                                    </Card>
-                                ) : null;
-                            })()}
-
                             {/* Component phân tích ảnh */}
                             <BodyImageAnalyzer 
                                 formData={formData} 
                                 onAnalysisComplete={handleAnalysisComplete}
+                                user={user}
+                                key={`body-analyzer-${analysisTimestamp}`}
                             />
                         </CardContent>
                     </Card>
@@ -532,7 +610,7 @@ const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
                                 </Typography>
                                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center', alignItems: 'center' }}>
                                     {formData.bodyType && (
-                                        <Chip
+                                        <Chip 
                                             label={`Loại hình thể: ${formData.bodyType || 'Chưa xác định'}`}
                                             color="primary"
                                             sx={{ fontWeight: 'bold', fontSize: 16, bgcolor: '#CF4044', color: 'white' }}
@@ -563,6 +641,13 @@ const Step6 = ({ formData, handleChange, handleNext, handlePrevious }) => {
                                 </Box>
                             </CardContent>
                         </Card>
+                    )}
+
+                    {/* Error Display */}
+                    {error && (
+                        <Alert severity="error" sx={{ mb: 4, borderRadius: 3 }}>
+                            {error}
+                        </Alert>
                     )}
 
                     {/* Navigation Buttons */}

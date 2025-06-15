@@ -64,11 +64,26 @@ public class TrackDataAiServiceImpl implements ITrackDataAiService {
             .orElse(1000) + 1;
     }
 
+    @Override
     @Transactional
-    public TrackDataAi createNewTrackDataAi(TrackDataAi data) {
+    public synchronized TrackDataAi createNewTrackDataAi(TrackDataAi data) {
+        // Atomic operation: Get MAX ID and create new record
         Integer maxId = trackDataAiRepository.findMaxTrackDataAiId();
         int newId = (maxId != null ? maxId : 0) + 1;
+        
+        // Validation to prevent race condition
+        if (data.getTrackDataAiId() != null) {
+            throw new IllegalArgumentException("TrackDataAi ID should be null for new records");
+        }
+        
         data.setTrackDataAiId(newId);
-        return trackDataAiRepository.save(data);
+        TrackDataAi savedTrack = trackDataAiRepository.save(data);
+        
+        // Double-check the saved ID matches expected
+        if (!savedTrack.getTrackDataAiId().equals(newId)) {
+            throw new RuntimeException("Failed to create TrackDataAi with expected ID: " + newId);
+        }
+        
+        return savedTrack;
     }
 }
