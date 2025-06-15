@@ -179,8 +179,8 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete, user: userProp }) => 
   const [loading, setLoading] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [error, setError] = useState('');
-  const [waistCircumference, setWaistCircumference] = useState(formData.waistSize || '');
-  const [chestCircumference, setChestCircumference] = useState(formData.chestSize || '');
+  const [waistCircumference, setWaistCircumference] = useState('');
+  const [chestCircumference, setChestCircumference] = useState('');
   const [waistError, setWaistError] = useState('');
   const [chestError, setChestError] = useState('');
   const { user: authUser } = useAuth();
@@ -196,6 +196,22 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete, user: userProp }) => 
       username: user?.username
     });
   }, [user]);
+
+  // Initialize measurements from formData on first mount
+  useEffect(() => {
+    console.log('🚀 Initial mount - setting measurements from formData:', {
+      waistSize: formData.waistSize,
+      chestSize: formData.chestSize
+    });
+    
+    if (formData.waistSize) {
+      setWaistCircumference(formData.waistSize);
+    }
+    if (formData.chestSize) {
+      setChestCircumference(formData.chestSize);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array - only run on mount
 
   // Tạo key riêng cho từng user dựa trên customerId
   const getStorageKey = () => {
@@ -289,11 +305,22 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete, user: userProp }) => 
   };
 
   // Initialize measurements from formData when component mounts or formData changes
+  // BUT only if local state is empty to avoid overriding user input
   useEffect(() => {
-    if (formData.waistSize && waistCircumference !== formData.waistSize) {
+    console.log('🔄 FormData sync check:', {
+      formDataWaist: formData.waistSize,
+      localWaist: waistCircumference,
+      formDataChest: formData.chestSize,
+      localChest: chestCircumference
+    });
+    
+    // Only sync from formData if local state is empty (initial load)
+    if (formData.waistSize && !waistCircumference) {
+      console.log('🔄 Syncing waist from formData:', formData.waistSize);
       setWaistCircumference(formData.waistSize);
     }
-    if (formData.chestSize && chestCircumference !== formData.chestSize) {
+    if (formData.chestSize && !chestCircumference) {
+      console.log('🔄 Syncing chest from formData:', formData.chestSize);
       setChestCircumference(formData.chestSize);
     }
   }, [formData.waistSize, formData.chestSize]);
@@ -413,19 +440,23 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete, user: userProp }) => 
           setPreviewUrl(analysisData.imageBase64);
         }
         
-        // Update form data if measurements are available
-        if (analysisData.waist_circumference && onAnalysisComplete) {
+        // Update form data if measurements are available AND not already set locally
+        if (analysisData.waist_circumference && !waistCircumference && onAnalysisComplete) {
+          setWaistCircumference(analysisData.waist_circumference);
           const waistEvent = {
             target: { name: 'waistSize', value: analysisData.waist_circumference }
           };
           onAnalysisComplete(savedResult.bodyType, waistEvent);
+          console.log('✅ Restored waist from server:', analysisData.waist_circumference);
         }
         
-        if (analysisData.chest_circumference && onAnalysisComplete) {
+        if (analysisData.chest_circumference && !chestCircumference && onAnalysisComplete) {
+          setChestCircumference(analysisData.chest_circumference);
           const chestEvent = {
             target: { name: 'chestSize', value: analysisData.chest_circumference }
           };
           onAnalysisComplete(savedResult.bodyType, chestEvent);
+          console.log('✅ Restored chest from server:', analysisData.chest_circumference);
         }
         
         // Save to localStorage as well for backup
@@ -462,6 +493,18 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete, user: userProp }) => 
           if (parsedData.previewUrl) {
             setPreviewUrl(parsedData.previewUrl);
             console.log('✅ Restored image preview from localStorage:', parsedData.previewUrl.substring(0, 50) + '...');
+          }
+          
+          // ⚠️ KHÔNG restore measurements từ localStorage để tránh override giá trị user đang nhập
+          // Chỉ restore nếu chưa có giá trị nào được nhập
+          if (parsedData.waistCircumference && !waistCircumference) {
+            setWaistCircumference(parsedData.waistCircumference);
+            console.log('✅ Restored waist measurement from localStorage:', parsedData.waistCircumference);
+          }
+          
+          if (parsedData.chestCircumference && !chestCircumference) {
+            setChestCircumference(parsedData.chestCircumference);
+            console.log('✅ Restored chest measurement from localStorage:', parsedData.chestCircumference);
           }
         }
         
@@ -523,7 +566,10 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete, user: userProp }) => 
         previewUrl: urlToSave, // Lưu blob URL hoặc base64 nhỏ
         fileName: fileName,
         timestamp: Date.now(),
-        hasImage: !!(newPreviewUrl || previewUrl || selectedFile) // Flag để biết có ảnh
+        hasImage: !!(newPreviewUrl || previewUrl || selectedFile), // Flag để biết có ảnh
+        // Lưu measurements để restore sau này (nhưng không override khi user đang nhập)
+        waistCircumference: waistCircumference,
+        chestCircumference: chestCircumference
       };
       
       localStorage.setItem(storageKey, JSON.stringify(dataToSave));
@@ -613,6 +659,8 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete, user: userProp }) => 
   const handleWaistChange = (event) => {
     const value = event.target.value;
     
+    console.log('🔢 Waist input changed:', value);
+    
     // Immediately update local state to prevent focus loss
     setWaistCircumference(value);
     
@@ -626,15 +674,20 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete, user: userProp }) => 
     window.waistUpdateTimeout = setTimeout(() => {
       const error = validateWaist(value);
       setWaistError(error);
-      if (!error && value.trim() !== '') {
-        updateFormData('waistSize', value);
-      }
-    }, 1000); // Increased to 1 second for better UX
+      
+      // Always update formData with the current value, even if there's an error
+      // This prevents the value from being lost
+      updateFormData('waistSize', value);
+      
+      console.log('🔢 Waist validation result:', { value, error, updated: true });
+    }, 500); // Reduced to 500ms for better responsiveness
   };
 
   // Cập nhật chest_circumference vào formData
   const handleChestChange = (event) => {
     const value = event.target.value;
+    
+    console.log('🔢 Chest input changed:', value);
     
     // Immediately update local state to prevent focus loss
     setChestCircumference(value);
@@ -649,10 +702,13 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete, user: userProp }) => 
     window.chestUpdateTimeout = setTimeout(() => {
       const error = validateChest(value);
       setChestError(error);
-      if (!error && value.trim() !== '') {
-        updateFormData('chestSize', value);
-      }
-    }, 1000); // Increased to 1 second for better UX
+      
+      // Always update formData with the current value, even if there's an error
+      // This prevents the value from being lost
+      updateFormData('chestSize', value);
+      
+      console.log('🔢 Chest validation result:', { value, error, updated: true });
+    }, 500); // Reduced to 500ms for better responsiveness
   };
 
   // Helper function to update formData - keeping for backward compatibility
@@ -705,8 +761,24 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete, user: userProp }) => 
       setLoading(true);
       setError('');
 
-      // Get customerId for API call
-      const customerId = user?.customerId || user?.id || user?.customer_id || user?.customer?.customerId || user?.customer?.customer_id;
+      // Get customerId for API call - improved resolution logic
+      let customerId = null;
+      
+      // Try multiple ways to get customerId based on AuthContext structure
+      if (user?.customerId) {
+        customerId = user.customerId;
+      } else if (user?.customer?.customerId) {
+        customerId = user.customer.customerId;
+      } else if (user?.id) {
+        customerId = user.id;
+      } else if (user?.customer_id) {
+        customerId = user.customer_id;
+      } else if (user?.customer?.customer_id) {
+        customerId = user.customer.customer_id;
+      } else if (user?.userId) {
+        customerId = user.userId;
+      }
+      
       console.log('🔍 Debug user object for customerId:', {
         user: user,
         userType: typeof user,
@@ -717,6 +789,7 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete, user: userProp }) => 
         customer: user?.customer,
         customerCustomerId: user?.customer?.customerId,
         customerCustomer_id: user?.customer?.customer_id,
+        userId: user?.userId,
         resolvedCustomerId: customerId
       });
       
@@ -725,7 +798,7 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete, user: userProp }) => 
         console.error('Available user properties:', user ? Object.keys(user) : 'user is null/undefined');
         
         // Check if user is still loading
-        if (!user) {
+        if (!user || Object.keys(user).length === 0) {
           setError('Đang tải thông tin người dùng. Vui lòng thử lại sau vài giây.');
         } else {
           setError('Không thể xác định thông tin người dùng. Vui lòng đăng nhập lại.');
@@ -1155,24 +1228,24 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete, user: userProp }) => 
           </Box>
           
           {(previewUrl || selectedFile) && (
-            <Box 
-              sx={{ 
-                mb: 2, 
-                mt: 2, 
-                textAlign: 'center', 
-                maxWidth: 300, 
-                margin: '0 auto',
-                position: 'relative',
-                zIndex: 10,
-                backgroundColor: 'white',
-                padding: 1,
-                borderRadius: 2,
-                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-              }}
-            >
-              <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
-                Ảnh đã chọn:
-              </Typography>
+            <Box sx={{ textAlign: 'center', mb: 2, mt: 2 }}>
+              <Box 
+                sx={{ 
+                  display: 'inline-block',
+                  position: 'relative',
+                  zIndex: 10,
+                  backgroundColor: 'white',
+                  padding: 1.5,
+                  borderRadius: 3,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                  border: '1px solid #e0e0e0',
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    boxShadow: '0 6px 20px rgba(0,0,0,0.15)',
+                    transform: 'translateY(-2px)'
+                  }
+                }}
+              >
               <img 
                 src={(() => {
                   // Ưu tiên blob URL (nhẹ và persistent)
@@ -1207,12 +1280,16 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete, user: userProp }) => 
                 })()} 
                 alt="Preview" 
                 style={{ 
-                  maxWidth: '100%', 
-                  maxHeight: 300, 
+                  maxWidth: 'min(400px, 90vw)',
+                  maxHeight: '400px',
+                  minWidth: '200px',
+                  minHeight: '200px',
+                  width: 'auto',
+                  height: 'auto',
                   borderRadius: 8,
-                  border: '1px solid #ddd',
                   objectFit: 'contain',
-                  display: 'block'
+                  display: 'block',
+                  margin: '0 auto'
                 }} 
                 onError={(e) => {
                   console.error('🚨 Image load error, src:', e.target.src);
@@ -1241,10 +1318,17 @@ const BodyImageAnalyzer = ({ formData, onAnalysisComplete, user: userProp }) => 
                     e.target.style.opacity = '0.5';
                   }
                 }}
-                onLoad={() => {
+                onLoad={(e) => {
                   console.log('✅ Image loaded successfully');
+                  // Add fade-in animation when image loads
+                  e.target.style.opacity = '0';
+                  e.target.style.transition = 'opacity 0.3s ease-in-out';
+                  setTimeout(() => {
+                    e.target.style.opacity = '1';
+                  }, 50);
                 }}
               />
+              </Box>
             </Box>
           )}
           

@@ -1661,13 +1661,15 @@ public class TrackDataAiController {
                         } else if (jsonNode.has("recommendation")) { // Check singular form
                             result.setRecommendations(jsonNode.get("recommendation").asText());
                         } else {
-                            logger.warn("No recommendations field found in Claude response JSON, using analysis as fallback");
-                            // Use analysis as fallback for recommendations if available
+                            logger.warn("No recommendations field found in Claude response JSON, generating separate recommendations");
+                            // Generate separate recommendations based on analysis instead of copying it
                             String analysisText = jsonNode.has("analysis") ? jsonNode.get("analysis").asText() : "";
                             if (!analysisText.isEmpty()) {
-                                result.setRecommendations(analysisText);
+                                // Extract key insights from analysis to create recommendations
+                                String recommendations = generateRecommendationsFromAnalysis(analysisText);
+                                result.setRecommendations(recommendations);
                             } else {
-                                result.setRecommendations("Đề xuất tập luyện sẽ được cung cấp dựa trên phân tích hình thể của bạn.");
+                                result.setRecommendations("Đề xuất tập luyện sẽ được cung cấp dựa trên phân tích hình thể của bạn. Hãy tập trung vào các bài tập phù hợp với loại cơ thể của bạn.");
                             }
                         }
                         
@@ -1754,14 +1756,15 @@ public class TrackDataAiController {
                 if (recommendationsMatcher.find()) {
                     result.setRecommendations(recommendationsMatcher.group(1));
                 } else {
-                    logger.warn("No recommendations pattern found in Claude response, using analysis as fallback");
-                    // Use analysis as fallback for recommendations
+                    logger.warn("No recommendations pattern found in Claude response, generating separate recommendations");
+                    // Generate separate recommendations based on analysis instead of copying it
                     String analysisText = result.getAnalysis();
                     if (analysisText != null && !analysisText.isEmpty() && 
                         !analysisText.contains("Không thể trích xuất phân tích")) {
-                        result.setRecommendations(analysisText);
+                        String recommendations = generateRecommendationsFromAnalysis(analysisText);
+                        result.setRecommendations(recommendations);
                     } else {
-                        result.setRecommendations("Đề xuất tập luyện sẽ được cung cấp dựa trên phân tích hình thể của bạn.");
+                        result.setRecommendations("Đề xuất tập luyện sẽ được cung cấp dựa trên phân tích hình thể của bạn. Hãy tập trung vào các bài tập phù hợp với loại cơ thể của bạn.");
                     }
                 }
             } catch (Exception e) {
@@ -1784,6 +1787,56 @@ public class TrackDataAiController {
         }
     }
     
+    /**
+     * Generate specific recommendations based on analysis content
+     * @param analysisText The analysis text to extract recommendations from
+     * @return Generated recommendations text
+     */
+    private String generateRecommendationsFromAnalysis(String analysisText) {
+        if (analysisText == null || analysisText.trim().isEmpty()) {
+            return "Đề xuất tập luyện cơ bản sẽ được cung cấp dựa trên thông tin cơ thể của bạn.";
+        }
+        
+        StringBuilder recommendations = new StringBuilder();
+        String lowerAnalysis = analysisText.toLowerCase();
+        
+        // Detect body type and provide specific recommendations
+        if (lowerAnalysis.contains("skinny fat") || lowerAnalysis.contains("mỡ thừa")) {
+            recommendations.append("🏋️ **Đề xuất tập luyện cho Skinny Fat:**\n\n");
+            recommendations.append("• **Tập tạ kết hợp cardio**: Tập trung vào việc xây dựng cơ bắp và đốt mỡ thừa\n");
+            recommendations.append("• **Bài tập compound**: Squat, deadlift, bench press để phát triển toàn thân\n");
+            recommendations.append("• **Cardio cường độ vừa**: 20-30 phút sau tập tạ để đốt mỡ hiệu quả\n");
+            recommendations.append("• **Chế độ ăn protein cao**: Tăng protein để xây dựng cơ bắp và giảm mỏ\n");
+        } else if (lowerAnalysis.contains("gầy") || lowerAnalysis.contains("underweight")) {
+            recommendations.append("💪 **Đề xuất tập luyện cho người gầy:**\n\n");
+            recommendations.append("• **Tập tạ nặng**: Tập trung vào các bài tập compound để tăng khối lượng cơ\n");
+            recommendations.append("• **Hạn chế cardio**: Chỉ tập cardio nhẹ để không đốt cháy quá nhiều calo\n");
+            recommendations.append("• **Tăng calo**: Ăn nhiều hơn nhu cầu để hỗ trợ tăng cân và xây dựng cơ bắp\n");
+            recommendations.append("• **Nghỉ ngơi đầy đủ**: 7-8 tiếng ngủ để cơ thể phục hồi và phát triển\n");
+        } else if (lowerAnalysis.contains("béo") || lowerAnalysis.contains("overweight") || lowerAnalysis.contains("obese")) {
+            recommendations.append("🔥 **Đề xuất tập luyện cho người thừa cân:**\n\n");
+            recommendations.append("• **Cardio cường độ cao**: HIIT, chạy bộ, đạp xe để đốt cháy mỡ thừa\n");
+            recommendations.append("• **Tập tạ duy trì cơ**: Giữ khối lượng cơ trong quá trình giảm cân\n");
+            recommendations.append("• **Chế độ ăn deficit**: Ăn ít calo hơn tiêu thụ để giảm cân hiệu quả\n");
+            recommendations.append("• **Tăng hoạt động hàng ngày**: Đi bộ, leo cầu thang thay vì thang máy\n");
+        } else {
+            recommendations.append("⚖️ **Đề xuất tập luyện cân bằng:**\n\n");
+            recommendations.append("• **Kết hợp tập tạ và cardio**: 3-4 ngày tập tạ, 2-3 ngày cardio\n");
+            recommendations.append("• **Tập toàn thân**: Phát triển đều các nhóm cơ\n");
+            recommendations.append("• **Chế độ ăn cân bằng**: Đủ protein, carb và chất béo tốt\n");
+            recommendations.append("• **Theo dõi tiến độ**: Đo lường và điều chỉnh chương trình phù hợp\n");
+        }
+        
+        // Add general recommendations
+        recommendations.append("\n**Lưu ý chung:**\n");
+        recommendations.append("• Khởi động kỹ trước khi tập và giãn cơ sau tập\n");
+        recommendations.append("• Tăng cường độ tập luyện từ từ theo thời gian\n");
+        recommendations.append("• Uống đủ nước và nghỉ ngơi hợp lý\n");
+        recommendations.append("• Tham khảo ý kiến chuyên gia nếu cần thiết\n");
+        
+        return recommendations.toString();
+    }
+
     /**
      * Helper method to sanitize HTML content
      * @param html The HTML content to sanitize
