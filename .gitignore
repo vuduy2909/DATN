@@ -8,6 +8,7 @@ coverage/
 
 # Production build
 build/
+!./**/gradle/wrapper/gradle-wrapper.jar
 
 # Env files
 .env
