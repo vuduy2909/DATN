@@ -1,0 +1,99 @@
+name: Build and Deploy Frontend on Tag
+
+on:
+  push:
+    tags:
+      - 'fe-v*'          # kích hoạt khi có tag bắt đầu bằng fe-v (fe-v1.0.0, fe-v2.3.4 …)
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+
+    # 👇 Tất cả lệnh `run:` bên dưới sẽ tự động cd vào thư mục này trước khi chạy
+    defaults:
+      run:
+        working-directory: ./start-gym-FE/start-gym-FE
+
+    steps:
+      - name: 🧾 Checkout source code
+        uses: actions/checkout@v3
+
+      - name: 🟢 Set up Node.js
+        uses: oven-sh/setup-bun@v2
+
+
+      - name: 📦 Install dependencies
+        run: bun i
+
+      - name: 🏗️ Build React app
+        env:
+          REACT_APP_API_URL: ${{ secrets.BACKEND_HOST }}
+          CI: false
+        run: bun run build
+      - name: 🔍 Debug build output
+        run: |
+          echo "=== Current working directory ==="
+          pwd
+          echo "=== Contents of current directory ==="
+          ls -la
+          echo "=== Contents of build directory (if exists) ==="
+          ls -la build/ || echo "build/ directory does not exist"
+          echo "=== Build directory size ==="
+          du -sh build/ || echo "No build directory"
+          echo "=== Files in build directory ==="
+          find build/ -type f | head -10 || echo "No files in build directory"
+
+      - name: 🔍 Debug from repository root
+        run: |
+          echo "=== From repository root ==="
+          pwd
+          echo "=== Check frontend build path ==="
+          ls -la start-gym-FE/start-gym-FE/build/ || echo "Build directory not found from repo root"
+          echo "=== Files to copy ==="
+          find start-gym-FE/start-gym-FE/build/ -type f | head -10 || echo "No files found"
+        working-directory: ${{ github.workspace }}
+
+      - name: 🗑️ Prepare VPS directory
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASS }}
+          script: |
+            echo "🔄 Preparing frontend deployment directory..."
+            sudo mkdir -p /app/fe
+            sudo chown ${{ secrets.SSH_USER }}:${{ secrets.SSH_USER }} /app/fe
+            
+            echo "🗑️ Backing up existing frontend..."
+            if [ -d "/app/fe" ] && [ "$(ls -A /app/fe)" ]; then
+              sudo rm -rf /app/fe.backup-$(date +%Y%m%d-%H%M%S) 2>/dev/null || true
+              sudo mv /app/fe /app/fe.backup-$(date +%Y%m%d-%H%M%S) || true
+              sudo mkdir -p /app/fe
+              sudo chown ${{ secrets.SSH_USER }}:${{ secrets.SSH_USER }} /app/fe
+            fi
+            
+            echo "✅ VPS ready for frontend deployment"
+
+      - name: 📦 Copy build files to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASS }}
+          source: "start-gym-FE/start-gym-FE/build/*"
+          target: "/app/fe/"
+          strip_components: 3
+
+      - name: ✅ Verify deployment
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASS }}
+          script: |
+            echo "📍 Frontend deployment directory contents:"
+            ls -la /app/fe
+            echo "📊 Frontend deployment size:"
+            du -sh /app/fe
+            echo "✅ Frontend deployment completed successfully!"
+            echo "🎉 Frontend deployed with tag: ${{ github.ref_name }}" 

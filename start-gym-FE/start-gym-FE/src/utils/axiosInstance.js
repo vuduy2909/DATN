@@ -1,7 +1,7 @@
 import axios from 'axios';
-
+const BACKEND_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
 export const axiosInstance = axios.create({
-    baseURL: 'http://localhost:8080/api/v1',
+    baseURL: `${BACKEND_URL}/api/v1`,
     timeout: 30000, // Tăng timeout lên 30 giây cho image analysis
     // Don't set Content-Type globally as it will interfere with multipart requests
 });
@@ -37,7 +37,8 @@ export const getImageUrl = (imageUrl) => {
     // Handle server-side image paths
     if (imageUrl.startsWith('/uploads/') || imageUrl.startsWith('uploads/')) {
         const formattedPath = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
-        return `http://localhost:8080${formattedPath}`;
+         return `${BACKEND_URL}${formattedPath}`;
+
     }
     
     // Default case - assume it's a relative path to be served from the backend

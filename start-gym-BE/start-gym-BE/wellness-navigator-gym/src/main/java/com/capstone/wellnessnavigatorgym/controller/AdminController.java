@@ -2069,15 +2069,15 @@ public class AdminController {
     @GetMapping("/courses/{courseId}/days")
     public ResponseEntity<?> getCourseDays(@PathVariable Integer courseId) {
         try {
-            // Query to get course days with exercises
+            // Query to get course days with exercises (JOIN with days table)
             String sql = "SELECT cd.course_day_id, cd.course_id, cd.day_id, d.day_name, cd.status, " +
-                        "e.exercise_id, e.exercise_name, e.target, e.body_part, e.instructions " +
+                        "e.exercise_id, e.exercise_name, e.target, e.body_part, e.instructions, ed.status as exercise_status " +
                         "FROM course_days cd " +
                         "JOIN days d ON cd.day_id = d.day_id " +
-                        "LEFT JOIN exercise_day ed ON d.day_id = ed.day_id AND ed.course_id = cd.course_id " +
+                        "LEFT JOIN exercise_day ed ON cd.day_id = ed.day_id AND ed.course_id = cd.course_id " +
                         "LEFT JOIN exercise e ON ed.exercise_id = e.exercise_id " +
                         "WHERE cd.course_id = :courseId AND cd.status = true " +
-                        "ORDER BY d.day_id, e.exercise_id";
+                        "ORDER BY cd.day_id, e.exercise_id";
             
             List<Tuple> results = entityManager.createNativeQuery(sql, Tuple.class)
                 .setParameter("courseId", courseId)
@@ -2099,14 +2099,16 @@ public class AdminController {
                     daysMap.put(dayId, dayInfo);
                 }
                 
-                // Add exercise if exists
-                if (result.get("exercise_id") != null) {
+                // Add exercise if exists and has valid data
+                if (result.get("exercise_id") != null && result.get("exercise_name") != null) {
                     Map<String, Object> exercise = new HashMap<>();
                     exercise.put("exerciseId", result.get("exercise_id"));
                     exercise.put("exerciseName", result.get("exercise_name"));
                     exercise.put("target", result.get("target"));
                     exercise.put("bodyPart", result.get("body_part"));
                     exercise.put("instructions", result.get("instructions"));
+                    // Add exercise status from exercise_day table (1=visible, 0=hidden)
+                    exercise.put("status", result.get("exercise_status"));
                     
                     @SuppressWarnings("unchecked")
                     List<Map<String, Object>> exercises = (List<Map<String, Object>>) daysMap.get(dayId).get("exercises");
@@ -2115,11 +2117,6 @@ public class AdminController {
             }
             
             List<Map<String, Object>> courseDays = new ArrayList<>(daysMap.values());
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("courseDays", courseDays);
-            response.put("totalDays", courseDays.size());
-            response.put("courseId", courseId);
             
             return ResponseEntity.ok(courseDays);
             
@@ -2133,7 +2130,7 @@ public class AdminController {
     @PostMapping("/courses/{courseId}/days")
     public ResponseEntity<?> addCourseDay(@PathVariable Integer courseId) {
         try {
-            // Get the current highest day number for this course to determine next day number
+            // Get the current highest day number for this course
             String getMaxDaySQL = "SELECT MAX(CAST(SUBSTRING(d.day_name, 5) AS UNSIGNED)) as max_day_num " +
                                   "FROM days d " +
                                   "JOIN course_days cd ON d.day_id = cd.day_id " +
@@ -2143,28 +2140,41 @@ public class AdminController {
             maxDayQuery.setParameter("courseId", courseId);
             Number maxDayNum = (Number) maxDayQuery.getSingleResult();
             int nextDayNumber = (maxDayNum != null) ? maxDayNum.intValue() + 1 : 1;
+            
+            // Use existing day with the next number (database has Day 1-84 pre-created)
+            Integer dayId = nextDayNumber; // Day 1 = day_id 1, Day 2 = day_id 2, etc.
             String dayName = "Day " + nextDayNumber;
-            // First create a new day
-            String insertDaySQL = "INSERT INTO days (day_name) VALUES (:dayName)";
-            Query insertDayQuery = entityManager.createNativeQuery(insertDaySQL);
-            insertDayQuery.setParameter("dayName", dayName);
-            insertDayQuery.executeUpdate();
-            // Get the newly created day ID
-            String getLastIdSQL = "SELECT LAST_INSERT_ID()";
-            Number dayId = (Number) entityManager.createNativeQuery(getLastIdSQL).getSingleResult();
-            // Create course_days association
-            String insertCourseDaySQL = "INSERT INTO course_days (course_id, day_id, status) VALUES (:courseId, :dayId, true)";
+            
+            // Check if this course-day combination already exists
+            String checkExistingSQL = "SELECT COUNT(*) FROM course_days WHERE course_id = :courseId AND day_id = :dayId";
+            Query checkExistingQuery = entityManager.createNativeQuery(checkExistingSQL);
+            checkExistingQuery.setParameter("courseId", courseId);
+            checkExistingQuery.setParameter("dayId", dayId);
+            Number existingCount = (Number) checkExistingQuery.getSingleResult();
+            
+            if (existingCount.intValue() > 0) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("message", "This day is already added to the course");
+                return ResponseEntity.badRequest().body(errorResponse);
+            }
+            
+            // Insert into course_days with existing day_id
+            String insertCourseDaySQL = "INSERT INTO course_days (course_id, day_id, status, course, day) " +
+                                       "VALUES (:courseId, :dayId, true, :courseId, :dayId)";
             Query insertCourseDayQuery = entityManager.createNativeQuery(insertCourseDaySQL);
             insertCourseDayQuery.setParameter("courseId", courseId);
             insertCourseDayQuery.setParameter("dayId", dayId);
             insertCourseDayQuery.executeUpdate();
+            
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Day added successfully");
             response.put("dayId", dayId);
             response.put("dayName", dayName);
             response.put("dayNumber", nextDayNumber);
             response.put("courseId", courseId);
+            
             return ResponseEntity.ok(response);
+            
         } catch (Exception e) {
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("message", "Failed to add course day: " + e.getMessage());
@@ -2175,25 +2185,7 @@ public class AdminController {
     @DeleteMapping("/courses/{courseId}/days/{dayId}")
     public ResponseEntity<?> deleteCourseDay(@PathVariable Integer courseId, @PathVariable Integer dayId) {
         try {
-            // Get the day number of the day being deleted
-            String getDayNumberSQL = "SELECT CAST(SUBSTRING(d.day_name, 5) AS UNSIGNED) as day_num " +
-                                     "FROM days d " +
-                                     "JOIN course_days cd ON d.day_id = cd.day_id " +
-                                     "WHERE cd.course_id = :courseId AND d.day_id = :dayId " +
-                                     "AND d.day_name REGEXP '^Day [0-9]+$'";
-            
-            Query getDayNumberQuery = entityManager.createNativeQuery(getDayNumberSQL);
-            getDayNumberQuery.setParameter("courseId", courseId);
-            getDayNumberQuery.setParameter("dayId", dayId);
-            
-            Number deletedDayNumber = null;
-            try {
-                deletedDayNumber = (Number) getDayNumberQuery.getSingleResult();
-            } catch (Exception e) {
-                // Day doesn't follow "Day X" format or doesn't exist, proceed with normal deletion
-            }
-            
-            // Soft delete by setting status to false
+            // Soft delete by setting status to false in course_days
             String updateSQL = "UPDATE course_days SET status = false WHERE course_id = :courseId AND day_id = :dayId";
             Query updateQuery = entityManager.createNativeQuery(updateSQL);
             updateQuery.setParameter("courseId", courseId);
@@ -2207,17 +2199,10 @@ public class AdminController {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
             }
             
-            // If the deleted day followed "Day X" format, renumber subsequent days
-            if (deletedDayNumber != null) {
-                renumberSubsequentDays(courseId, deletedDayNumber.intValue());
-            }
-            
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Course day deleted successfully");
             response.put("dayId", dayId);
             response.put("courseId", courseId);
-            response.put("deletedDayNumber", deletedDayNumber);
-            response.put("renumbered", deletedDayNumber != null);
             
             return ResponseEntity.ok(response);
             
@@ -2275,7 +2260,7 @@ public class AdminController {
     
     @PostMapping("/courses/{courseId}/days/{dayId}/exercises")
     public ResponseEntity<?> addExerciseToDay(@PathVariable Integer courseId, 
-                                              @PathVariable Integer dayId, 
+                                              @PathVariable Integer dayId, // This is day_id from days table
                                               @RequestBody Map<String, Object> exerciseData) {
         try {
             Integer exerciseId = null;
@@ -2306,7 +2291,7 @@ public class AdminController {
                                       "WHERE course_id = :courseId AND day_id = :dayId AND exercise_id = :exerciseId";
             BigInteger alreadyExists = (BigInteger) entityManager.createNativeQuery(checkExistingSQL)
                 .setParameter("courseId", courseId)
-                .setParameter("dayId", dayId)
+                .setParameter("dayId", dayId) // dayId from days table
                 .setParameter("exerciseId", exerciseId)
                 .getSingleResult();
             
@@ -2316,21 +2301,14 @@ public class AdminController {
                 return ResponseEntity.badRequest().body(errorResponse);
             }
             
-            // Get order number (default to 1 if not provided)
-            Integer orderNum = 1;
-            if (exerciseData.containsKey("order") && exerciseData.get("order") != null) {
-                orderNum = Integer.parseInt(exerciseData.get("order").toString());
-            }
-            
-            // Insert exercise-day relationship
-            String insertSQL = "INSERT INTO exercise_day (course_id, day_id, exercise_id, order_num, status) " +
-                              "VALUES (:courseId, :dayId, :exerciseId, :orderNum, true)";
+            // Insert exercise-day relationship (status=1 means visible)
+            String insertSQL = "INSERT INTO exercise_day (course_id, day_id, exercise_id, status) " +
+                              "VALUES (:courseId, :dayId, :exerciseId, 1)";
             
             Query insertQuery = entityManager.createNativeQuery(insertSQL);
             insertQuery.setParameter("courseId", courseId);
-            insertQuery.setParameter("dayId", dayId);
+            insertQuery.setParameter("dayId", dayId); // dayId from days table
             insertQuery.setParameter("exerciseId", exerciseId);
-            insertQuery.setParameter("orderNum", orderNum);
             
             insertQuery.executeUpdate();
             
@@ -2339,7 +2317,6 @@ public class AdminController {
             response.put("courseId", courseId);
             response.put("dayId", dayId);
             response.put("exerciseId", exerciseId);
-            response.put("orderNum", orderNum);
             
             return ResponseEntity.ok(response);
             
@@ -2353,13 +2330,13 @@ public class AdminController {
     @GetMapping("/courses/{courseId}/days/{dayId}/exercises")
     public ResponseEntity<?> getDayExercises(@PathVariable Integer courseId, @PathVariable Integer dayId) {
         try {
-            // Query to get exercises for a specific day in a course
-            String sql = "SELECT e.exercise_id, e.exercise_name, e.description, e.body_part, e.target, " +
-                         "e.equipment, e.gif_url, e.instructions, e.secondary_muscles, ed.order_num " +
+            // Query to get exercises for a specific day in a course (without order_num as it doesn't exist)
+            String sql = "SELECT e.exercise_id, e.exercise_name, e.exercise_description, e.body_part, e.target, " +
+                         "e.equipment, e.video_url, e.instructions, ed.status " +
                          "FROM exercise e " +
                          "JOIN exercise_day ed ON e.exercise_id = ed.exercise_id " +
                          "WHERE ed.course_id = :courseId AND ed.day_id = :dayId " +
-                         "ORDER BY ed.order_num";
+                         "ORDER BY e.exercise_id";
             
             List<Map<String, Object>> dayExercises = new ArrayList<>();
             
@@ -2376,10 +2353,9 @@ public class AdminController {
                 exercise.put("bodyPart", result[3]);
                 exercise.put("target", result[4]);
                 exercise.put("equipment", result[5]);
-                exercise.put("gifUrl", result[6]);
+                exercise.put("videoUrl", result[6]);
                 exercise.put("instructions", result[7]);
-                exercise.put("secondaryMuscles", result[8]);
-                exercise.put("orderNum", result[9]);
+                exercise.put("status", result[8]);
                 dayExercises.add(exercise);
             }
             

@@ -582,6 +582,54 @@ public class SecurityController {
     }
     
     /**
+     * Verify OTP only (separate step before password reset)
+     */
+    @PostMapping("/verify-otp")
+    public ResponseEntity<?> verifyOTP(@RequestBody Map<String, String> request) {
+        try {
+            String email = request.get("email");
+            String otp = request.get("otp");
+            
+            if (email == null || email.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("Email is required");
+            }
+            
+            if (otp == null || otp.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("OTP is required");
+            }
+            
+            // Check if OTP exists and is valid
+            OtpData otpData = passwordResetOtps.get(email);
+            if (otpData == null) {
+                return ResponseEntity.badRequest().body("Mã OTP không tồn tại hoặc đã hết hạn");
+            }
+            
+            // Check if OTP has expired
+            if (System.currentTimeMillis() > otpData.expirationTime) {
+                passwordResetOtps.remove(email);
+                return ResponseEntity.badRequest().body("Mã OTP đã hết hạn");
+            }
+            
+            // Check if OTP matches
+            if (!otpData.otp.equals(otp)) {
+                return ResponseEntity.badRequest().body("Mã OTP không chính xác");
+            }
+            
+            // OTP is valid - don't remove it yet, keep it for password reset
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Mã OTP hợp lệ. Bạn có thể đặt lại mật khẩu.");
+            response.put("email", email);
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            System.err.println("Error verifying OTP: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error verifying OTP: " + e.getMessage());
+        }
+    }
+    
+    /**
      * Verify OTP and reset password
      */
     @PostMapping("/reset-password")

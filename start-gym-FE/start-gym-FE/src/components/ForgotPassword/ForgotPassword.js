@@ -159,6 +159,30 @@ const ForgotPassword = () => {
         return true;
     };
 
+    // OTP validation
+    const validateOTP = (otp) => {
+        if (!otp || otp.length !== 6) {
+            setOtpError('Vui lòng nhập mã OTP 6 số');
+            return false;
+        }
+        if (!/^\d{6}$/.test(otp)) {
+            setOtpError('OTP chỉ được chứa số');
+            return false;
+        }
+        setOtpError('');
+        return true;
+    };
+
+    // Confirm password validation
+    const validateConfirmPassword = (confirmPassword) => {
+        if (newPassword !== confirmPassword) {
+            setConfirmPasswordError('Mật khẩu xác nhận không khớp');
+            return false;
+        }
+        setConfirmPasswordError('');
+        return true;
+    };
+
     // Handle countdown for resend OTP
     useEffect(() => {
         let timer;
@@ -223,28 +247,42 @@ const ForgotPassword = () => {
         }
     };
 
-    // Step 2: Verify OTP and reset password
+    // Step 2: Verify OTP and Reset Password
+    const handleVerifyOTP = async (e) => {
+        e.preventDefault();
+        setErrorMessage('');
+        setSuccessMessage('');
+
+        if (!validateOTP(otp)) {
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const response = await axios.post('http://localhost:8080/api/v1/public/verify-otp', {
+                email: email,
+                otp: otp
+            });
+
+            setSuccessMessage(response.data.message);
+            setActiveStep(2); // Move to step 3 (password reset)
+            
+        } catch (error) {
+            setErrorMessage(error.response?.data || 'Mã OTP không chính xác');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Step 3: Reset password
     const handleResetPassword = async (e) => {
         e.preventDefault();
         setErrorMessage('');
         setSuccessMessage('');
 
-        // Validate inputs
-        if (!otp || otp.length !== 6) {
-            setOtpError('Vui lòng nhập mã OTP 6 số');
+        if (!validatePassword(newPassword) || !validateConfirmPassword(confirmPassword)) {
             return;
         }
-        setOtpError('');
-
-        if (!validatePassword(newPassword)) {
-            return;
-        }
-
-        if (newPassword !== confirmPassword) {
-            setConfirmPasswordError('Mật khẩu xác nhận không khớp');
-            return;
-        }
-        setConfirmPasswordError('');
 
         setLoading(true);
         try {
@@ -255,12 +293,13 @@ const ForgotPassword = () => {
             });
 
             setSuccessMessage(response.data.message);
-            setActiveStep(2);
+            setActiveStep(3); // Move to success step
             
-            // Auto redirect to login after 3 seconds
+            // Redirect to login after 2 seconds
             setTimeout(() => {
                 navigate('/login');
-            }, 3000);
+            }, 2000);
+            
         } catch (error) {
             setErrorMessage(error.response?.data || 'Có lỗi xảy ra khi đặt lại mật khẩu');
         } finally {
@@ -399,9 +438,9 @@ const ForgotPassword = () => {
 
                             {/* Step 2: Verify OTP and Reset Password */}
                             {activeStep === 1 && (
-                                <Box component="form" onSubmit={handleResetPassword}>
+                                <Box component="form" onSubmit={handleVerifyOTP}>
                                     <Typography variant="h6" sx={{ mb: 2, color: 'text.primary' }}>
-                                        Nhập mã xác thực và mật khẩu mới
+                                        Nhập mã xác thực
                                     </Typography>
                                     <Typography variant="body2" sx={{ mb: 3, color: 'text.secondary' }}>
                                         Mã xác thực đã được gửi đến: <strong>{email}</strong>
@@ -412,7 +451,7 @@ const ForgotPassword = () => {
                                         label="Mã OTP (6 số)"
                                         value={otp}
                                         onChange={(e) => {
-                                            setOtp(e.target.value.replace(/\D/g, '').slice(0, 6));
+                                            setOtp(e.target.value);
                                             setOtpError('');
                                         }}
                                         error={!!otpError}
@@ -422,6 +461,67 @@ const ForgotPassword = () => {
                                         variant="outlined"
                                         inputProps={{ maxLength: 6, pattern: '[0-9]*' }}
                                     />
+
+                                    {/* Countdown and Resend */}
+                                    <Box sx={{ textAlign: 'center', mb: 3 }}>
+                                        {countdown > 0 ? (
+                                            <Typography variant="body2" color="text.secondary">
+                                                Gửi lại mã sau: {formatTime(countdown)}
+                                            </Typography>
+                                        ) : (
+                                            <Button
+                                                variant="text"
+                                                onClick={handleResendOTP}
+                                                disabled={!canResend || loading}
+                                                sx={{ color: 'primary.main' }}
+                                            >
+                                                Gửi lại mã OTP
+                                            </Button>
+                                        )}
+                                    </Box>
+
+                                    <Box sx={{ display: 'flex', gap: 2, justifyContent: 'space-between' }}>
+                                        <Button
+                                            variant="outlined"
+                                            startIcon={<ArrowBack />}
+                                            onClick={() => setActiveStep(0)}
+                                            sx={{ 
+                                                borderColor: 'primary.main',
+                                                color: 'primary.main'
+                                            }}
+                                        >
+                                            Quay lại
+                                        </Button>
+                                        
+                                        <Button
+                                            type="submit"
+                                            variant="contained"
+                                            disabled={loading}
+                                            startIcon={loading ? <CircularProgress size={20} /> : <VpnKey />}
+                                            sx={{ 
+                                                background: 'linear-gradient(135deg, #CF4044 0%, #B8363C 100%)',
+                                                boxShadow: '0 8px 16px rgba(207, 64, 68, 0.3)',
+                                                '&:hover': {
+                                                    background: 'linear-gradient(135deg, #B8363C 0%, #A62F33 100%)',
+                                                    boxShadow: '0 12px 24px rgba(207, 64, 68, 0.4)',
+                                                }
+                                            }}
+                                        >
+                                            {loading ? 'Đang xử lý...' : 'Xác thực'}
+                                        </Button>
+                                    </Box>
+                                </Box>
+                            )}
+
+                            {/* Step 3: Reset Password */}
+                            {activeStep === 2 && (
+                                <Box component="form" onSubmit={handleResetPassword}>
+                                    <Typography variant="h6" sx={{ mb: 2, color: 'text.primary' }}>
+                                        Đặt lại mật khẩu
+                                    </Typography>
+                                    <Typography variant="body2" sx={{ mb: 3, color: 'text.secondary' }}>
+                                        Nhập mật khẩu mới cho tài khoản của bạn
+                                    </Typography>
 
                                     <TextField
                                         fullWidth
@@ -449,7 +549,7 @@ const ForgotPassword = () => {
                                         value={confirmPassword}
                                         onChange={(e) => {
                                             setConfirmPassword(e.target.value);
-                                            setConfirmPasswordError('');
+                                            if (e.target.value) validateConfirmPassword(e.target.value);
                                         }}
                                         error={!!confirmPasswordError}
                                         helperText={confirmPasswordError}
@@ -458,28 +558,11 @@ const ForgotPassword = () => {
                                         variant="outlined"
                                     />
 
-                                    {/* Countdown and Resend */}
-                                    <Box sx={{ textAlign: 'center', mb: 3 }}>
-                                        {countdown > 0 ? (
-                                            <Typography variant="body2" color="text.secondary">
-                                                Gửi lại mã sau: {formatTime(countdown)}
-                                            </Typography>
-                                        ) : (
-                                            <Button
-                                                variant="text"
-                                                onClick={handleResendOTP}
-                                                disabled={!canResend || loading}
-                                                sx={{ color: 'primary.main' }}
-                                            >
-                                                Gửi lại mã OTP
-                                            </Button>
-                                        )}
-                                    </Box>
-
                                     <Box sx={{ display: 'flex', gap: 2, justifyContent: 'space-between' }}>
                                         <Button
                                             variant="outlined"
-                                            onClick={() => setActiveStep(0)}
+                                            startIcon={<ArrowBack />}
+                                            onClick={() => setActiveStep(1)}
                                             sx={{ 
                                                 borderColor: 'primary.main',
                                                 color: 'primary.main'
@@ -508,14 +591,14 @@ const ForgotPassword = () => {
                                 </Box>
                             )}
 
-                            {/* Step 3: Success */}
-                            {activeStep === 2 && (
+                            {/* Success Step */}
+                            {activeStep === 3 && (
                                 <Box sx={{ textAlign: 'center' }}>
                                     <Typography variant="h6" sx={{ mb: 2, color: 'success.main' }}>
                                         🎉 Đặt lại mật khẩu thành công!
                                     </Typography>
                                     <Typography variant="body2" sx={{ mb: 3, color: 'text.secondary' }}>
-                                        Bạn sẽ được chuyển đến trang đăng nhập sau 3 giây...
+                                        Bạn sẽ được chuyển đến trang đăng nhập sau 2 giây...
                                     </Typography>
                                     
                                     <Button

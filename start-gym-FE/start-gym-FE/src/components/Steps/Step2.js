@@ -77,8 +77,8 @@ const Step2 = ({ formData, handleChange, handleNext, handlePrevious }) => {
         const value = e.target.value;
         setAge(value)
 
-        if (value < 15 || value > 80) {
-            setAgeError('Độ tuổi hợp lệ từ 15 -> 80')
+        if (value < 18 || value > 40) {
+            setAgeError('Độ tuổi hợp lệ từ 18 -> 40')
         } else {
             setAgeError('')
         }
@@ -89,7 +89,7 @@ const Step2 = ({ formData, handleChange, handleNext, handlePrevious }) => {
                !heightError && !weightError && !ageError &&
                height >= 150 && height <= 210 &&
                weight >= 40 && weight <= 150 &&
-               age >= 15 && age <= 80;
+               age >= 18 && age <= 40;
     };
 
     // Thêm keyboard navigation
@@ -243,7 +243,7 @@ const Step2 = ({ formData, handleChange, handleNext, handlePrevious }) => {
                                         value={age}
                                         onChange={handleAgeChange}
                                         error={!!ageError}
-                                        helperText={ageError || "Từ 15 đến 80 tuổi"}
+                                        helperText={ageError || "Từ 18 đến 40 tuổi"}
                                         required
                                         size="small"
                                         sx={{

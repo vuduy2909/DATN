@@ -108,7 +108,8 @@ const Login = () => {
         setErrorMessage('');
         
         try {
-            const response = await axios.post('http://localhost:8080/api/v1/public/login', {
+            const BACKEND_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
+            const response = await axios.post(`${BACKEND_URL}/api/v1/public/login`, {
                 username: username,
                 password: password
             });
@@ -223,7 +224,8 @@ const Login = () => {
     const handleGoogleLoginSuccess = async (response) => {
         try {
             const googleToken = response.credential;
-            const googleResponse = await axios.post('http://localhost:8080/api/v1/public/oauth/google', {
+            const BACKEND_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
+            const googleResponse = await axios.post(`${BACKEND_URL}/api/v1/public/oauth/google`, {
                 token: googleToken,
             });
 

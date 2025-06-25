@@ -175,7 +175,8 @@ const EditCourse = () => {
 
     // Day management
     const openAddDayDialog = () => {
-        setNextDayName(`Day ${courseDays.length + 1}`);
+        const nextDayNumber = courseDays.length + 1;
+        setNextDayName(`Day ${nextDayNumber}`);
         setDayDialog({ open: true, dayData: null, isEdit: false });
     };
 
@@ -188,10 +189,10 @@ const EditCourse = () => {
                 showSnackbar('Day added successfully! ✅', 'success');
                 setDayDialog({ open: false, dayData: null, isEdit: false });
                 
-                // Fetch updated days list
+                // Fetch updated days list để cập nhật UI
                 await fetchCourseDays();
                 
-                // Open add exercise dialog for new day
+                // Tự động mở dialog thêm exercise cho day mới
                 setExerciseDialog({
                     open: true,
                     dayId: res.data.dayId,
@@ -220,8 +221,7 @@ const EditCourse = () => {
                 try {
                     await axiosInstance.delete(`/admin/courses/${courseId}/days/${dayId}`);
                     
-                    // After deletion, we need to renumber the remaining days
-                    // The backend should handle this, but we'll refresh the list to show the updated names
+                    // Fetch lại danh sách days sau khi xóa
                     await fetchCourseDays();
                     
                     showSnackbar('Day deleted successfully! Subsequent days have been renumbered. 🗑️', 'success');
@@ -263,7 +263,7 @@ const EditCourse = () => {
                 setSelectedExercise('');
                 setExerciseOrder(1);
                 
-                // Update days list with new exercise
+                // Fetch lại toàn bộ danh sách days để cập nhật số lượng exercises
                 await fetchCourseDays();
             }
         } catch (error) {
@@ -283,16 +283,8 @@ const EditCourse = () => {
                 try {
                     await axiosInstance.delete(`/admin/courses/${courseId}/days/${dayId}/exercises/${exerciseId}`);
                     
-                    // Refresh the day exercises
-                    const updatedDays = [...courseDays];
-                    const dayIndex = updatedDays.findIndex(day => day.dayId === dayId);
-                    
-                    if (dayIndex !== -1) {
-                        // Get fresh exercise list
-                        const exercises = await fetchDayExercises(dayId);
-                        updatedDays[dayIndex].exercises = exercises;
-                        setCourseDays(updatedDays);
-                    }
+                    // Fetch lại toàn bộ danh sách days để cập nhật UI
+                    await fetchCourseDays();
                     
                     showSnackbar('Exercise removed successfully! 🗑️', 'success');
                     
@@ -309,12 +301,14 @@ const EditCourse = () => {
         try {
             setActionLoading(true);
             const res = await axiosInstance.put(
-                `/admin/courses/${courseId}/days/${dayId}/exercises/${exerciseId}/toggle-status`,
-                { status: !currentStatus }
+                `/admin/courses/${courseId}/days/${dayId}/exercises/${exerciseId}/toggle-status`
+                // No body needed - backend will toggle automatically
             );
 
             if (res.data) {
                 showSnackbar(currentStatus ? 'Exercise hidden!' : 'Exercise shown!', 'success');
+                
+                // Fetch lại toàn bộ danh sách days để cập nhật UI
                 await fetchCourseDays();
             }
         } catch (error) {
@@ -325,11 +319,16 @@ const EditCourse = () => {
         }
     };
 
-    const getTotalDays = () => courseDays.length;
+    const getTotalDays = () => {
+        // Tổng số ngày = số phần tử day
+        return courseDays.length;
+    };
+    
     const getTotalExercises = () => {
+        // Tổng số bài tập = tổng số bài tập có status=true trong tất cả các day
         return courseDays.reduce((total, day) => {
             if (day.exercises && Array.isArray(day.exercises)) {
-                return total + day.exercises.filter(e => e.status === true).length;
+                return total + day.exercises.filter(exercise => exercise.status === true).length;
             }
             return total;
         }, 0);
@@ -544,7 +543,7 @@ const EditCourse = () => {
                         No days added yet
                     </Typography>
                     <Typography variant="body2" color="textSecondary" mb={3}>
-                        Start by adding the first day to your course
+                        Start by adding the first day to your course. The day name will be automatically generated.
                     </Typography>
                     <Button
                         startIcon={<AddIcon />}
@@ -663,17 +662,28 @@ const EditCourse = () => {
             >
                 <DialogTitle>Add New Day</DialogTitle>
                 <DialogContent>
-                    <TextField
-                        margin="dense"
-                        label="Day Name"
-                        fullWidth
-                        variant="outlined"
-                        value={nextDayName}
-                        disabled
-                    />
-                    <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mt: 1 }}>
-                        Day name will be auto-generated
-                    </Typography>
+                    <Box sx={{ mb: 2 }}>
+                        <Typography variant="body2" color="textSecondary" gutterBottom>
+                            Day name will be automatically generated as:
+                        </Typography>
+                        <TextField
+                            margin="dense"
+                            label="Day Name (Auto-generated)"
+                            fullWidth
+                            variant="outlined"
+                            value={nextDayName}
+                            disabled
+                            sx={{ 
+                                '& .MuiInputBase-input.Mui-disabled': {
+                                    WebkitTextFillColor: '#1976d2',
+                                    fontWeight: 'bold'
+                                }
+                            }}
+                        />
+                        <Typography variant="caption" color="primary" sx={{ display: 'block', mt: 1 }}>
+                            ✨ After adding this day, you can immediately add exercises to it
+                        </Typography>
+                    </Box>
                 </DialogContent>
                 <DialogActions>
                     <Button 
@@ -686,6 +696,7 @@ const EditCourse = () => {
                         onClick={handleAddDay} 
                         variant="contained"
                         disabled={actionLoading}
+                        startIcon={actionLoading ? null : <AddIcon />}
                     >
                         {actionLoading ? 'Adding...' : 'Add Day'}
                     </Button>
@@ -699,7 +710,9 @@ const EditCourse = () => {
                 maxWidth="sm"
                 fullWidth
             >
-                <DialogTitle>Add Exercise to Day</DialogTitle>
+                <DialogTitle>
+                    Add Exercise to {courseDays.find(day => day.dayId === exerciseDialog.dayId)?.dayName || 'Day'}
+                </DialogTitle>
                 <DialogContent>
                     <Grid container spacing={2} sx={{ mt: 1 }}>
                         <Grid item xs={12}>
@@ -711,6 +724,7 @@ const EditCourse = () => {
                                 onChange={(e) => setSelectedExercise(e.target.value)}
                                 variant="outlined"
                                 disabled={actionLoading}
+                                helperText="Choose an exercise to add to this day"
                             >
                                 <MenuItem value="">
                                     <em>Choose an exercise</em>
@@ -837,8 +851,6 @@ const EditCourse = () => {
                     {snackbar.message}
                 </Alert>
             </Snackbar>
-            
-            {DialogComponents}
         </Box>
     );
 };
