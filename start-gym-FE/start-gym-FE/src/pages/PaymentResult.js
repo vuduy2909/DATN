@@ -47,7 +47,9 @@ const PaymentResult = () => {
             
             // Build query string manually
             const queryString = new URLSearchParams(vnpParams).toString();
-            const url = `http://localhost:8080/api/v1/payment/vnpay-return?${queryString}`;
+             const BACKEND_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
+            const url = `${BACKEND_URL}/api/v1/payment/vnpay-return?${queryString}`;
+            
             
             console.log('Calling URL:', url);
             
