@@ -1,6 +1,8 @@
 package com.capstone.wellnessnavigatorgym.controller;
 
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 import com.capstone.wellnessnavigatorgym.dto.request.ChangePasswordDto;
 import com.capstone.wellnessnavigatorgym.dto.request.LoginRequest;
@@ -9,6 +11,7 @@ import com.capstone.wellnessnavigatorgym.dto.response.JwtResponse;
 import com.capstone.wellnessnavigatorgym.dto.response.MessageResponse;
 import com.capstone.wellnessnavigatorgym.dto.response.SocialResponse;
 import com.capstone.wellnessnavigatorgym.entity.*;
+import com.capstone.wellnessnavigatorgym.repository.ICustomerRepository;
 import com.capstone.wellnessnavigatorgym.security.jwt.JwtTokenProvider;
 import com.capstone.wellnessnavigatorgym.security.jwt.JwtUtility;
 import com.capstone.wellnessnavigatorgym.security.userprinciple.UserPrinciple;
@@ -67,17 +70,38 @@ public class SecurityController {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private ICustomerRepository customerRepository;
+
+    @Autowired
+    private EmailService emailService;
+
     @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
         // ===== ENHANCED PRE-AUTHENTICATION BAN CHECK =====
         try {
             System.out.println("=== PRE-AUTH BAN CHECK ===");
-            System.out.println("Checking ban status for username: " + loginRequest.getUsername());
+            System.out.println("Checking ban status for login input: " + loginRequest.getUsername());
             
-            // Check account
-            Optional<Account> accountOpt = accountService.findAccountByUserName(loginRequest.getUsername());
+            // Check account by username OR email
+            Optional<Account> accountOpt = Optional.empty();
+            String loginInput = loginRequest.getUsername();
+            
+            // First try to find by username
+            accountOpt = accountService.findAccountByUserName(loginInput);
+            
+            // If not found by username, try by email
+            if (!accountOpt.isPresent() && loginInput.contains("@")) {
+                Account accountByEmail = accountService.findByEmail(loginInput);
+                if (accountByEmail != null) {
+                    accountOpt = Optional.of(accountByEmail);
+                    System.out.println("Found account by email: " + loginInput);
+                }
+            }
+            
             if (accountOpt.isPresent()) {
                 Account account = accountOpt.get();
+                String actualUsername = account.getUserName(); // Get the actual username for further processing
                 
                 // Enhanced bit(1) handling for account.is_enable
                 Boolean accountIsEnable = account.getIsEnable();
@@ -86,13 +110,13 @@ public class SecurityController {
                 System.out.println("Account check - Raw is_enable: " + accountIsEnable + ", Parsed boolean: " + accountEnabled);
                 
                 // Check customer - MUST exist for every account
-                Customer customer = customerService.findByAccountUserName(loginRequest.getUsername());
+                Customer customer = customerService.findByAccountUserName(actualUsername);
                 String customerName = null;
                 boolean customerEnabled = true;
                 
                 if (customer == null) {
                     System.out.println("❌ PRE-AUTH CHECK: Account exists but no customer linked");
-                    System.out.println("❌ Username '" + loginRequest.getUsername() + "' has account but missing customer record");
+                    System.out.println("❌ Username '" + actualUsername + "' has account but missing customer record");
                     
                     Map<String, Object> errorResponse = new HashMap<>();
                     errorResponse.put("error", "Account configuration error");
@@ -121,7 +145,7 @@ public class SecurityController {
                     }
                     
                     System.out.println("🚫 PRE-AUTH BAN CHECK FAILED");
-                    System.out.println("🚫 User " + loginRequest.getUsername() + " is BANNED");
+                    System.out.println("🚫 User " + loginInput + " is BANNED");
                     System.out.println("🚫 Reason: " + banReason);
                     System.out.println("🚫 Account enabled: " + accountEnabled + " (raw: " + accountIsEnable + ")");
                     System.out.println("🚫 Customer enabled: " + customerEnabled + (customer != null ? " (raw: " + customer.getIsEnable() + ")" : " (no customer)"));
@@ -130,7 +154,7 @@ public class SecurityController {
                     Map<String, Object> bannedResponse = new HashMap<>();
                     bannedResponse.put("error", "Account is banned. Please contact support.");
                     bannedResponse.put("message", "Account is banned. Please contact support.");
-                    bannedResponse.put("username", loginRequest.getUsername());
+                    bannedResponse.put("username", actualUsername);
                     bannedResponse.put("customerName", customerName);
                     bannedResponse.put("isBanned", true);
                     bannedResponse.put("accountEnabled", accountEnabled);
@@ -148,13 +172,13 @@ public class SecurityController {
             } else {
                 // ===== USER NOT FOUND HANDLING =====
                 System.out.println("❌ PRE-AUTH CHECK: User not found in database");
-                System.out.println("❌ Username '" + loginRequest.getUsername() + "' does not exist");
+                System.out.println("❌ Login input '" + loginInput + "' does not exist (checked both username and email)");
                 
                 // Don't proceed with authentication for non-existent users
                 // Return specific error message for user not found
                 Map<String, Object> errorResponse = new HashMap<>();
                 errorResponse.put("error", "User does not exist");
-                errorResponse.put("message", "Tài khoản không tồn tại. Vui lòng kiểm tra lại username hoặc đăng ký tài khoản mới.");
+                errorResponse.put("message", "Tài khoản không tồn tại. Vui lòng kiểm tra lại thông tin đăng nhập hoặc đăng ký tài khoản mới.");
                 errorResponse.put("status", 401);
                 errorResponse.put("timestamp", java.time.LocalDateTime.now());
                 errorResponse.put("userExists", false);
@@ -170,9 +194,21 @@ public class SecurityController {
         
         Authentication authentication;
         try {
+            // For authentication, we need to use the actual username, not email
+            String loginInput = loginRequest.getUsername();
+            String actualUsername = loginInput;
+            
+            // If user logged in with email, convert to username for authentication
+            if (loginInput.contains("@")) {
+                Account accountByEmail = accountService.findByEmail(loginInput);
+                if (accountByEmail != null) {
+                    actualUsername = accountByEmail.getUserName();
+                }
+            }
+            
             authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword())
-        );
+                new UsernamePasswordAuthenticationToken(actualUsername, loginRequest.getPassword())
+            );
         } catch (Exception authException) {
             System.out.println("🔍 Authentication failed for user: " + loginRequest.getUsername());
             System.out.println("🔍 Exception type: " + authException.getClass().getSimpleName());
@@ -198,7 +234,7 @@ public class SecurityController {
             
             Map<String, Object> credentialsResponse = new HashMap<>();
             credentialsResponse.put("error", "Invalid credentials");
-            credentialsResponse.put("message", "Thông tin đăng nhập không chính xác. Vui lòng kiểm tra lại username và password.");
+            credentialsResponse.put("message", "Thông tin đăng nhập không chính xác. Vui lòng kiểm tra lại thông tin đăng nhập và mật khẩu.");
             credentialsResponse.put("status", 401);
             credentialsResponse.put("timestamp", java.time.LocalDateTime.now());
             credentialsResponse.put("userExists", true);
@@ -407,7 +443,263 @@ public class SecurityController {
         accountService.changePassword(username, newPass);
         return ResponseEntity.ok(new MessageResponse("update successful"));
     }
+
+    // ==================== REGISTRATION VALIDATION ENDPOINTS ====================
     
+    /**
+     * Check if email already exists for public registration
+     */
+    @GetMapping("/check-email-exists")
+    public ResponseEntity<?> checkEmailExistsPublic(@RequestParam String email) {
+        try {
+            Map<String, Object> response = new HashMap<>();
+            response.put("email", email);
+            
+            // Check email exists in system
+            boolean emailExists = accountService.existsByEmail(email);
+            
+            response.put("exists", emailExists);
+            
+            if (emailExists) {
+                response.put("message", "Email đã được sử dụng");
+            } else {
+                response.put("message", "Email có thể sử dụng");
+            }
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error checking email: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Check if username already exists for public registration
+     */
+    @GetMapping("/check-username-exists")
+    public ResponseEntity<?> checkUsernameExistsPublic(@RequestParam String username) {
+        try {
+            Map<String, Object> response = new HashMap<>();
+            response.put("username", username);
+            
+            // Check username exists in system
+            boolean usernameExists = accountService.existsByUsername(username);
+            
+            response.put("exists", usernameExists);
+            
+            if (usernameExists) {
+                response.put("message", "Tên đăng nhập đã được sử dụng");
+            } else {
+                response.put("message", "Tên đăng nhập có thể sử dụng");
+            }
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error checking username: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Check if phone number already exists for public registration
+     */
+    @GetMapping("/check-phone-exists")
+    public ResponseEntity<?> checkPhoneExistsPublic(@RequestParam String phone) {
+        try {
+            Map<String, Object> response = new HashMap<>();
+            response.put("phone", phone);
+            
+            // Check phone exists in customer table
+            Customer existingCustomer = customerRepository.findByCustomerPhone(phone);
+            boolean phoneExists = existingCustomer != null;
+            
+            response.put("exists", phoneExists);
+            
+            if (phoneExists) {
+                response.put("message", "Số điện thoại đã được sử dụng");
+                response.put("customerName", existingCustomer.getCustomerName());
+            } else {
+                response.put("message", "Số điện thoại có thể sử dụng");
+            }
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error checking phone: " + e.getMessage());
+        }
+    }
+
+    // ==================== FORGOT PASSWORD ENDPOINTS ====================
+    
+    /**
+     * Send password reset email with OTP
+     */
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> request) {
+        try {
+            String email = request.get("email");
+            
+            if (email == null || email.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("Email is required");
+            }
+            
+            // Check if email exists
+            Account account = accountService.findByEmail(email);
+            if (account == null) {
+                return ResponseEntity.badRequest().body("Email không tồn tại trong hệ thống");
+            }
+            
+            // Generate 6-digit OTP
+            String otp = String.format("%06d", new Random().nextInt(999999));
+            
+            // Store OTP with expiration (15 minutes)
+            passwordResetOtps.put(email, new OtpData(otp, System.currentTimeMillis() + 15 * 60 * 1000));
+            
+            // Send email with OTP
+            try {
+                emailService.sendPasswordResetOTP(email, otp);
+                System.out.println("Password reset OTP sent to email: " + email);
+            } catch (Exception e) {
+                System.err.println("Failed to send email to " + email + ": " + e.getMessage());
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body("Không thể gửi email. Vui lòng thử lại sau.");
+            }
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Mã xác thực đã được gửi đến email của bạn");
+            response.put("email", email);
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            System.err.println("Error in forgot password: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error sending password reset email: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Verify OTP and reset password
+     */
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> request) {
+        try {
+            String email = request.get("email");
+            String otp = request.get("otp");
+            String newPassword = request.get("newPassword");
+            
+            if (email == null || otp == null || newPassword == null) {
+                return ResponseEntity.badRequest().body("Email, OTP và mật khẩu mới là bắt buộc");
+            }
+            
+            // Verify OTP
+            OtpData otpData = passwordResetOtps.get(email);
+            if (otpData == null) {
+                return ResponseEntity.badRequest().body("Mã OTP không hợp lệ hoặc đã hết hạn");
+            }
+            
+            if (System.currentTimeMillis() > otpData.expirationTime) {
+                passwordResetOtps.remove(email);
+                return ResponseEntity.badRequest().body("Mã OTP đã hết hạn");
+            }
+            
+            if (!otpData.otp.equals(otp)) {
+                return ResponseEntity.badRequest().body("Mã OTP không chính xác");
+            }
+            
+            // Validate new password
+            if (newPassword.length() < 8) {
+                return ResponseEntity.badRequest().body("Mật khẩu phải có ít nhất 8 ký tự");
+            }
+            
+            if (!newPassword.matches(".*[a-z].*")) {
+                return ResponseEntity.badRequest().body("Mật khẩu phải có ít nhất 1 chữ thường");
+            }
+            
+            if (!newPassword.matches(".*[A-Z].*")) {
+                return ResponseEntity.badRequest().body("Mật khẩu phải có ít nhất 1 chữ hoa");
+            }
+            
+            if (!newPassword.matches(".*\\d.*")) {
+                return ResponseEntity.badRequest().body("Mật khẩu phải có ít nhất 1 số");
+            }
+            
+            if (!newPassword.matches(".*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?].*")) {
+                return ResponseEntity.badRequest().body("Mật khẩu phải có ít nhất 1 ký tự đặc biệt");
+            }
+            
+            // Find account and update password
+            Account account = accountService.findByEmail(email);
+            if (account == null) {
+                return ResponseEntity.badRequest().body("Tài khoản không tồn tại");
+            }
+            
+            // Update password
+            account.setEncryptPassword(passwordEncoder.encode(newPassword));
+            accountService.save(account);
+            
+            // Remove used OTP
+            passwordResetOtps.remove(email);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Đặt lại mật khẩu thành công");
+            response.put("email", email);
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error resetting password: " + e.getMessage());
+        }
+    }
+    
+    // Simple OTP storage class (use Redis or database in production)
+    private static class OtpData {
+        String otp;
+        long expirationTime;
+        
+        OtpData(String otp, long expirationTime) {
+            this.otp = otp;
+            this.expirationTime = expirationTime;
+        }
+    }
+    
+    // OTP storage - in production, use Redis or database
+    private final Map<String, OtpData> passwordResetOtps = new ConcurrentHashMap<>();
+
+    /**
+     * Test endpoint để kiểm tra cấu hình email
+     */
+    @PostMapping("/test-email")
+    public ResponseEntity<?> testEmail(@RequestBody Map<String, String> request) {
+        try {
+            String testEmail = request.get("email");
+            if (testEmail == null || testEmail.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("Email is required for testing");
+            }
+            
+            // Test gửi email đơn giản
+            emailService.sendSimpleEmail(testEmail, "StartGym Email Test", 
+                "Đây là email test từ StartGym. Nếu bạn nhận được email này, cấu hình SMTP đã hoạt động!");
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Test email sent successfully to: " + testEmail);
+            response.put("status", "success");
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("message", "Failed to send test email: " + e.getMessage());
+            errorResponse.put("status", "error");
+            errorResponse.put("error", e.getClass().getSimpleName());
+            
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
 
 }
 

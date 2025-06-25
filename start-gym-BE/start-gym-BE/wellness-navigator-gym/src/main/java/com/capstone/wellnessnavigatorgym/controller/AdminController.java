@@ -1262,11 +1262,19 @@ public class AdminController {
                     return ResponseEntity.badRequest().body("Invalid date format for dateOfBirth. Use yyyy-MM-dd");
                 }
             }
-            // Gán customer type
-            if (customerTypeId != null) {
-                CustomerType customerType = customerTypeRepository.findById(customerTypeId).orElse(null);
-                newCustomer.setCustomerType(customerType);
+            // Gán customer type - mặc định là 1 (Regular customer)
+            if (customerTypeId == null) {
+                customerTypeId = 1; // Default to Regular customer type
             }
+            CustomerType customerType = customerTypeRepository.findById(customerTypeId).orElse(null);
+            if (customerType == null) {
+                // Fallback to first available customer type if customerTypeId = 1 not found
+                List<CustomerType> allTypes = customerTypeRepository.findAll();
+                if (!allTypes.isEmpty()) {
+                    customerType = allTypes.get(0);
+                }
+            }
+            newCustomer.setCustomerType(customerType);
             Customer savedCustomer = customerRepository.save(newCustomer);
             // Trả về thông tin
             Map<String, Object> response = new HashMap<>();

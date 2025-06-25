@@ -350,7 +350,8 @@ const FitnessResultForm = ({
         {(!comparisonData && !success) && (
           <>
             <Typography variant="body2" sx={{ mb: 2 }}>
-              Vui lòng nhập chỉ số mới sau khi hoàn thành khóa học để đánh giá hiệu quả tập luyện
+              Vui lòng nhập chỉ số mới sau khi hoàn thành khóa học để đánh giá hiệu quả tập luyện.
+              Xin hãy gửi chỉ số chính xác để chúng tôi có thể giúp đỡ bạn.
             </Typography>
             
             <TextField

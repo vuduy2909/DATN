@@ -48,7 +48,6 @@ build/
 Thumbs.db
 
 # Ignore SQL dump files
-*.sql
 
 # Cursor workspace
 .cursor/
@@ -59,6 +58,4 @@ Thumbs.db
 *.csv
 *.zip
 
-*.json
-*.txt
-*.md
+

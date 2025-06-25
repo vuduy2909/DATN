@@ -1,0 +1,104 @@
+
+BE: intellji
+chạy WellnessNavigatorGymApplication.java
+FE:\CODE\start-gym-FE\start-gym-FE
+npm run start
+BACKEND (BE)
+Ngôn ngữ lập trình:
+Java - phiên bản 1.8 (Java 8)
+Framework chính:
+Spring Boot - phiên bản 2.7.13
+Spring Security - tích hợp với Spring Boot 2.7.13
+Spring Data JPA - tích hợp với Spring Boot 2.7.13
+Spring Batch - tích hợp với Spring Boot 2.7.13
+Spring OAuth2 - Client và Resource Server
+Build Tool:
+Gradle - phiên bản 8.2.1
+Cơ sở dữ liệu:
+MySQL - MySQL 8 (MySQL Connector/J)
+Hibernate - MySQL8Dialect
+Thư viện chính:
+Bảo mật:
+JWT (JSON Web Token) - phiên bản 0.9.1
+BCrypt Password Encoder
+Spring Security
+Cloud Services:
+Firebase Admin SDK - phiên bản 9.2.0
+Google Cloud Storage - phiên bản 2.22.2
+Google API Client - phiên bản 2.0.0
+Email:
+Spring Mail Starter (SMTP Gmail)
+Payment:
+VNPay Integration (Sandbox)
+AI Integration:
+Claude API (Anthropic) - model claude-3-5-sonnet-20241022
+Utilities:
+Lombok - annotation processor
+Jackson - JSON processing
+Guava - phiên bản 31.1-jre
+SLF4J & Logback - logging
+FRONTEND (FE)
+Ngôn ngữ lập trình:
+JavaScript/TypeScript (React)
+Framework chính:
+React - phiên bản 18.2.0
+React DOM - phiên bản 18.2.0
+React Scripts - phiên bản 5.0.1
+UI Framework & Components:
+Material-UI (MUI):
+@mui/material - phiên bản 5.14.18
+@mui/icons-material - phiên bản 5.14.15
+@mui/lab - phiên bản 5.0.0-alpha.153
+@mui/system - phiên bản 5.14.18
+@mui/x-date-pickers - phiên bản 6.20.2
+@mui/x-date-pickers-pro - phiên bản 6.18.1
+Ant Design:
+antd - phiên bản 5.12.5
+Bootstrap:
+bootstrap - phiên bản 5.3.2
+react-bootstrap - phiên bản 2.9.0
+Material Design Bootstrap:
+mdb-react-ui-kit - phiên bản 7.0.0
+Routing:
+React Router DOM - phiên bản 6.18.0
+HTTP Client:
+Axios - phiên bản 1.6.0
+CORS - phiên bản 2.8.5
+Charts & Visualization:
+Chart.js - phiên bản 4.4.0
+React Chart.js 2 - phiên bản 5.2.0
+Recharts - phiên bản 2.15.3
+Authentication:
+React Google Login - phiên bản 5.2.2
+@react-oauth/google - phiên bản 0.12.1
+JWT Decode - phiên bản 4.0.0
+Media & Animation:
+React Player - phiên bản 2.13.0
+React YouTube - phiên bản 10.1.0
+React Scroll Parallax - phiên bản 3.4.5
+Date/Time:
+Day.js - phiên bản 1.11.13
+Icons:
+FontAwesome - phiên bản 6.4.2 (toàn bộ bộ icons)
+Firebase:
+Firebase - phiên bản 11.8.1
+Other Libraries:
+React Content Loader - phiên bản 6.2.1
+React Loading Skeleton - phiên bản 3.3.1
+React Horizontal Scrolling Menu - phiên bản 2.7.1
+HTTP Proxy Middleware - phiên bản 2.0.6
+Web Vitals - phiên bản 2.1.4
+Package Manager:
+Yarn - phiên bản 1.22.21
+npm (cũng được hỗ trợ)
+Testing:
+Jest DOM - phiên bản 5.17.0
+React Testing Library - phiên bản 13.4.0
+User Event - phiên bản 13.5.0
+Tích hợp Services:
+Firebase - Storage, Authentication
+Google OAuth2 - Đăng nhập Google
+VNPay - Thanh toán
+Gmail SMTP - Gửi email
+Claude AI - Tích hợp AI cho tư vấn
+Hệ thống sử dụng kiến trúc monolithic với BE (Spring Boot) và FE (React) riêng biệt, giao tiếp qua REST API.

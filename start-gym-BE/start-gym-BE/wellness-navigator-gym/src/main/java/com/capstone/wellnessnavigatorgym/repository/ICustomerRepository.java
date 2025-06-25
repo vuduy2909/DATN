@@ -1,7 +1,6 @@
 package com.capstone.wellnessnavigatorgym.repository;
 
 import com.capstone.wellnessnavigatorgym.entity.Account;
-import com.capstone.wellnessnavigatorgym.entity.Cart;
 import com.capstone.wellnessnavigatorgym.entity.Customer;
 import com.capstone.wellnessnavigatorgym.entity.CustomerType;
 import org.springframework.data.domain.Page;

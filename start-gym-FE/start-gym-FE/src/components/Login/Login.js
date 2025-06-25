@@ -381,7 +381,7 @@ const Login = () => {
                                     <Box component="form" onSubmit={handleLogin}>
                                         <TextField
                                             fullWidth
-                                            label="Username"
+                                            label="Username or Email"
                                             value={username}
                                             onChange={(e) => setUsername(e.target.value)}
                                             error={!!usernameError}
@@ -445,7 +445,7 @@ const Login = () => {
                                             <Link 
                                                 component="button"
                                                 variant="body2"
-                                                onClick={handleNavigateToRegister}
+                                                onClick={() => navigate('/forgot-password')}
                                                 sx={{ 
                                                     color: 'primary.main',
                                                     textDecoration: 'none',

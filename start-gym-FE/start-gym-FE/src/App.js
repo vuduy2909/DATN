@@ -30,6 +30,7 @@ import AdminRoute from './components/AdminRoute';
 import NotFound from './pages/NotFound';
 import ScrollToTop from './components/ScrollToTop';
 import Contact from './pages/Contact/Contact';
+import ForgotPassword from './components/ForgotPassword/ForgotPassword';
 
 function App() {
   return (
@@ -40,6 +41,7 @@ function App() {
       <Route path="/" element={<Homepage />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/user" element={<User />} />
       <Route path="/profile" element={<Profile />} />
       <Route path="/account" element={<Account />} />

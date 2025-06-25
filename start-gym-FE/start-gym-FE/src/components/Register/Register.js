@@ -136,11 +136,164 @@ const Register = () => {
     const [countdown, setCountdown] = useState(0);
     const [isRegistrationSuccess, setIsRegistrationSuccess] = useState(false);
     
+    // Validation checking states for real-time feedback
+    const [validationChecking, setValidationChecking] = useState({
+        email: false,
+        phone: false,
+        username: false
+    });
+    
     const navigate = useNavigate();
 
     const handleNavigateToLogin = () => {
         navigate('/login');
     };
+
+    // Real-time validation functions
+    const checkEmailExists = async (email) => {
+        if (!email || !email.includes('@')) return;
+        
+        try {
+            setValidationChecking(prev => ({ ...prev, email: true }));
+            const response = await axios.get(`http://localhost:8080/api/v1/public/check-email-exists?email=${encodeURIComponent(email)}`);
+            
+            if (response.data.exists) {
+                setEmailError(response.data.message || 'Email đã được sử dụng');
+                return false;
+            } else {
+                // Email available, but still check format
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(email)) {
+                    setEmailError('Please enter a valid email address');
+                    return false;
+                }
+                setEmailError('');
+                return true;
+            }
+        } catch (error) {
+            console.error('Error checking email:', error);
+            // Don't show error to user, just continue with format validation
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                setEmailError('Please enter a valid email address');
+                return false;
+            }
+            setEmailError('');
+            return true;
+        } finally {
+            setValidationChecking(prev => ({ ...prev, email: false }));
+        }
+    };
+
+    const checkPhoneExists = async (phone) => {
+        if (!phone || phone.length < 10) return;
+        
+        try {
+            setValidationChecking(prev => ({ ...prev, phone: true }));
+            const response = await axios.get(`http://localhost:8080/api/v1/public/check-phone-exists?phone=${encodeURIComponent(phone)}`);
+            
+            if (response.data.exists) {
+                setPhoneError(`${response.data.message}${response.data.customerName ? ` (${response.data.customerName})` : ''}`);
+                return false;
+            } else {
+                // Phone available, but still check format
+                const phoneRegex = /^(\+84|84|0)[3|5|7|8|9][0-9]{8}$/;
+                if (!phoneRegex.test(phone)) {
+                    setPhoneError('Please enter a valid Vietnamese phone number');
+                    return false;
+                }
+                setPhoneError('');
+                return true;
+            }
+        } catch (error) {
+            console.error('Error checking phone:', error);
+            // Don't show error to user, just continue with format validation
+            const phoneRegex = /^(\+84|84|0)[3|5|7|8|9][0-9]{8}$/;
+            if (!phoneRegex.test(phone)) {
+                setPhoneError('Please enter a valid Vietnamese phone number');
+                return false;
+            }
+            setPhoneError('');
+            return true;
+        } finally {
+            setValidationChecking(prev => ({ ...prev, phone: false }));
+        }
+    };
+
+    const checkUsernameExists = async (username) => {
+        if (!username || username.length < 3) return;
+        
+        try {
+            setValidationChecking(prev => ({ ...prev, username: true }));
+            const response = await axios.get(`http://localhost:8080/api/v1/public/check-username-exists?username=${encodeURIComponent(username)}`);
+            
+            if (response.data.exists) {
+                // Since we don't have a separate usernameError state, we'll use errorMessage for immediate feedback
+                setErrorMessage(response.data.message || 'Tên đăng nhập đã được sử dụng');
+                return false;
+            } else {
+                setErrorMessage('');
+                return true;
+            }
+        } catch (error) {
+            console.error('Error checking username:', error);
+            return true; // Don't block user if API fails
+        } finally {
+            setValidationChecking(prev => ({ ...prev, username: false }));
+        }
+    };
+
+    // Debounced validation functions
+    const [debounceTimers, setDebounceTimers] = useState({
+        email: null,
+        phone: null,
+        username: null
+    });
+
+    const debouncedCheckEmail = (email) => {
+        if (debounceTimers.email) {
+            clearTimeout(debounceTimers.email);
+        }
+        
+        const timerId = setTimeout(() => {
+            checkEmailExists(email);
+        }, 800);
+        
+        setDebounceTimers(prev => ({ ...prev, email: timerId }));
+    };
+
+    const debouncedCheckPhone = (phone) => {
+        if (debounceTimers.phone) {
+            clearTimeout(debounceTimers.phone);
+        }
+        
+        const timerId = setTimeout(() => {
+            checkPhoneExists(phone);
+        }, 800);
+        
+        setDebounceTimers(prev => ({ ...prev, phone: timerId }));
+    };
+
+    const debouncedCheckUsername = (username) => {
+        if (debounceTimers.username) {
+            clearTimeout(debounceTimers.username);
+        }
+        
+        const timerId = setTimeout(() => {
+            checkUsernameExists(username);
+        }, 800);
+        
+        setDebounceTimers(prev => ({ ...prev, username: timerId }));
+    };
+
+    // Cleanup debounce timers on unmount
+    useEffect(() => {
+        return () => {
+            Object.values(debounceTimers).forEach(timer => {
+                if (timer) clearTimeout(timer);
+            });
+        };
+    }, [debounceTimers]);
 
     // Email validation
     const validateEmail = (email) => {
@@ -508,12 +661,22 @@ const Register = () => {
                                                         value={customerEmail}
                                                         onChange={(e) => {
                                                             setCustomerEmail(e.target.value);
-                                                            if (e.target.value) validateEmail(e.target.value);
+                                                            if (e.target.value && e.target.value.includes('@')) {
+                                                                debouncedCheckEmail(e.target.value);
+                                                            } else if (e.target.value) {
+                                                                validateEmail(e.target.value);
+                                                            }
                                                         }}
                                                         onFocus={() => setEmailFocused(true)}
                                                         onBlur={() => {
                                                             setEmailFocused(false);
-                                                            validateEmail(customerEmail);
+                                                            if (customerEmail) {
+                                                                if (customerEmail.includes('@')) {
+                                                                    checkEmailExists(customerEmail);
+                                                                } else {
+                                                                    validateEmail(customerEmail);
+                                                                }
+                                                            }
                                                         }}
                                                         error={!!emailError}
                                                         helperText={emailError || (emailFocused ? 'Enter a valid email address' : '')}
@@ -521,6 +684,9 @@ const Register = () => {
                                                         variant="outlined"
                                                         size="small"
                                                         disabled={isRegistrationSuccess}
+                                                        InputProps={{
+                                                            endAdornment: validationChecking.email ? <CircularProgress size={20} /> : null
+                                                        }}
                                                     />
                                                 </Grid>
                                                 
@@ -531,12 +697,22 @@ const Register = () => {
                                                         value={customerPhone}
                                                         onChange={(e) => {
                                                             setCustomerPhone(e.target.value);
-                                                            if (e.target.value) validatePhone(e.target.value);
+                                                            if (e.target.value && e.target.value.length >= 10) {
+                                                                debouncedCheckPhone(e.target.value);
+                                                            } else if (e.target.value) {
+                                                                validatePhone(e.target.value);
+                                                            }
                                                         }}
                                                         onFocus={() => setPhoneFocused(true)}
                                                         onBlur={() => {
                                                             setPhoneFocused(false);
-                                                            validatePhone(customerPhone);
+                                                            if (customerPhone) {
+                                                                if (customerPhone.length >= 10) {
+                                                                    checkPhoneExists(customerPhone);
+                                                                } else {
+                                                                    validatePhone(customerPhone);
+                                                                }
+                                                            }
                                                         }}
                                                         error={!!phoneError}
                                                         helperText={phoneError || (phoneFocused ? 'Format: 0xxxxxxxxx or +84xxxxxxxxx' : '')}
@@ -544,6 +720,9 @@ const Register = () => {
                                                         variant="outlined"
                                                         size="small"
                                                         disabled={isRegistrationSuccess}
+                                                        InputProps={{
+                                                            endAdornment: validationChecking.phone ? <CircularProgress size={20} /> : null
+                                                        }}
                                                     />
                                                 </Grid>
                                             </Grid>
@@ -559,11 +738,19 @@ const Register = () => {
                                                         fullWidth
                                                         label="Username *"
                                                         value={username}
-                                                        onChange={(e) => setUsername(e.target.value)}
+                                                        onChange={(e) => {
+                                                            setUsername(e.target.value);
+                                                            if (e.target.value && e.target.value.length >= 3) {
+                                                                debouncedCheckUsername(e.target.value);
+                                                            }
+                                                        }}
                                                         required
                                                         variant="outlined"
                                                         size="small"
                                                         disabled={isRegistrationSuccess}
+                                                        InputProps={{
+                                                            endAdornment: validationChecking.username ? <CircularProgress size={20} /> : null
+                                                        }}
                                                     />
                                                 </Grid>
                                                 
