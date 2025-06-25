@@ -1,5 +1,19 @@
-:80 {
-    root * ./build
-    try_files {path} /index.html
-    file_server
+
+(start_gym_static) {
+
+	root * /app/fe
+	try_files {path} /index.html  	# fallback cho SPA router
+	file_server
+}
+
+start-gym.site, www.start-gym.site {
+	import start_gym_static
+}
+
+
+api.start-gym.site {
+	reverse_proxy 103.82.194.100:8080
+}
+:80 {   
+    import start_gym_static
 }

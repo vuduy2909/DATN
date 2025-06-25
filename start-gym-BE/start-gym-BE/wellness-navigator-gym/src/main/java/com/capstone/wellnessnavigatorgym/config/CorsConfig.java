@@ -18,8 +18,10 @@ public class CorsConfig {
         config.addAllowedOrigin("http://localhost:3000");
         config.addAllowedOrigin("http://127.0.0.1:3000");
         config.addAllowedOrigin("http://127.0.0.1:3000");
-        config.addAllowedOrigin("https://start-gym.online");
-        config.addAllowedOrigin("http://start-gym.online");
+        config.addAllowedOrigin("https://start-gym.site");
+        config.addAllowedOrigin("http://start-gym.site");
+        config.addAllowedOrigin("https://www.start-gym.site");
+        config.addAllowedOrigin("http://www.start-gym.site");
         config.addAllowedOrigin("http://103.82.194.100:80");
         config.addAllowedOrigin("http://103.82.194.100");
         
