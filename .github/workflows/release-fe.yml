@@ -3,7 +3,7 @@ name: Build and Deploy Frontend on Tag
 on:
   push:
     tags:
-      - 'fe-v*'          # kích hoạt khi có tag bắt đầu bằng fe-v (fe-v1.0.0, fe-v2.3.4 …)
+      - 'v*'        
 
 jobs:
   build-deploy:
