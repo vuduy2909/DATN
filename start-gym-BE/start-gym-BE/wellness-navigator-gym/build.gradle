@@ -41,6 +41,10 @@ dependencies {
     //     https://mvnrepository.com/artifact/io.jsonwebtoken/jjwt
     implementation group: 'io.jsonwebtoken', name: 'jjwt', version: '0.9.1'
     
+    // Swagger/OpenAPI dependencies
+    implementation 'org.springdoc:springdoc-openapi-ui:1.6.15'
+    implementation 'org.springdoc:springdoc-openapi-security:1.6.15'
+    
     // Firebase dependencies - compatible versions to avoid conflicts
     implementation 'com.google.firebase:firebase-admin:9.2.0'
     implementation('com.google.cloud:google-cloud-storage:2.22.2') {

@@ -40,8 +40,11 @@ public interface ICourseRepository extends JpaRepository<Course, Integer> {
             "JOIN exercise_day ed ON d.day_id = ed.day_id AND ed.course_id = c.course_id " +
             "JOIN exercise e ON ed.exercise_id = e.exercise_id " +
             "JOIN comments cm ON e.exercise_id = cm.exercise_id " +
+            "AND (cm.course_id = c.course_id OR cm.course_id IS NULL) " +
+            "AND (cm.day_id = d.day_id OR cm.day_id IS NULL) " +
             "JOIN customer cu ON cm.customer_id = cu.customer_id " +
-            "WHERE c.course_id = :courseId AND d.day_id = :dayId", nativeQuery = true)
+            "WHERE c.course_id = :courseId AND d.day_id = :dayId " +
+            "ORDER BY cm.created_date DESC", nativeQuery = true)
     List<Tuple> getCourseDetailsByDayAndCourseOfComment(@Param("courseId") Integer courseId, @Param("dayId") Integer dayId);
 
     @Modifying

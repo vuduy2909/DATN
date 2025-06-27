@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 
 import javax.persistence.*;
+import java.time.LocalDateTime;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -30,6 +31,15 @@ public class Account {
     
     @Column(name = "is_enable")
     private Boolean isEnable;
+    
+    @Column(name = "created_date")
+    private LocalDateTime createdDate;
+
+    @Column(name = "refresh_token")
+    private String refreshToken;
+    
+    @Column(name = "refresh_token_expiry_date")
+    private LocalDateTime refreshTokenExpiryDate;
 
     @ManyToMany
     @JoinTable(name = "account_roles",
@@ -44,5 +54,22 @@ public class Account {
     
     public void setPassword(String password) {
         this.encryptPassword = password;
+    }
+    
+    // Getter and setter for refresh token fields
+    public String getRefreshToken() {
+        return refreshToken;
+    }
+    
+    public void setRefreshToken(String refreshToken) {
+        this.refreshToken = refreshToken;
+    }
+    
+    public LocalDateTime getRefreshTokenExpiryDate() {
+        return refreshTokenExpiryDate;
+    }
+    
+    public void setRefreshTokenExpiryDate(LocalDateTime refreshTokenExpiryDate) {
+        this.refreshTokenExpiryDate = refreshTokenExpiryDate;
     }
 }

@@ -16,9 +16,27 @@ const AuthService = {
         }
     },
 
-    logout: () => {
-        // Xử lý đăng xuất, ví dụ xóa token khỏi Local Storage
+    logout: async () => {
+        try {
+            // Call logout API to delete refresh token on server
+            const token = localStorage.getItem('token');
+            if (token) {
+                await axiosInstance.post('/public/logout', {}, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Error during logout:', error);
+            // Continue with local cleanup even if API fails
+        }
+        
+        // Xử lý đăng xuất, xóa token và refresh token khỏi Local Storage
         localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('username');
+        localStorage.removeItem('isAdmin');
         // Có thể thực hiện các bước khác khi đăng xuất
     },
 

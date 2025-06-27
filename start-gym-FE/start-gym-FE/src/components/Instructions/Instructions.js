@@ -2,8 +2,8 @@ import React from 'react';
 import styles from './Instructions.module.css';
 
 const Instructions = ({ exercise }) => {
-    const separatedInstructions = exercise && exercise.exerciseDescription ? exercise.exerciseDescription.split('.').filter(sentence => sentence.trim() !== '') : [];
-
+    // Hiển thị instructions thay vì exerciseDescription
+    const separatedInstructions = exercise && exercise.instructions ? exercise.instructions.split('.').filter(sentence => sentence.trim() !== '') : [];
 
     return (
         <div className={styles.tab_info}>

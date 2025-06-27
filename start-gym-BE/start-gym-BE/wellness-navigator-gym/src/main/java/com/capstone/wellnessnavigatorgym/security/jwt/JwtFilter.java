@@ -25,9 +25,6 @@ public class JwtFilter extends OncePerRequestFilter {
 
     @Autowired
     private JwtUtility jwtUtility;
-    
-    @Autowired
-    private JwtTokenProvider jwtTokenProvider;
 
     @Autowired
     private UserDetailService userDetailService;
@@ -39,48 +36,30 @@ public class JwtFilter extends OncePerRequestFilter {
             String jwt = parseJwt(request);
             logger.debug("JWT Token: {}", jwt != null ? "Present" : "Not found");
             
-            if (jwt != null) {
-                boolean isValid = jwtUtility.validateJwtToken(jwt);
-                String username = null;
+            if (jwt != null && jwtUtility.validateJwtToken(jwt)) {
+                String username = jwtUtility.getUserNameFromJwtToken(jwt);
+                logger.debug("JWT Token validated for user: {}", username);
                 
-                if (isValid) {
-                    username = jwtUtility.getUserNameFromJwtToken(jwt);
-                    logger.debug("JWT Token validated with JwtUtility for user: {}", username);
-                } else {
-                    // Try with JwtTokenProvider
-                    isValid = jwtTokenProvider.validateToken(jwt);
-                    if (isValid) {
-                        username = jwtTokenProvider.getUsernameFromToken(jwt);
-                        logger.debug("JWT Token validated with JwtTokenProvider for user: {}", username);
-                    }
-                }
-                
-                logger.debug("JWT Token validation result: {}", isValid);
-                
-                if (isValid && username != null) {
-                    try {
-                        UserDetails userDetails = userDetailService.loadUserByUsername(username);
-                        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                                userDetails, null, userDetails.getAuthorities());
-                        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                try {
+                    UserDetails userDetails = userDetailService.loadUserByUsername(username);
+                    UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                            userDetails, null, userDetails.getAuthorities());
+                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
-                        SecurityContextHolder.getContext().setAuthentication(authentication);
-                        logger.debug("User authentication set successfully for: {}", username);
-                    } catch (Exception userDetailsException) {
-                        // This catches banned customer exceptions from UserDetailService
-                        logger.warn("Authentication failed for user {}: {}", username, userDetailsException.getMessage());
-                        SecurityContextHolder.clearContext();
-                        
-                        // If this is a banned customer, return 401 immediately
-                        if (userDetailsException.getMessage().contains("banned")) {
-                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                            response.setContentType("application/json");
-                            response.getWriter().write("{\"error\":\"Customer account is banned\",\"message\":\"Your account has been banned\"}");
-                            return;
-                        }
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                    logger.debug("User authentication set successfully for: {}", username);
+                } catch (Exception userDetailsException) {
+                    // This catches banned customer exceptions from UserDetailService
+                    logger.warn("Authentication failed for user {}: {}", username, userDetailsException.getMessage());
+                    SecurityContextHolder.clearContext();
+                    
+                    // If this is a banned customer, return 401 immediately
+                    if (userDetailsException.getMessage().contains("banned")) {
+                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                        response.setContentType("application/json");
+                        response.getWriter().write("{\"error\":\"Customer account is banned\",\"message\":\"Your account has been banned\"}");
+                        return;
                     }
-                } else {
-                    logger.warn("JWT Token validation failed with both providers");
                 }
             }
         } catch (Exception e) {

@@ -72,7 +72,7 @@ export const getComment = async (courseId, dayId) => {
         const res = await request.get(`/course/${courseId}/day/${dayId}/comment`);
         return res;
     } catch (error) {
-        console.log('Error fetching comments', error);
+        console.error('Error fetching comments', error);
         throw error;
     }
 }
@@ -91,7 +91,7 @@ export const postComment = async (data) => {
         });
         return res;
     } catch (error) {
-        console.log('Error posting comments', error);
+        console.error('Error posting comments', error);
         throw error;
     }
 }
@@ -176,7 +176,29 @@ export const reportComment = async ({ commentId, reportReason }) => {
         const res = await request.put(`/comment/${commentId}/report`, { reportReason });
         return res;
     } catch (error) {
-        console.log('Error reporting comment', error);
+        console.error('Error reporting comment', error);
+        throw error;
+    }
+}
+
+// UPDATE COMMENT
+export const updateComment = async (commentId, data) => {
+    try {
+        const res = await request.put(`/comment/${commentId}`, data);
+        return res;
+    } catch (error) {
+        console.error('Error updating comment', error);
+        throw error;
+    }
+}
+
+// DELETE COMMENT
+export const deleteComment = async (commentId) => {
+    try {
+        const res = await request.delete(`/comment/${commentId}`);
+        return res;
+    } catch (error) {
+        console.error('Error deleting comment', error);
         throw error;
     }
 }

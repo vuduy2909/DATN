@@ -111,13 +111,15 @@ const DashboardComponent = () => {
             'Silver': '#95a5a6'
         };
         
-        // Hiển thị tất cả customer types (bao gồm cả doanh thu = 0)
+        // Chỉ hiển thị customer types có doanh thu > 0
         Object.entries(dashboardData.revenueByCustomerType).forEach(([customerType, revenue]) => {
+            if (revenue > 0) {
             revenueData.push({
                 name: customerType,
                 revenue: revenue / 1000000, // Convert to millions
                 color: colorMap[customerType] || '#95a5a6' // Default color if not in map
             });
+            }
         });
         
         // Sắp xếp theo tên để hiển thị consistent
@@ -510,7 +512,7 @@ const DashboardComponent = () => {
                 <Grid item xs={12}>
                     <Card elevation={8} sx={{ p: 3, borderRadius: 3 }}>
                         <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold', color: '#333' }}>
-                            Xu Hướng 2 Tháng Qua
+                            Xu Hướng 3 Tháng Qua
                         </Typography>
                         <ResponsiveContainer width="100%" height={400}>
                             <LineChart data={dashboardData?.monthlyData || []}>

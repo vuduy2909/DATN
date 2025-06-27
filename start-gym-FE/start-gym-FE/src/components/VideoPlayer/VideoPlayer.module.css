@@ -6,6 +6,26 @@
     background-color: #fff;
 }
 
+.mainContent {
+    display: flex;
+    width: 100%;
+    max-width: 1400px;
+    gap: 20px;
+}
+
+.videoSection {
+    flex: 1;
+    min-width: 0;
+}
+
+.exercisesSection {
+    width: 350px;
+    flex-shrink: 0;
+    align-self: flex-start;
+    position: sticky;
+    top: 20px;
+}
+
 .video {
     width: 100%;
     height: auto;
@@ -94,15 +114,14 @@
 
 .underVideo {
     display: flex;
-    width: 900px;
+    width: 100%;
     background-color: #fff;
 }
 
 .groupTab {
     display: flex;
     flex-direction: column;
-    width: 75%;
-    margin-right: 20px;
+    width: 100%;
 }
 
 .video_tags {

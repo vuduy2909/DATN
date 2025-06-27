@@ -119,7 +119,12 @@ const Login = () => {
             
             if (response.status === 200) {
                 const token = response.data.token;
+                const refreshToken = response.data.refreshToken;
+                
                 localStorage.setItem('token', token);
+                if (refreshToken) {
+                    localStorage.setItem('refreshToken', refreshToken);
+                }
                 localStorage.setItem('username', username);
                 setUser(token);
                 
@@ -231,7 +236,12 @@ const Login = () => {
 
             if (googleResponse.status === 200) {
                 const token = googleResponse.data.token;
+                const refreshToken = googleResponse.data.refreshToken;
+                
                 localStorage.setItem('token', token);
+                if (refreshToken) {
+                    localStorage.setItem('refreshToken', refreshToken);
+                }
                 setUser(token);
                 
                 // Store username from Google response if available

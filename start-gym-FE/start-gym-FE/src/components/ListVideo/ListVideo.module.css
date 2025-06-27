@@ -4,14 +4,14 @@
     background-color: #fff;
     border-radius: 10px;
     margin-right: 10px;
-    height: 650px;
+    height: 500px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .sectionTitle {
-    margin: 15px 27px 0;
+    margin: 10px 15px 0;
     color: #333;
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 600;
 }
 
@@ -20,7 +20,8 @@
     flex-direction: column;
     width: 18rem;
     overflow-y: auto;
-    padding-bottom: 20px;
+    padding-bottom: 10px;
+    flex: 1;
 }
 
 .videoList::-webkit-scrollbar {
@@ -36,15 +37,15 @@
     flex-shrink: 0;
     background: #F6F7F9;
     color: #333;
-    font-size: 17px;
+    font-size: 14px;
     font-style: normal;
     font-weight: 400;
     line-height: 16px;
     border: unset;
     border-radius: 3px;
-    margin: 15px 27px;
-    height: 42px;
-    padding: 20px;
+    margin: 10px 15px;
+    height: 36px;
+    padding: 10px 15px;
 }
 
 .searchBar:focus-visible {
@@ -58,7 +59,7 @@
     cursor: pointer;
     transition: all 0.3s ease;
     border-radius: 8px;
-    margin: 15px 27px;
+    margin: 8px 15px;
     position: relative;
 }
 
@@ -77,10 +78,10 @@
 }
 
 .videoThumbnail {
-    width: 20px;
-    height: 76px;
-    margin-right: 20px;
-    padding-right: 24px;
+    width: 16px;
+    height: 60px;
+    margin-right: 15px;
+    padding-right: 20px;
     object-fit: cover;
     border-radius: 2px 0px 0px 2px;
     background-color: var(--color-red-body);
@@ -105,15 +106,15 @@
 
 .title {
     color: #262626;
-    font-size: 17px;
-    line-height: 24px;
-    margin-bottom: 4px;
+    font-size: 15px;
+    line-height: 20px;
+    margin-bottom: 3px;
 }
 
 .target {
     color: #666;
-    font-size: 13px;
-    margin: 0 0 8px 0;
+    font-size: 12px;
+    margin: 0 0 6px 0;
 }
 
 .star {

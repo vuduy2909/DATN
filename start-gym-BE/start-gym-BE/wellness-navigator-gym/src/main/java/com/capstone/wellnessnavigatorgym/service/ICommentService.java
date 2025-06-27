@@ -10,4 +10,6 @@ public interface ICommentService {
     Comment findCommentById(Integer id);
 
     void saveComment(Comment comment);
+    
+    void deleteComment(Integer id);
 }

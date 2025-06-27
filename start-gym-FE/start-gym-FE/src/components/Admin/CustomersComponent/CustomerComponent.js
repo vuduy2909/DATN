@@ -46,7 +46,7 @@ const CustomerComponent = () => {
 
   // Pagination state
   const [page, setPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(10); // Back to 10 as requested
   const [totalCustomers, setTotalCustomers] = useState(0);
 
   // Search and filter state
@@ -71,40 +71,70 @@ const CustomerComponent = () => {
     setSnackbar({ ...snackbar, open: false });
   };
 
+  // Helper function to check if customer is admin
+  const isAdminCustomer = (customer) => {
+    if (!customer.account || !customer.account.roles) return false;
+    return customer.account.roles.some(role => role.roleName === 'ROLE_ADMIN');
+  };
+
   // Fetch customers
   const fetchCustomers = async () => {
     setLoading(true);
     try {
-      const res = await request.get('/admin/customers');
+      // First, get total count to determine appropriate page size
+      const countParams = {
+        page: 0,
+        size: 1, // Just get first page to check total
+        status: 'all'
+      };
+      
+      const countRes = await request.get('/admin/customers', { params: countParams });
+      const totalCount = countRes?.totalElements || 0;
+      
+      // Now fetch all customers with appropriate size
+      const params = {
+        page: 0,
+        size: Math.max(totalCount, 50), // Dynamic size based on actual count, minimum 50
+        status: 'all' // Get both active and banned customers
+      };
+      
+      const res = await request.get('/admin/customers', { params });
       console.log('Admin customers API response:', res);
       
       let customerData = [];
+      let totalElements = 0;
+      
       if (Array.isArray(res)) {
         customerData = res;
+        totalElements = res.length;
       } else if (res && typeof res === 'object') {
         // Check if response has a customers array property
         if (res.customers && Array.isArray(res.customers)) {
           customerData = res.customers;
+          totalElements = res.totalElements || res.customers.length;
         } else {
           const possibleArrays = Object.values(res).filter(val => Array.isArray(val));
           if (possibleArrays.length > 0) {
             customerData = possibleArrays[0];
+            totalElements = customerData.length;
           }
         }
       }
       
       // Debug: Log each customer's isEnable status
       console.log('Customer data structure:');
+      console.log(`Total customers from API: ${totalElements}`);
       customerData.forEach(customer => {
         console.log(`Customer ${customer.customerName}: isEnable = ${customer.isEnable} (type: ${typeof customer.isEnable})`);
       });
       
       setCustomers(customerData);
-      setTotalCustomers(customerData.length);
+      setTotalCustomers(totalElements); // Use totalElements from API response
     } catch (error) {
       console.error("Error fetching customers:", error);
       showSnackbar('Failed to load customers', 'error');
       setCustomers([]);
+      setTotalCustomers(0);
     } finally {
       setLoading(false);
     }
@@ -392,8 +422,30 @@ const CustomerComponent = () => {
                         {customer.customerName?.charAt(0)}
                       </Avatar>
                       <Box>
-                        <Typography variant="subtitle1" fontWeight="bold">
+                        <Typography 
+                          variant="subtitle1" 
+                          fontWeight="bold"
+                          sx={{ 
+                            color: isAdminCustomer(customer) ? '#d32f2f' : 'inherit' // Red color for admin
+                          }}
+                        >
                           {customer.customerName}
+                          {isAdminCustomer(customer) && (
+                            <Typography 
+                              component="span" 
+                              variant="caption" 
+                              sx={{ 
+                                ml: 1, 
+                                color: '#d32f2f', 
+                                fontWeight: 'bold',
+                                backgroundColor: '#ffebee',
+                                padding: '2px 6px',
+                                borderRadius: '4px'
+                              }}
+                            >
+                              ADMIN
+                            </Typography>
+                          )}
                         </Typography>
                         <Typography variant="body2" color="textSecondary">
                           ID: {customer.customerId}

@@ -14,7 +14,7 @@ import java.util.Optional;
 @Transactional
 public interface IAccountRepository extends JpaRepository<Account, Integer> {
 
-    @Query(value = "select account_id, user_name, encrypt_password, email, is_enable " +
+    @Query(value = "select account_id, user_name, encrypt_password, email, is_enable, created_date, refresh_token, refresh_token_expiry_date " +
             "from account " +
             "where user_name = :username", nativeQuery = true)
     Optional<Account> findAccountByUserName(@Param("username") String username);
@@ -24,6 +24,8 @@ public interface IAccountRepository extends JpaRepository<Account, Integer> {
     Boolean existsByEmail(String email);
 
     Account findByEmail(String email);
+
+    Optional<Account> findByRefreshToken(String refreshToken);
 
     @Modifying
     @Query(value = "UPDATE account SET encrypt_password = :pass " +

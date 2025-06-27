@@ -7,12 +7,14 @@ import java.util.concurrent.ConcurrentMap;
 import com.capstone.wellnessnavigatorgym.dto.request.ChangePasswordDto;
 import com.capstone.wellnessnavigatorgym.dto.request.LoginRequest;
 import com.capstone.wellnessnavigatorgym.dto.request.SignupRequest;
+import com.capstone.wellnessnavigatorgym.dto.request.TokenRefreshRequest;
 import com.capstone.wellnessnavigatorgym.dto.response.JwtResponse;
 import com.capstone.wellnessnavigatorgym.dto.response.MessageResponse;
 import com.capstone.wellnessnavigatorgym.dto.response.SocialResponse;
+import com.capstone.wellnessnavigatorgym.dto.response.TokenRefreshResponse;
 import com.capstone.wellnessnavigatorgym.entity.*;
+import com.capstone.wellnessnavigatorgym.exception.TokenRefreshException;
 import com.capstone.wellnessnavigatorgym.repository.ICustomerRepository;
-import com.capstone.wellnessnavigatorgym.security.jwt.JwtTokenProvider;
 import com.capstone.wellnessnavigatorgym.security.jwt.JwtUtility;
 import com.capstone.wellnessnavigatorgym.security.userprinciple.UserPrinciple;
 import com.capstone.wellnessnavigatorgym.service.*;
@@ -56,9 +58,6 @@ public class SecurityController {
     private JwtUtility jwtUtility;
 
     @Autowired
-    private JwtTokenProvider jwtTokenProvider;
-
-    @Autowired
     private IAccountService accountService;
 
     @Autowired
@@ -75,6 +74,9 @@ public class SecurityController {
 
     @Autowired
     private EmailService emailService;
+
+    @Autowired
+    private RefreshTokenService refreshTokenService;
 
     @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
@@ -251,17 +253,19 @@ public class SecurityController {
         List<String> roles = userDetails.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .collect(Collectors.toList());
+                
+        String refreshToken = refreshTokenService.createRefreshToken(userDetails.getId());
+        
         return ResponseEntity.ok(
                 new JwtResponse(
                         jwt,
+                        refreshToken,
                         userDetails.getId(),
                         userDetails.getUsername(),
                         roles
                 )
         );
     }
-
-
 
     @PostMapping("/oauth/google")
     @Transactional
@@ -312,6 +316,18 @@ public class SecurityController {
             // Create authentication for JWT generation
             Authentication auth = new UsernamePasswordAuthenticationToken(payload.getEmail(), null, Collections.emptyList());
             String jwt = jwtUtility.generateJwtToken(auth);
+            
+            // Get account and create refresh token
+            Account account = accountService.findByEmail(payload.getEmail());
+            if (account != null) {
+                String refreshToken = refreshTokenService.createRefreshToken(account.getAccountId());
+                List<String> roles = new ArrayList<>();
+                for (Role role : account.getRoles()) {
+                    roles.add(role.getRoleName());
+                }
+                return ResponseEntity.ok(new JwtResponse(jwt, refreshToken, account.getAccountId(), payload.getEmail(), roles));
+            }
+            
             return ResponseEntity.ok(new JwtResponse(jwt, payload.getEmail()));
         } catch (Exception e) {
             e.printStackTrace();
@@ -746,6 +762,48 @@ public class SecurityController {
             errorResponse.put("error", e.getClass().getSimpleName());
             
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+    @PostMapping("/refreshtoken")
+    public ResponseEntity<?> refreshtoken(@Valid @RequestBody TokenRefreshRequest request) {
+        String requestRefreshToken = request.getRefreshToken();
+
+        // Verify token exists and is not expired
+        if (!refreshTokenService.verifyExpiration(requestRefreshToken)) {
+            throw new TokenRefreshException(requestRefreshToken, "Refresh token is expired. Please make a new signin request");
+        }
+
+        return refreshTokenService.findByRefreshToken(requestRefreshToken)
+                .map(account -> {
+                    Authentication auth = new UsernamePasswordAuthenticationToken(
+                            account.getUserName(), 
+                            null, 
+                            Collections.emptyList()
+                    );
+                    String token = jwtUtility.generateJwtToken(auth);
+                    return ResponseEntity.ok(new TokenRefreshResponse(token, requestRefreshToken));
+                })
+                .orElseThrow(() -> new TokenRefreshException(requestRefreshToken,
+                        "Refresh token is not in database!"));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logoutUser(@RequestHeader("Authorization") String bearerToken) {
+        try {
+            if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
+                String jwt = bearerToken.substring(7);
+                String username = jwtUtility.getUserNameFromJwtToken(jwt);
+                
+                Optional<Account> accountOpt = accountService.findAccountByUserName(username);
+                if (accountOpt.isPresent()) {
+                    refreshTokenService.deleteRefreshToken(accountOpt.get().getAccountId());
+                }
+            }
+            
+            return ResponseEntity.ok(new MessageResponse("Log out successful!"));
+        } catch (Exception e) {
+            return ResponseEntity.ok(new MessageResponse("Log out successful!"));
         }
     }
 

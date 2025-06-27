@@ -29,6 +29,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import LoginIcon from '@mui/icons-material/Login';
 import Divider from '@mui/material/Divider';
+import axiosInstance from '../../utils/axiosInstance';
 
 const Search = styled('div')(({ theme }) => ({
   position: 'relative',
@@ -108,8 +109,8 @@ const Header = () => {
     const pages = ['About', 'Collections', 'Recipe', 'Blog'];
     const settings = ['Profile', 'Account', 'Dashboard', 'Logout'];
 
-    const token = localStorage.getItem('token'); // Lấy token từ Local Storage
-
+    // State để theo dõi token
+    const [token, setToken] = useState(null);
     const [anchorElNav, setAnchorElNav] = React.useState(null);
     const [anchorElUser, setAnchorElUser] = React.useState(null);
     const [searchInput, setSearchInput] = React.useState('');
@@ -155,9 +156,39 @@ const Header = () => {
     const location = useLocation();
     const currentPath = location.pathname.toLowerCase();
 
-    const handleLogout = () => {
-        // Xóa token khỏi Local Storage khi đăng xuất
+    const handleLogout = async () => {
+        try {
+            // Call logout API to delete refresh token on server
+            const currentToken = localStorage.getItem('token');
+            if (currentToken) {
+                await axiosInstance.post('/public/logout', {}, {
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Error during logout:', error);
+            // Continue with local cleanup even if API fails
+        }
+        
+        // Xóa token và refresh token khỏi Local Storage khi đăng xuất
         localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('username');
+        localStorage.removeItem('isAdmin');
+        
+        // Cập nhật state
+        setToken(null);
+        setUserData([]);
+        setIsAdmin(false);
+        
+        handleCloseUserMenu();
+        navigate('/login');
+    };
+
+    const handleNavigateToLogin = () => {
+        handleCloseUserMenu();
         navigate('/login');
     };
 
@@ -201,17 +232,23 @@ const Header = () => {
     const [userData, setUserData] = useState([]);
     const [isAdmin, setIsAdmin] = useState(false);
     
+    // Effect để theo dõi thay đổi token
     useEffect(() => {
         const fetchUserData = async () => {
             try {
                 // Kiểm tra token trước khi gọi API
-                const token = localStorage.getItem('token');
-                if (!token || token === 'null' || token === 'undefined') {
+                const currentToken = localStorage.getItem('token');
+                if (!currentToken || currentToken === 'null' || currentToken === 'undefined') {
                     console.log('No valid token found, skipping user data fetch');
+                    setToken(null);
+                    setUserData([]);
                     setIsAdmin(false);
                     localStorage.removeItem('isAdmin');
                     return;
                 }
+
+                // Cập nhật token state
+                setToken(currentToken);
 
                 // Gọi API để lấy thông tin user với xử lý lỗi tốt hơn
                 const res = await request.get('/customer/detail', {
@@ -223,9 +260,11 @@ const Header = () => {
                 // Kiểm tra response có lỗi hay không
                 if (!res || res.status === 401 || res.status === 403) {
                     console.log('User not authenticated or token expired');
+                    setToken(null);
                     setUserData([]);
                     setIsAdmin(false);
                     localStorage.removeItem('isAdmin');
+                    localStorage.removeItem('token'); // Xóa token không hợp lệ
                     return;
                 }
                 
@@ -260,25 +299,17 @@ const Header = () => {
                         localStorage.setItem('isAdmin', 'true');
                         setIsAdmin(true);
                     } else {
-                        // Không reset nếu đã có trong localStorage, có thể API không trả về roles
-                        const currentAdminStatus = localStorage.getItem('isAdmin') === 'true';
-                        if (!currentAdminStatus) {
-                            localStorage.setItem('isAdmin', 'false');
-                            setIsAdmin(false);
-                        }
-                    }
-                } else {
-                    // Không reset admin status nếu đã có trong localStorage
-                    const currentAdminStatus = localStorage.getItem('isAdmin') === 'true';
-                    if (currentAdminStatus) {
-                        setIsAdmin(true);
-                    } else {
+                        localStorage.setItem('isAdmin', 'false');
                         setIsAdmin(false);
                     }
+                } else {
+                    localStorage.setItem('isAdmin', 'false');
+                    setIsAdmin(false);
                 }
             } catch (error) {
                 console.log("Error fetching user information", error);
                 // Reset user data
+                setToken(null);
                 setUserData([]);
                 setIsAdmin(false);
                 localStorage.removeItem('isAdmin');
@@ -291,11 +322,12 @@ const Header = () => {
         }
 
         // Only fetch user data when component mounts or user changes
-        const token = localStorage.getItem('token');
-        if (token && token !== 'null' && token !== 'undefined') {
+        const currentToken = localStorage.getItem('token');
+        if (currentToken && currentToken !== 'null' && currentToken !== 'undefined') {
             fetchUserData();
         } else {
             // Reset data when no token
+            setToken(null);
             setUserData([]);
             setIsAdmin(false);
             localStorage.removeItem('isAdmin');
@@ -319,6 +351,9 @@ const Header = () => {
                 return null;
         }
     };
+
+    // Debug: Log token state changes
+    console.log('Header render - token state:', token, 'localStorage token:', localStorage.getItem('token'));
 
     return (
         <AppBar position="static" className={styles.appBar}>
@@ -454,13 +489,11 @@ const Header = () => {
                                 open={Boolean(anchorElUser)}
                                 onClose={handleCloseUserMenu}
                             >
-                                <StyledMenuItem onClick={handleLogout}>
-                                    <Link to="/login" style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center' }}>
-                                        <LoginIcon sx={{ color: '#CF4044', mr: 2 }} />
-                                        <Typography variant="subtitle1">
-                                            Login
-                                        </Typography>
-                                    </Link>
+                                <StyledMenuItem onClick={handleNavigateToLogin}>
+                                    <LoginIcon sx={{ color: '#CF4044', mr: 2 }} />
+                                    <Typography variant="subtitle1">
+                                        Login
+                                    </Typography>
                                 </StyledMenuItem>
                             </StyledMenu>
                         )}
@@ -470,4 +503,5 @@ const Header = () => {
         </AppBar >
     );
 }
+
 export default Header;
