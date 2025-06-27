@@ -14,8 +14,8 @@ const ChartLine = ({ chartData }) => {
         const myChartRef = chartRef.current.getContext('2d');
 
         // Dữ liệu mặc định
-        let labels = ['Day 1', 'Day 10', 'Day 15', 'Day 20', 'Day 25', 'Day 30'];
-        let data = [50, 60, 80, 70, 70, 90, 100];
+        let labels = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
+        let data = [65, 75, 45, 80];
         
         // Sử dụng dữ liệu từ API nếu có
         if (chartData && chartData.data && chartData.data.length > 0) {
@@ -28,18 +28,88 @@ const ChartLine = ({ chartData }) => {
             data: {
                 labels: labels,
                 datasets: [{
-                    label: 'Activity chart',
+                    label: 'Weekly Activity (%)',
                     data: data,
-                    fill: false,
-                    borderColor: '#d35255',
-                    tension: 0.1
+                    fill: true,
+                    backgroundColor: 'rgba(207, 64, 68, 0.1)',
+                    borderColor: '#CF4044',
+                    pointBackgroundColor: '#CF4044',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointRadius: 6,
+                    pointHoverRadius: 8,
+                    tension: 0.4
                 }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            color: '#2c3e50',
+                            font: {
+                                size: 12,
+                                weight: 'bold'
+                            }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(44, 62, 80, 0.9)',
+                        titleColor: '#fff',
+                        bodyColor: '#fff',
+                        borderColor: '#CF4044',
+                        borderWidth: 1,
+                        callbacks: {
+                            label: function(context) {
+                                return `Activity: ${context.parsed.y}%`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';
+                            },
+                            color: '#64748b',
+                            font: {
+                                size: 11
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.1)',
+                            drawBorder: false
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            color: '#64748b',
+                            font: {
+                                size: 11,
+                                weight: 'bold'
+                            }
+                        },
+                        grid: {
+                            display: false
+                        }
+                    }
+                },
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                }
             }
         })
     }, [chartData])
 
     return (
-        <div>
+        <div style={{ height: '300px', position: 'relative' }}>
             <canvas ref={chartRef} className={styles.chart} />
         </div>
     )

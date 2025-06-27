@@ -11,7 +11,7 @@ const AdminRoute = ({ redirectPath = "/404", children }) => {
   useEffect(() => {
     const checkAdminStatus = async () => {
       // Nếu không có user/token, không phải admin - redirect to 404
-      if (!user || user === 'null' || user === 'undefined') {
+      if (!user || user === 'null' || user === 'undefined' || user === '') {
         setIsAdmin(false);
         setIsLoading(false);
         return;

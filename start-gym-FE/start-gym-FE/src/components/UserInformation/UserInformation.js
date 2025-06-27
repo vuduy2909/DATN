@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useAuth } from '../../AuthContext'
+import { useLanguage } from '../../contexts/LanguageContext'
 import { 
     Container, 
     Grid, 
@@ -19,6 +20,7 @@ import {
     Grow,
     useTheme
 } from '@mui/material';
+
 import {
     Email,
     Phone,
@@ -48,6 +50,7 @@ import { useNavigate } from 'react-router-dom';
 
 const UserInformation = () => {
     const { user } = useAuth();
+    const { language, toggleLanguage, t } = useLanguage();
     const [userData, setUserData] = useState([]);
     const [recommendedCourse, setRecommendedCourse] = useState('')
     const [lengthCourse, setLengthCourse] = useState(0)
@@ -318,18 +321,18 @@ const UserInformation = () => {
                         <Grid container spacing={3} sx={{ mb: 4 }}>
                             <Grid item xs={12} sm={6} md={4}>
                                 <StatCard
-                                    title="Weekly Activity"
+                                    title={t.weeklyActivity}
                                     value={dashboardStats?.weeklyActivity ? `${Math.round(dashboardStats.weeklyActivity)}%` : "0%"}
                                     subtitle={dashboardStats?.completedSessions && dashboardStats?.targetSessions 
-                                        ? `${dashboardStats.completedSessions}/${dashboardStats.targetSessions} buổi`
-                                        : "0/3 buổi"}
+                                        ? `${dashboardStats.completedSessions}/${dashboardStats.targetSessions} ${language === 'en' ? 'sessions' : 'buổi'}`
+                                        : `0/3 ${language === 'en' ? 'sessions' : 'buổi'}`}
                                     icon={<TrendingUp />}
                                     gradient={`linear-gradient(135deg, ${redThemeColors.primary} 0%, ${redThemeColors.secondary} 100%)`}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={6} md={4}>
                                 <StatCard
-                                    title="Course In Progress"
+                                    title={t.courseInProgress}
                                     value={dashboardStats?.coursesInProgress || lengthCourse}
                                     icon={<FolderOpen />}
                                     gradient={`linear-gradient(135deg, ${redThemeColors.info} 0%, #2980b9 100%)`}
@@ -337,7 +340,7 @@ const UserInformation = () => {
                             </Grid>
                             <Grid item xs={12} sm={6} md={4}>
                                 <StatCard
-                                    title="BMI"
+                                    title={t.bmi}
                                     value={dashboardStats?.bmi ? Number(dashboardStats.bmi).toFixed(2) : recommendedCourse?.bmi ? Number(recommendedCourse.bmi).toFixed(2) : '0.00'}
                                     icon={<FitnessCenter />}
                                     gradient={`linear-gradient(135deg, ${redThemeColors.success} 0%, #2ecc71 100%)`}
@@ -369,7 +372,7 @@ const UserInformation = () => {
                                             }}
                                         >
                                             <Analytics sx={{ mr: 1, color: redThemeColors.primary }} />
-                                            Activity Chart
+                                            {t.activityChart}
                                         </Typography>
                                         <ChartLine chartData={activityChartData} />
                                     </Card>
@@ -397,7 +400,7 @@ const UserInformation = () => {
                                             }}
                                         >
                                             <Timeline sx={{ mr: 1, color: redThemeColors.primary }} />
-                                            Progress
+                                            {t.progress}
                                         </Typography>
                                         <ChartCircle chartData={progressChartData} />
                                     </Card>
@@ -432,24 +435,24 @@ const UserInformation = () => {
                                                 }}
                                             >
                                                 <Star sx={{ mr: 1, color: redThemeColors.primary }} />
-                                                Information
+                                                {t.information}
                                             </Typography>
                                             
                                             <InfoItem 
                                                 icon={<Email />}
-                                                label="Email"
+                                                label={t.email}
                                                 value={userData.customerEmail}
                                                 color={redThemeColors.primary}
                                             />
                                             <InfoItem 
                                                 icon={<Phone />}
-                                                label="Phone"
+                                                label={t.phone}
                                                 value={userData.customerPhone}
                                                 color={redThemeColors.secondary}
                                             />
                                             <InfoItem 
                                                 icon={<LocationOn />}
-                                                label="Location"
+                                                label={t.location}
                                                 value={userData.customerAddress}
                                                 color={redThemeColors.success}
                                             />
@@ -467,20 +470,20 @@ const UserInformation = () => {
                                                 }}
                                             >
                                                 <AccountBox sx={{ mr: 1, color: redThemeColors.primary }} />
-                                                Biography
+                                                {t.biography}
                                             </Typography>
                                             
                                             <InfoItem 
                                                 icon={<Wc />}
-                                                label="Gender"
+                                                label={t.gender}
                                                 value={typeof userData.customerGender === 'string' ? 
-                                                    userData.customerGender === 'Male' || userData.customerGender === 'male' ? 'Nam' : 'Nữ' 
-                                                    : userData.customerGender === true ? 'Nam' : 'Nữ'}
+                                                    userData.customerGender === 'Male' || userData.customerGender === 'male' ? (language === 'en' ? 'Male' : 'Nam') : (language === 'en' ? 'Female' : 'Nữ')
+                                                    : userData.customerGender === true ? (language === 'en' ? 'Male' : 'Nam') : (language === 'en' ? 'Female' : 'Nữ')}
                                                 color={redThemeColors.info}
                                             />
                                             <InfoItem 
                                                 icon={<Cake />}
-                                                label="Date of Birth"
+                                                label={t.dateOfBirth}
                                                 value={userData.dateOfBirth}
                                                 color={redThemeColors.warning}
                                             />

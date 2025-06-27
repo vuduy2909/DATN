@@ -30,6 +30,7 @@ import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import LoginIcon from '@mui/icons-material/Login';
 import Divider from '@mui/material/Divider';
 import axiosInstance from '../../utils/axiosInstance';
+import LanguageSelector from '../LanguageSelector/LanguageSelector';
 
 const Search = styled('div')(({ theme }) => ({
   position: 'relative',
@@ -238,7 +239,7 @@ const Header = () => {
             try {
                 // Kiểm tra token trước khi gọi API
                 const currentToken = localStorage.getItem('token');
-                if (!currentToken || currentToken === 'null' || currentToken === 'undefined') {
+                if (!currentToken || currentToken === 'null' || currentToken === 'undefined' || currentToken.trim() === '') {
                     console.log('No valid token found, skipping user data fetch');
                     setToken(null);
                     setUserData([]);
@@ -323,7 +324,7 @@ const Header = () => {
 
         // Only fetch user data when component mounts or user changes
         const currentToken = localStorage.getItem('token');
-        if (currentToken && currentToken !== 'null' && currentToken !== 'undefined') {
+        if (currentToken && currentToken !== 'null' && currentToken !== 'undefined' && currentToken.trim() !== '') {
             fetchUserData();
         } else {
             // Reset data when no token
@@ -352,9 +353,6 @@ const Header = () => {
         }
     };
 
-    // Debug: Log token state changes
-    console.log('Header render - token state:', token, 'localStorage token:', localStorage.getItem('token'));
-
     return (
         <AppBar position="static" className={styles.appBar}>
             <Container maxWidth="xl" className={styles.container}>
@@ -373,18 +371,29 @@ const Header = () => {
                     
                     {/* Menu item  - Navigation */}
                     <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex' } }} className={styles.menuItem}>
-                        {pages.map((page) => (
-                            <Button
-                                className={styles.menuItemText}
-                                key={page}
-                                onClick={handleCloseNavMenu}
-                                sx={{ my: 2, color: 'white', display: 'block' }}
-                            >
-                                <Link to={`/${page.toLowerCase()}`} className={styles.menuItemText}>
-                                    <Typography textAlign="center">{page}</Typography>
+                        {pages.map((page) => {
+                            // Chỉ highlight khi đường dẫn chính xác khớp với trang, không highlight About ở trang home
+                            const isActive = currentPath.includes(page.toLowerCase()) && currentPath !== '/';
+                            
+                            return (
+                                <Link 
+                                    key={page}
+                                    to={`/${page.toLowerCase()}`} 
+                                    className={`${styles.menuItemText} ${isActive ? styles.active : ''}`}
+                                    onClick={handleCloseNavMenu}
+                                >
+                                    <Typography 
+                                        textAlign="center" 
+                                        sx={{ 
+                                            fontSize: '20px !important',
+                                            fontWeight: isActive ? 600 : 500
+                                        }}
+                                    >
+                                        {page}
+                                    </Typography>
                                 </Link>
-                            </Button>
-                        ))}
+                            );
+                        })}
                     </Box>
 
                     {/* Search */}
@@ -400,6 +409,11 @@ const Header = () => {
                             onKeyDown={handleSearchKeyDown}
                         />
                     </Search>
+
+                    {/* Language Selector */}
+                    <Box sx={{ mr: 2 }}>
+                        <LanguageSelector iconOnly={true} />
+                    </Box>
 
                     {/* Account */}
                     <Box sx={{ flexGrow: 0 }}>
@@ -439,8 +453,37 @@ const Header = () => {
                                 open={Boolean(anchorElUser)}
                                 onClose={handleCloseUserMenu}
                             >
-                                {/* Show Admin menu item if user is admin */}
-                                {isAdmin && (
+                                {/* Show Admin menu item if user is admin - Enhanced logic */}
+                                {(() => {
+                                    const isAdminFromState = isAdmin;
+                                    const isAdminFromLS = localStorage.getItem('isAdmin') === 'true';
+                                    const isAdminFromData = userData && userData.account && userData.account.roles && 
+                                        userData.account.roles.some(role => 
+                                            role.roleId === 2 || role.id === 2 || 
+                                            (role.roleName && role.roleName.toUpperCase().includes('ADMIN'))
+                                        );
+                                    
+                                    // Additional check for admin username
+                                    const username = localStorage.getItem('username') || '';
+                                    const isAdminByUsername = username.toLowerCase().includes('admin');
+                                    
+                                    const shouldShowAdmin = isAdminFromState || isAdminFromLS || isAdminFromData || isAdminByUsername;
+                                    
+                                    // Debug logs to see why admin menu not showing
+                                    console.log('🔍 Admin Menu Debug:', {
+                                        isAdminFromState,
+                                        isAdminFromLS,
+                                        isAdminFromData,
+                                        isAdminByUsername,
+                                        shouldShowAdmin,
+                                        username,
+                                        'localStorage.getItem("isAdmin")': localStorage.getItem('isAdmin'),
+                                        'userData?.account?.roles': userData?.account?.roles,
+                                        'Current user': userData?.customerName || 'Unknown'
+                                    });
+                                    
+                                    return shouldShowAdmin;
+                                })() && (
                                     <StyledMenuItem onClick={() => handleNavigate('Admin')}>
                                         <AdminPanelSettingsIcon sx={{ color: '#CF4044' }} />
                                         <Typography textAlign="left">Admin</Typography>

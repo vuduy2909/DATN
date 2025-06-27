@@ -1,6 +1,7 @@
 package com.capstone.wellnessnavigatorgym.entity;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.capstone.wellnessnavigatorgym.utils.TimeUtil;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
@@ -100,12 +101,12 @@ public class UserDataAi {
     // Automatically set timestamps
     @PrePersist
     protected void onCreate() {
-        createdDate = LocalDateTime.now();
-        updated_date = LocalDateTime.now();
+        createdDate = TimeUtil.now();
+        updated_date = TimeUtil.now();
     }
     
     @PreUpdate
     protected void onUpdate() {
-        updated_date = LocalDateTime.now();
+        updated_date = TimeUtil.now();
     }
 }

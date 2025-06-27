@@ -27,28 +27,47 @@
 }
 
 .menuItem {
-    margin-left: 40px;
+    margin-left: 20px;
 }
-
-.menuItem:hover {}
 
 .menuItemText {
-    font-size: 16px !important;
-    margin: 0 6px !important;
-    line-height: 0.1 !important;
-    padding: 4px 0px !important;
-}
-
-.menuItemText>a>p {
-    padding: 4px 0px;
+    font-size: 20px !important;
+    margin: 0 4px !important;
+    padding: 16px 16px !important;
+    border-radius: 8px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-decoration: none !important;
     color: #ffffff !important;
-    transition: all 2s ease !important;
-    transition-delay: 1s;
-    margin: 0 !important;
 }
 
-.menuItemText>a>p:hover {
-    border-bottom: 1px solid;
+.menuItemText:hover {
+    background-color: rgba(207, 64, 68, 0.9) !important;
+}
+
+.menuItemText > p {
+    padding: 0 !important;
+    margin: 0 !important;
+    color: #ffffff !important;
+    line-height: normal !important;
+    font-size: 20px !important;
+    font-weight: 500 !important;
+}
+
+.menuItemText:hover > p {
+    color: #ffffff !important;
+}
+
+/* Active state for current page */
+.menuItemText.active {
+    background-color: rgba(207, 64, 68, 0.8) !important;
+}
+
+.menuItemText.active > p {
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    font-size: 20px !important;
 }
 
 .SearchIconWrapper {

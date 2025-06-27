@@ -29,4 +29,9 @@ public interface UserDashboardService {
      * Lấy dữ liệu cho biểu đồ hoạt động
      */
     Map<String, Object> getActivityChartData(Integer customerId);
+    
+    /**
+     * Lấy số lượng khóa học đang theo
+     */
+    Integer getCoursesInProgressCount(Integer customerId);
 } 

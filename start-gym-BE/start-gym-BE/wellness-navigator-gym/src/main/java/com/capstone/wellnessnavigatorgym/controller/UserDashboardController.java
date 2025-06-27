@@ -62,8 +62,10 @@ public class UserDashboardController {
         progressChartData.put("total", 20);
         response.put("progressChartData", progressChartData);
         
-        // Thêm các thông tin khác vào response nếu cần
-        response.put("coursesInProgress", 2); // Placeholder - cần implement
+        // Lấy thông tin courses in progress từ UserDashboardService
+        Integer customerId = getCustomerIdFromUsername(username);
+        Integer coursesInProgress = userDashboardService.getCoursesInProgressCount(customerId);
+        response.put("coursesInProgress", coursesInProgress);
         
         return ResponseEntity.ok(response);
     }

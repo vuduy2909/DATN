@@ -1,9 +1,37 @@
 .collection {
-    display: flex;
-    flex-wrap: wrap;
-    padding-left: 20px;
-    justify-content: flex-start;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
     gap: 15px;
+    padding: 0 20px;
+    width: 100%;
+    box-sizing: border-box;
+    /* Ensure minimum width for the container to maintain 4 columns */
+    min-width: 0;
+    overflow-x: auto; /* Allow horizontal scroll if needed on very small screens */
+    /* Smooth scrolling */
+    scroll-behavior: smooth;
+    /* Custom scrollbar styling */
+    scrollbar-width: thin;
+    scrollbar-color: #CF4044 #f1f1f1;
+}
+
+/* Custom scrollbar for webkit browsers */
+.collection::-webkit-scrollbar {
+    height: 8px;
+}
+
+.collection::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+.collection::-webkit-scrollbar-thumb {
+    background: #CF4044;
+    border-radius: 10px;
+}
+
+.collection::-webkit-scrollbar-thumb:hover {
+    background: #b8363a;
 }
 
 .collection_card {
@@ -11,11 +39,15 @@
     padding: 0.75rem;
     margin: 0;
     background-color: #fff;
-    width: 16.5rem !important;
+    /* Remove fixed width, let it be flexible within grid */
+    width: 100%;
+    /* Set minimum width to prevent cards from becoming too small */
+    min-width: 250px;
     border-radius: 8px;
     background: #FFF;
     box-shadow: 3px 3px 8px 0px rgba(197, 205, 236, 0.60);
     position: relative;
+    box-sizing: border-box;
 }
 
 .collection_card:hover {
@@ -195,26 +227,45 @@
     background-color: #c45a59 !important;
 }
 
-@media screen and (max-width: 1400px) {
-    .collection_card {
-        width: 15.5rem !important;
+/* Responsive adjustments for very small screens - maintain 4 columns but allow horizontal scroll */
+@media screen and (max-width: 1200px) {
+    .collection {
+        gap: 12px;
+        padding: 0 15px;
     }
 }
 
 @media screen and (max-width: 992px) {
     .collection {
-        padding-left: 10px;
-        justify-content: flex-start;
+        gap: 10px;
+        padding: 0 10px;
     }
     
     .collection_card {
-        width: 45% !important;
+        min-width: 220px;
     }
 }
 
 @media screen and (max-width: 768px) {
+    .collection {
+        gap: 8px;
+        padding: 0 5px;
+    }
+    
     .collection_card {
-        width: 100% !important;
+        min-width: 200px;
+        padding: 0.5rem;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .collection_card {
+        min-width: 180px;
+        padding: 0.4rem;
+    }
+    
+    .card_body {
+        padding: 0.5rem !important;
     }
 }
 

@@ -25,6 +25,7 @@ import { useAuth } from '../../AuthContext';
 import { request } from '../../utils/axiosInstance';
 import { getCsrfToken, getImageUrl } from '../../utils/axiosInstance';
 import { Tooltip } from '@mui/material';
+import AddCourseCard from '../AddCourseCard/AddCourseCard';
 
 const CollectionCard = ({ 
   id, 
@@ -919,60 +920,7 @@ const Collections_card = ({ selectedCategory, recommendedCourses, loading, onCou
     }
   };
 
-  // Add Course card component with plus sign
-  const AddCourseCard = () => {
-    return (
-      <Card className={styles.collection_card}>
-        <div className={styles.card_header} style={{ 
-          height: '180px', 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center',
-          background: 'linear-gradient(135deg, #f5f7fa 0%, #e4e8eb 100%)'
-        }}>
-          <Box sx={{ 
-            width: 80, 
-            height: 80, 
-            borderRadius: '50%', 
-            bgcolor: '#CF4044',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            boxShadow: '0 4px 8px rgba(0,0,0,0.2)'
-          }}>
-            <Typography variant="h3" sx={{ color: 'white', fontWeight: 'bold', mt: '-5px' }}>+</Typography>
-          </Box>
-        </div>
-        <Card.Body className={styles.card_body}>
-          <Card.Title>Thêm khóa học</Card.Title>
-          <Typography variant="body2" sx={{ color: '#666', mb: 2 }}>
-            Nhận thêm khóa học được đề xuất phù hợp với bạn
-          </Typography>
-          
-          <svg
-            className={styles.line}
-            xmlns="http://www.w3.org/2000/svg"
-            width="414"
-            height="2"
-            viewBox="0 0 414 2"
-            fill="none"
-          >
-            <path d="M0 1H413.5" stroke="#6A6B6C" strokeWidth="0.5" />
-          </svg>
-          
-          <div className={styles.course_actions}>
-            <button 
-              className={styles.detail_btn_center} 
-              style={{ backgroundColor: '#CF4044', width: '100%' }}
-              onClick={handleRecommendClick}
-            >
-              Nhận Gợi Ý
-            </button>
-          </div>
-        </Card.Body>
-      </Card>
-    );
-  };
+
 
   if (loading || loadingCourses) {
     return (
@@ -1024,7 +972,7 @@ const Collections_card = ({ selectedCategory, recommendedCourses, loading, onCou
             />
           ))}
           {/* Add the plus card at the end if we're in My Course and there are courses */}
-          {selectedCategory === "My Course" && searchFilteredCards.length > 0 && <AddCourseCard />}
+          {selectedCategory === "My Course" && searchFilteredCards.length > 0 && <AddCourseCard sx={{ maxWidth: '280px' }} />}
         </>
       ) : noSearchResults ? (
         <div className={styles.bn_left}>
@@ -1037,38 +985,24 @@ const Collections_card = ({ selectedCategory, recommendedCourses, loading, onCou
             </p>
           </div>
         </div>
+      ) : isMyCourseWithNoData ? (
+        // Show AddCourseCard when user has no courses in My Course tab
+        <AddCourseCard sx={{ maxWidth: '280px', margin: '0 auto' }} />
       ) : (
         <div className={styles.bn_left}>
           <div className={styles.bn_left_1}>
             <p className={styles.typo}>
-              <span className={styles.typo_red}>
-                {isMyCourseWithNoData ? "Chưa có" : "No"}
-              </span> {isMyCourseWithNoData ? "khóa học nào" : "courses found"}
+              <span className={styles.typo_red}>No</span> courses found
             </p>
             <p className={styles.typo_des}>
-              {isMyCourseWithNoData ? (
-                <>
-                  <span>Bạn chưa tham gia khóa học nào. Hãy khám phá các khóa học khác!</span>
-                  <Button 
-                    variant="contained" 
-                    className={styles.bn_left_btn}
-                    onClick={handleRecommendClick}
-                  >
-                      Nhận gợi ý
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button 
-                    variant="contained" 
-                    className={styles.bn_left_btn}
-                    onClick={handleRecommendClick}
-                  >
-                      Start now
-                  </Button>
-                  <span>to receive personalized recommendations.</span>
-                </>
-              )}
+              <Button 
+                variant="contained" 
+                className={styles.bn_left_btn}
+                onClick={handleRecommendClick}
+              >
+                  Start now
+              </Button>
+              <span>to receive personalized recommendations.</span>
             </p>
           </div>
         </div>

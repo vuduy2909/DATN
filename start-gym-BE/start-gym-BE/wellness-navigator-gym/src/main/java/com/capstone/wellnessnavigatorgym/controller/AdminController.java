@@ -1417,7 +1417,7 @@ public class AdminController {
             newAccount.setEmail(customerEmail);
             newAccount.setEncryptPassword(passwordEncoder.encode(password));
             newAccount.setIsEnable(isEnable);
-            newAccount.setCreatedDate(LocalDateTime.now()); // Fix: Set created_date
+            // created_date will be set automatically by @PrePersist
             // Gán role mặc định
             Role userRole = new Role(1, "ROLE_USER");
             Set<Role> roles = new HashSet<>();
@@ -4075,7 +4075,7 @@ public class AdminController {
             newAccount.setEmail(email);
             newAccount.setEncryptPassword(passwordEncoder.encode(password)); // Properly encode password
             newAccount.setIsEnable(true); // Enable by default
-            newAccount.setCreatedDate(LocalDateTime.now()); // Fix: Set created_date
+            // created_date will be set automatically by @PrePersist
             
             // Set default USER role
             Role userRole = new Role(1, "ROLE_USER");
@@ -4410,4 +4410,122 @@ public class AdminController {
     }
 
     // ==================== REVENUE MANAGEMENT ENDPOINTS ====================
+
+    /**
+     * Get customer body metrics from user_data_ai table
+     */
+    @GetMapping("/customers/{customerId}/body-metrics")
+    public ResponseEntity<?> getCustomerBodyMetrics(@PathVariable Integer customerId) {
+        try {
+            logger.info("=== Getting Body Metrics for Customer ID: {} ===", customerId);
+            
+            // Check if customer exists
+            Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new RuntimeException("Customer not found with ID: " + customerId));
+            
+            logger.info("Customer found: {} (ID: {})", customer.getCustomerName(), customer.getCustomerId());
+            
+            // Get body metrics data from user_data_ai table for recommended courses only
+            String sql = "SELECT " +
+                "ud.user_data_id, ud.customer_id, ud.height, ud.weight, ud.weight_after, " +
+                "ud.bmi, ud.waist_circumference, ud.chest_circumference, " +
+                "ud.waist_circumference_after, ud.chest_circumference_after, " +
+                "ud.body_type, ud.training_goals, ud.training_frequency, ud.age, " +
+                "ud.effective, ud.gender, ud.training_history, ud.occupation, " +
+                "ud.work_environment, ud.track_data_ai_id, ud.course_id, " +
+                "ud.created_date, ud.updated_date, c.course_name " +
+                "FROM user_data_ai ud " +
+                "LEFT JOIN course c ON ud.course_id = c.course_id " +
+                "LEFT JOIN customer_course cc ON ud.customer_id = cc.customer_id AND ud.course_id = cc.course_id " +
+                "WHERE ud.customer_id = :customerId " +
+                "AND cc.recommended_status = true " +
+                "ORDER BY ud.created_date DESC";
+            
+            Query query = entityManager.createNativeQuery(sql);
+            query.setParameter("customerId", customerId);
+            
+            @SuppressWarnings("unchecked")
+            List<Object[]> results = query.getResultList();
+            
+            List<Map<String, Object>> bodyMetrics = new ArrayList<>();
+            
+            for (Object[] row : results) {
+                Map<String, Object> metrics = new HashMap<>();
+                metrics.put("userDataId", row[0]);
+                metrics.put("customerId", row[1]);
+                metrics.put("height", row[2]);
+                metrics.put("weight", row[3]);
+                metrics.put("weightAfter", row[4]);
+                metrics.put("bmi", row[5]);
+                metrics.put("waistCircumference", row[6]);
+                metrics.put("chestCircumference", row[7]);
+                metrics.put("waistCircumferenceAfter", row[8]);
+                metrics.put("chestCircumferenceAfter", row[9]);
+                metrics.put("bodyType", row[10]);
+                metrics.put("trainingGoals", row[11]);
+                metrics.put("trainingFrequency", row[12]);
+                metrics.put("age", row[13]);
+                metrics.put("effective", row[14]);
+                metrics.put("gender", row[15]);
+                metrics.put("trainingHistory", row[16]);
+                metrics.put("occupation", row[17]);
+                metrics.put("workEnvironment", row[18]);
+                metrics.put("trackDataAiId", row[19]);
+                metrics.put("courseId", row[20]);
+                metrics.put("createdDate", row[21]);
+                metrics.put("updatedDate", row[22]);
+                metrics.put("courseName", row[23]);
+                
+                // Calculate progress if before/after data exists
+                if (row[3] != null && row[4] != null) { // weight and weightAfter
+                    double weightBefore = ((Number) row[3]).doubleValue();
+                    double weightAfter = ((Number) row[4]).doubleValue();
+                    double weightChange = weightAfter - weightBefore;
+                    metrics.put("weightChange", Math.round(weightChange * 100.0) / 100.0);
+                    metrics.put("weightChangePercentage", Math.round((weightChange / weightBefore * 100) * 100.0) / 100.0);
+                }
+                
+                if (row[6] != null && row[8] != null) { // waist circumference
+                    double waistBefore = ((Number) row[6]).doubleValue();
+                    double waistAfter = ((Number) row[8]).doubleValue();
+                    double waistChange = waistAfter - waistBefore;
+                    metrics.put("waistChange", Math.round(waistChange * 100.0) / 100.0);
+                    metrics.put("waistChangePercentage", Math.round((waistChange / waistBefore * 100) * 100.0) / 100.0);
+                }
+                
+                if (row[7] != null && row[9] != null) { // chest circumference
+                    double chestBefore = ((Number) row[7]).doubleValue();
+                    double chestAfter = ((Number) row[9]).doubleValue();
+                    double chestChange = chestAfter - chestBefore;
+                    metrics.put("chestChange", Math.round(chestChange * 100.0) / 100.0);
+                    metrics.put("chestChangePercentage", Math.round((chestChange / chestBefore * 100) * 100.0) / 100.0);
+                }
+                
+                bodyMetrics.add(metrics);
+            }
+            
+            Map<String, Object> response = new HashMap<>();
+            Map<String, Object> customerInfo = new HashMap<>();
+            customerInfo.put("customerId", customer.getCustomerId());
+            customerInfo.put("customerName", customer.getCustomerName());
+            customerInfo.put("customerEmail", customer.getCustomerEmail());
+            
+            response.put("customer", customerInfo);
+            response.put("bodyMetrics", bodyMetrics);
+            response.put("totalRecords", bodyMetrics.size());
+            response.put("timestamp", LocalDateTime.now());
+            
+            logger.info("Successfully fetched {} body metrics records for customer {}", bodyMetrics.size(), customerId);
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("Error getting customer body metrics for customer {}: {}", customerId, e.getMessage(), e);
+            
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Failed to get body metrics: " + e.getMessage());
+            errorResponse.put("timestamp", LocalDateTime.now());
+            
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
 } 

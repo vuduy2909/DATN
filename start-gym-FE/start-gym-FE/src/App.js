@@ -31,10 +31,11 @@ import NotFound from './pages/NotFound';
 import ScrollToTop from './components/ScrollToTop';
 import Contact from './pages/Contact/Contact';
 import ForgotPassword from './components/ForgotPassword/ForgotPassword';
+import { LanguageProvider } from './contexts/LanguageContext';
 
 function App() {
   return (
-    <>
+    <LanguageProvider>
       <ScrollToTop />
     <Routes>
         {/* Trang chính */}
@@ -87,7 +88,7 @@ function App() {
         <Route path="/404" element={<NotFound />} />
         <Route path="*" element={<Navigate replace to="/404" />} />
     </Routes>
-    </>
+    </LanguageProvider>
   );
 }
 

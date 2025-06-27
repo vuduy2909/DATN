@@ -29,6 +29,9 @@ import {
     LocalFireDepartment
 } from '@mui/icons-material';
 
+// Environment variables for configuration
+const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || "226089694808-fthd5ct8muaa07m6s1i8pais2s76l2ll.apps.googleusercontent.com";
+
 // StartGym Theme
 const startGymTheme = createTheme({
     palette: {
@@ -116,6 +119,8 @@ const Login = () => {
 
             console.log("Login response:", response.data);
             console.log("User role:", response.data.roles);
+            console.log("Role type:", typeof response.data.roles);
+            console.log("Role comparison result:", response.data.roles === 'ROLE_ADMIN');
             
             if (response.status === 200) {
                 const token = response.data.token;
@@ -128,13 +133,25 @@ const Login = () => {
                 localStorage.setItem('username', username);
                 setUser(token);
                 
+                // Enhanced admin role check with multiple conditions
+                const userRole = response.data.roles;
+                const isAdmin = userRole === 'ROLE_ADMIN' || 
+                               userRole === 'ADMIN' || 
+                               (Array.isArray(userRole) && userRole.includes('ROLE_ADMIN')) ||
+                               (Array.isArray(userRole) && userRole.some(role => 
+                                   role === 'ROLE_ADMIN' || role === 'ADMIN' || 
+                                   (typeof role === 'object' && (role.roleName === 'ROLE_ADMIN' || role.name === 'ADMIN'))
+                               ));
+                
+                console.log("Is Admin Check Result:", isAdmin);
+                
                 // Set admin status and redirect accordingly
-                if (response.data.roles == 'ROLE_ADMIN') {
-                    console.log("User is ADMIN, setting admin status and redirecting...");
+                if (isAdmin) {
+                    console.log("User is ADMIN, setting admin status and redirecting to /admin...");
                     localStorage.setItem('isAdmin', 'true');
                     navigate('/admin', { replace: true });
                 } else {
-                    console.log("User is not admin, redirecting...");
+                    console.log("User is not admin, redirecting to returnUrl or home...");
                     localStorage.setItem('isAdmin', 'false');
                     // Redirect to returnUrl if provided, otherwise to home
                     navigate(returnUrl, { replace: true });
@@ -249,7 +266,21 @@ const Login = () => {
                     localStorage.setItem('username', googleResponse.data.username || googleResponse.data.email);
                 }
                 
-                if (googleResponse.data.roles === 'ROLE_ADMIN') {
+                // Enhanced admin role check for Google login
+                const userRole = googleResponse.data.roles;
+                const isAdmin = userRole === 'ROLE_ADMIN' || 
+                               userRole === 'ADMIN' || 
+                               (Array.isArray(userRole) && userRole.includes('ROLE_ADMIN')) ||
+                               (Array.isArray(userRole) && userRole.some(role => 
+                                   role === 'ROLE_ADMIN' || role === 'ADMIN' || 
+                                   (typeof role === 'object' && (role.roleName === 'ROLE_ADMIN' || role.name === 'ADMIN'))
+                               ));
+                
+                console.log("Google Login - User role:", userRole);
+                console.log("Google Login - Role type:", typeof userRole);
+                console.log("Google Login - Is Admin:", isAdmin);
+                
+                if (isAdmin) {
                     console.log("Google login: User is ADMIN, setting admin status and redirecting...");
                     localStorage.setItem('isAdmin', 'true');
                     navigate('/admin', { replace: true });
@@ -491,7 +522,7 @@ const Login = () => {
 
                                         {/* Google Login */}
                                         <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                                            <GoogleOAuthProvider clientId="407042400394-382jp0sktf2dn0eqjg4m9c2ujkc4lgqq.apps.googleusercontent.com">
+                                            <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
                                                 <GoogleLogin
                                                     onSuccess={handleGoogleLoginSuccess}
                                                     onFailure={handleGoogleLoginFailure}

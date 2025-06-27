@@ -369,7 +369,7 @@ const Profile = () => {
                         <Box
                             sx={{
                                 height: 200,
-                                backgroundImage: `url(${userData.customerImg ? `url(${userData.customerImg})` : DEFAULT_IMAGE})`,
+                                backgroundImage: `url(${banner})`,
                                 backgroundSize: 'cover',
                                 backgroundPosition: 'center',
                                 position: 'relative',
@@ -380,7 +380,7 @@ const Profile = () => {
                                     left: 0,
                                     right: 0,
                                     bottom: 0,
-                                    background: `linear-gradient(135deg, ${redTheme.primary}CC, ${redTheme.secondary}CC)`,
+                                    background: `linear-gradient(135deg, ${redTheme.primary}80, ${redTheme.secondary}80)`,
                                 }
                             }}
                         />

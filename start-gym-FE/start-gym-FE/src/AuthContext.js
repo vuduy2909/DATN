@@ -54,7 +54,7 @@ export const AuthProvider = ({ children }) => {
         const MIN_CHECK_INTERVAL = 60000; // 1 minute minimum between checks
         
         // Set initial user state based on token existence
-        if (token && token !== 'null' && token !== 'undefined') {
+        if (token && token !== 'null' && token !== 'undefined' && token.trim() !== '') {
             // Don't set user to token string, wait for API response
             if (!user || typeof user === 'string') {
                 setUser({}); // Set empty object until we get real user data
@@ -64,7 +64,7 @@ export const AuthProvider = ({ children }) => {
         }
         
         // Only check auth status if token exists and enough time has passed since last check
-        if (token && token !== 'null' && token !== 'undefined' && 
+        if (token && token !== 'null' && token !== 'undefined' && token.trim() !== '' && 
             (currentTime - lastAuthCheck > MIN_CHECK_INTERVAL || !isAuthChecked)) {
             
             // Update last check time

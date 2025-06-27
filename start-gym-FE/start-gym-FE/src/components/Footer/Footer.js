@@ -34,8 +34,8 @@ const Footer = () => {
             </div>
             <div className={styles.footer_nav_info}>
                 <div className={styles.footer_info}>
-                    <p className={styles.copyright}>Copyright @ 2023 All Rights Reserved.</p>
-                    <p className={styles.phone}>+84 779 253  333</p>
+                    <p className={styles.copyright}>Copyright @ 2025 All Rights Reserved.</p>
+                    <p className={styles.phone}>+84 702 623 644</p>
                     <p className={styles.email}>info@startgym.com</p>
                     <p className={styles.address}>Da Nang, Viet Nam</p>
                 </div>

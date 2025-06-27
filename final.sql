@@ -29,11 +29,14 @@ CREATE TABLE `account` (
   `is_enable` bit(1) DEFAULT NULL,
   `user_name` varchar(255) DEFAULT NULL,
   `created_date` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `refresh_token` varchar(255) DEFAULT NULL,
+  `refresh_token_expiry_date` datetime(6) DEFAULT NULL,
   PRIMARY KEY (`account_id`),
   KEY `idx_account_created_date` (`created_date`),
   KEY `idx_account_email` (`email`),
   KEY `idx_account_username` (`user_name`),
-  KEY `idx_account_enable_created` (`is_enable`,`created_date`)
+  KEY `idx_account_enable_created` (`is_enable`,`created_date`),
+  KEY `idx_account_refresh_token` (`refresh_token`)
 ) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -43,7 +46,7 @@ CREATE TABLE `account` (
 
 LOCK TABLES `account` WRITE;
 /*!40000 ALTER TABLE `account` DISABLE KEYS */;
-INSERT INTO `account` VALUES (1,'userduyzzz@gmail.com','$2a$12$il4lnAGKeQSfmJCs/2gMWuQsfeV/u4m81PVU5fQEFR8OIq8.grl3W',_binary '','userduy','2025-05-05 14:44:33'),(2,'adminduyzzwe@gmail.com','$2a$12$il4lnAGKeQSfmJCs/2gMWuQsfeV/u4m81PVU5fQEFR8OIq8.grl3W',_binary '','adminduy','2025-05-10 14:44:33'),(3,'employer6@gmail.com','$2a$12$il4lnAGKeQSfmJCs/2gMWuQsfeV/u4m81PVU5fQEFR8OIq8.grl3W',_binary '','vanba','2025-05-15 14:44:33'),(4,'vuduynambinh@gmail.com','$2a$12$ZR6x5/Eru.dHMgnD3rUmnOOFIE1ZT/UoKuhl.wcOfW5FsaY3rKYzq',_binary '','usertest','2025-06-01 14:44:33'),(5,'546456456duy@gmail.com','$2a$12$il4lnAGKeQSfmJCs/2gMWuQsfeV/u4m81PVU5fQEFR8OIq8.grl3W',_binary '','testuser','2025-06-05 14:44:33'),(6,'ZXXX@gmail.com','$2a$12$il4lnAGKeQSfmJCs/2gMWuQsfeV/u4m81PVU5fQEFR8OIq8.grl3W',_binary '','testuser2','2025-06-10 14:44:33'),(7,'plvduy031123@gmail.com','$2a$12$il4lnAGKeQSfmJCs/2gMWuQsfeV/u4m81PVU5fQEFR8OIq8.grl3W',_binary '','testuser3','2025-06-15 14:44:33'),(8,'123200098@sv1.dut','$2a$12$Qhg.kMRkZKxayFIFybiVEO7o9X2yNjVDrLGxzLscSQCk3ChKHmFOa',_binary '','testuser4','2025-04-15 14:44:33'),(9,'123200098665@sv1.dut','$2a$12$DYXgVQYda5TfQgox0gi8COZogGv1LJOja9n3M.AkTikKHjhTGx6CC',_binary '','testuser5','2025-04-20 14:44:33'),(10,'plvduy0322@gmail.com','$2a$12$PybhbcYY/ocrbBNgybnN6OFN31EZBYjXcCmzItRwv9O8jHAk/Rg7K',_binary '','userlara','2025-03-15 14:44:33'),(11,'plvduy031123223@gmail.com','$2a$12$tYcIt6w.fnXyQpwJdqncouXQF0SPSIvu7XCJVIuCTf1J2vqcojYe2',_binary '','Abs','2025-03-20 14:44:33'),(12,'hoangvd.it@dut.udn.vn','$2a$12$W51yUjomLt6I6Gxoygl/1.YyrmcL1cDFgUJYr0z.bFWOdQbPqZ59u',_binary '','mrhoang','2025-06-25 14:44:33'),(13,'13@gmail.com','$2a$12$YYFeT2C7YG8Jp4jpvt6U2.XkNjykDlqLOYp6YHrSo5JdRuqOPAP8i',_binary '','testuser13','2025-06-27 02:23:17');
+INSERT INTO `account` VALUES (1,'userduyzzz@gmail.com','$2a$12$il4lnAGKeQSfmJCs/2gMWuQsfeV/u4m81PVU5fQEFR8OIq8.grl3W',_binary '','userduy','2025-05-05 14:44:33',NULL,NULL),(2,'adminduyzzwe@gmail.com','$2a$12$il4lnAGKeQSfmJCs/2gMWuQsfeV/u4m81PVU5fQEFR8OIq8.grl3W',_binary '','adminduy','2025-05-10 14:44:33','1af90dbd-9c84-4c0f-9a9e-c843db5002a8','2025-06-27 18:06:49.308000'),(3,'employer6@gmail.com','$2a$12$il4lnAGKeQSfmJCs/2gMWuQsfeV/u4m81PVU5fQEFR8OIq8.grl3W',_binary '','vanba','2025-05-15 14:44:33',NULL,NULL),(4,'vuduynambinh@gmail.com','$2a$12$ZR6x5/Eru.dHMgnD3rUmnOOFIE1ZT/UoKuhl.wcOfW5FsaY3rKYzq',_binary '','usertest','2025-06-01 14:44:33',NULL,NULL),(5,'546456456duy@gmail.com','$2a$12$il4lnAGKeQSfmJCs/2gMWuQsfeV/u4m81PVU5fQEFR8OIq8.grl3W',_binary '','testuser','2025-06-05 14:44:33',NULL,NULL),(6,'ZXXX@gmail.com','$2a$12$il4lnAGKeQSfmJCs/2gMWuQsfeV/u4m81PVU5fQEFR8OIq8.grl3W',_binary '','testuser2','2025-06-10 14:44:33',NULL,NULL),(7,'plvduy031123@gmail.com','$2a$12$il4lnAGKeQSfmJCs/2gMWuQsfeV/u4m81PVU5fQEFR8OIq8.grl3W',_binary '','testuser3','2025-06-15 14:44:33',NULL,NULL),(8,'123200098@sv1.dut','$2a$12$Qhg.kMRkZKxayFIFybiVEO7o9X2yNjVDrLGxzLscSQCk3ChKHmFOa',_binary '','testuser4','2025-04-15 14:44:33',NULL,NULL),(9,'123200098665@sv1.dut','$2a$12$DYXgVQYda5TfQgox0gi8COZogGv1LJOja9n3M.AkTikKHjhTGx6CC',_binary '','testuser5','2025-04-20 14:44:33',NULL,NULL),(10,'plvduy0322@gmail.com','$2a$12$PybhbcYY/ocrbBNgybnN6OFN31EZBYjXcCmzItRwv9O8jHAk/Rg7K',_binary '','userlara','2025-03-15 14:44:33',NULL,NULL),(11,'plvduy031123223@gmail.com','$2a$12$tYcIt6w.fnXyQpwJdqncouXQF0SPSIvu7XCJVIuCTf1J2vqcojYe2',_binary '','Abs','2025-03-20 14:44:33',NULL,NULL),(12,'hoangvd.it@dut.udn.vn','$2a$12$W51yUjomLt6I6Gxoygl/1.YyrmcL1cDFgUJYr0z.bFWOdQbPqZ59u',_binary '','mrhoang','2025-06-25 14:44:33',NULL,NULL),(13,'13@gmail.com','$2a$12$YYFeT2C7YG8Jp4jpvt6U2.XkNjykDlqLOYp6YHrSo5JdRuqOPAP8i',_binary '','testuser13','2025-06-27 02:23:17',NULL,NULL);
 /*!40000 ALTER TABLE `account` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -138,7 +141,7 @@ CREATE TABLE `comments` (
   CONSTRAINT `comments_ibfk_2` FOREIGN KEY (`exercise_id`) REFERENCES `exercise` (`exercise_id`),
   CONSTRAINT `fk_comments_course` FOREIGN KEY (`course_id`) REFERENCES `course` (`course_id`) ON DELETE CASCADE,
   CONSTRAINT `fk_comments_day` FOREIGN KEY (`day_id`) REFERENCES `days` (`day_id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -147,7 +150,7 @@ CREATE TABLE `comments` (
 
 LOCK TABLES `comments` WRITE;
 /*!40000 ALTER TABLE `comments` DISABLE KEYS */;
-INSERT INTO `comments` VALUES (1,'tập không đúng',1,13,1,1,'2025-05-29 01:18:46','2025-06-18 11:11:11',0,0,NULL,NULL),(3,'I love this workout routine',2,2,1,2,'2025-05-29 01:18:46','2025-05-29 01:18:46',0,0,NULL,NULL),(5,'video hướng dẫn sai',1,1,NULL,NULL,'2025-06-13 08:22:51','2025-06-18 11:11:11',1,1,'userduy',5),(6,'very good',1,1,NULL,NULL,'2025-06-13 08:36:11','2025-06-13 11:21:58',1,2,'trytry',1),(7,'rat tot',3,8,NULL,NULL,'2025-06-13 13:37:26','2025-06-13 13:37:26',0,0,NULL,5);
+INSERT INTO `comments` VALUES (1,'tập không đúng',1,13,1,1,'2025-05-29 01:18:46','2025-06-27 17:36:47',0,0,NULL,5),(2,'I love this workout routine',2,2,1,2,'2025-05-29 01:18:46','2025-06-27 17:36:47',0,0,NULL,5),(3,'video hướng dẫn sai',1,1,3,6,'2025-06-13 08:22:51','2025-06-27 16:25:36',0,0,NULL,5),(4,'very good',1,1,4,7,'2025-06-13 08:36:11','2025-06-27 16:25:36',1,1,NULL,1),(5,'rat tot',3,8,5,7,'2025-06-13 13:37:26','2025-06-27 16:28:43',1,1,NULL,5),(6,'rất hay\n',2,1,39,1,'2025-06-27 17:18:51','2025-06-27 17:25:58',0,0,NULL,1),(7,'hướng dẫn rất nhiệt tình',2,1,1,2,'2025-06-27 17:28:27','2025-06-27 17:28:27',0,0,NULL,1),(8,'hay rồi , rất tốt',2,1,1,1,'2025-06-27 17:38:41','2025-06-27 17:39:38',1,1,'Reported by user',5);
 /*!40000 ALTER TABLE `comments` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -816,4 +819,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2025-06-27  2:30:53
+-- Dump completed on 2025-06-27 18:36:38

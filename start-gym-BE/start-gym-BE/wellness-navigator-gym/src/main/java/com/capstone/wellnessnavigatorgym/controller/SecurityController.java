@@ -313,22 +313,26 @@ public class SecurityController {
                 
                 customerService.save(newCustomer);
             }
-            // Create authentication for JWT generation
-            Authentication auth = new UsernamePasswordAuthenticationToken(payload.getEmail(), null, Collections.emptyList());
-            String jwt = jwtUtility.generateJwtToken(auth);
             
-            // Get account and create refresh token
+            // Get account for JWT generation
             Account account = accountService.findByEmail(payload.getEmail());
-            if (account != null) {
-                String refreshToken = refreshTokenService.createRefreshToken(account.getAccountId());
-                List<String> roles = new ArrayList<>();
-                for (Role role : account.getRoles()) {
-                    roles.add(role.getRoleName());
-                }
-                return ResponseEntity.ok(new JwtResponse(jwt, refreshToken, account.getAccountId(), payload.getEmail(), roles));
+            if (account == null) {
+                return ResponseEntity.badRequest().body("Account not found after creation");
             }
             
-            return ResponseEntity.ok(new JwtResponse(jwt, payload.getEmail()));
+            // Create UserPrinciple for JWT generation
+            UserPrinciple userPrinciple = UserPrinciple.build(account);
+            Authentication auth = new UsernamePasswordAuthenticationToken(userPrinciple, null, userPrinciple.getAuthorities());
+            String jwt = jwtUtility.generateJwtToken(auth);
+            
+            // Create refresh token
+            String refreshToken = refreshTokenService.createRefreshToken(account.getAccountId());
+            List<String> roles = new ArrayList<>();
+            for (Role role : account.getRoles()) {
+                roles.add(role.getRoleName());
+            }
+            
+            return ResponseEntity.ok(new JwtResponse(jwt, refreshToken, account.getAccountId(), account.getUserName(), roles));
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -776,10 +780,12 @@ public class SecurityController {
 
         return refreshTokenService.findByRefreshToken(requestRefreshToken)
                 .map(account -> {
+                    // Create UserPrinciple for JWT generation
+                    UserPrinciple userPrinciple = UserPrinciple.build(account);
                     Authentication auth = new UsernamePasswordAuthenticationToken(
-                            account.getUserName(), 
+                            userPrinciple, 
                             null, 
-                            Collections.emptyList()
+                            userPrinciple.getAuthorities()
                     );
                     String token = jwtUtility.generateJwtToken(auth);
                     return ResponseEntity.ok(new TokenRefreshResponse(token, requestRefreshToken));

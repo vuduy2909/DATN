@@ -3,6 +3,7 @@ package com.capstone.wellnessnavigatorgym.entity;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
+import com.capstone.wellnessnavigatorgym.utils.TimeUtil;
 
 import javax.persistence.*;
 import java.time.LocalDateTime;
@@ -46,6 +47,14 @@ public class Account {
             joinColumns = @JoinColumn(name = "account_id"),
             inverseJoinColumns = @JoinColumn(name = "role_id"))
     private Set<Role> roles = new LinkedHashSet<>();
+    
+    // Lifecycle methods
+    @PrePersist
+    public void prePersist() {
+        if (this.createdDate == null) {
+            this.createdDate = TimeUtil.now();
+        }
+    }
     
     // Convenience methods for password field
     public String getPassword() {

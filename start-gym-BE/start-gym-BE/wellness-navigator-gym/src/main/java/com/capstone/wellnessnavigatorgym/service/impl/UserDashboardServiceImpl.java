@@ -307,29 +307,40 @@ public class UserDashboardServiceImpl implements UserDashboardService {
     }
     
     /**
-     * Phương thức phụ trợ để lấy số khóa học đang theo
+     * Lấy số khóa học đang theo
      */
-    private Integer getCoursesInProgressCount(Integer customerId) {
-        // Lấy danh sách khóa học của người dùng
+    @Override
+    public Integer getCoursesInProgressCount(Integer customerId) {
+        // Lấy danh sách khóa học của người dùng với status ACTIVE
         List<CustomerCourse> customerCourses = customerCourseRepository.findByCustomer_CustomerId(customerId);
         if (customerCourses.isEmpty()) {
             return 0;
         }
         
-        // Đếm số khóa học đang tiến hành (chưa hoàn thành)
+        // Đếm số khóa học đang active và chưa hoàn thành
         int inProgressCount = 0;
         
         for (CustomerCourse customerCourse : customerCourses) {
             Integer courseId = customerCourse.getCourse().getCourseId();
-            // Kiểm tra xem khóa học đã hoàn thành chưa
-            CustomerDayCompletionService.CourseProgressDTO progress = 
-                    completionService.getCourseProgress(customerId, courseId);
             
-            if (!progress.getIsCompleted()) {
+            try {
+                // Kiểm tra xem khóa học đã hoàn thành chưa
+                CustomerDayCompletionService.CourseProgressDTO progress = 
+                        completionService.getCourseProgress(customerId, courseId);
+                
+                // Chỉ đếm khóa học chưa hoàn thành
+                if (!progress.getIsCompleted()) {
+                    inProgressCount++;
+                }
+            } catch (Exception e) {
+                // Nếu có lỗi khi lấy progress, coi như khóa học đang in progress
+                log.warn("Error getting course progress for customer {} and course {}: {}", 
+                    customerId, courseId, e.getMessage());
                 inProgressCount++;
             }
         }
         
+        log.info("Customer {} has {} courses in progress", customerId, inProgressCount);
         return inProgressCount;
     }
     

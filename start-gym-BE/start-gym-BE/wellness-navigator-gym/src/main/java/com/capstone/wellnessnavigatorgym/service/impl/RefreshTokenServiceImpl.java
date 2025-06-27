@@ -4,6 +4,7 @@ import com.capstone.wellnessnavigatorgym.entity.Account;
 import com.capstone.wellnessnavigatorgym.exception.TokenRefreshException;
 import com.capstone.wellnessnavigatorgym.repository.IAccountRepository;
 import com.capstone.wellnessnavigatorgym.service.RefreshTokenService;
+import com.capstone.wellnessnavigatorgym.utils.TimeUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,7 +28,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         if (accountOpt.isPresent()) {
             Account account = accountOpt.get();
             String refreshToken = UUID.randomUUID().toString();
-            LocalDateTime expiryDate = LocalDateTime.now().plusHours(REFRESH_TOKEN_DURATION_HOURS);
+            LocalDateTime expiryDate = TimeUtil.nowPlusHours(REFRESH_TOKEN_DURATION_HOURS);
             
             account.setRefreshToken(refreshToken);
             account.setRefreshTokenExpiryDate(expiryDate);
@@ -43,7 +44,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         Optional<Account> accountOpt = accountRepository.findByRefreshToken(token);
         if (accountOpt.isPresent()) {
             Account account = accountOpt.get();
-            if (account.getRefreshTokenExpiryDate().isBefore(LocalDateTime.now())) {
+            if (account.getRefreshTokenExpiryDate().isBefore(TimeUtil.now())) {
                 // Token expired, clear it
                 account.setRefreshToken(null);
                 account.setRefreshTokenExpiryDate(null);
