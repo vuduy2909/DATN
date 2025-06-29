@@ -123,6 +123,59 @@ const Account = () => {
     const [selectedFile, setSelectedFile] = useState(null);
     const [previewUrl, setPreviewUrl] = useState(null);
 
+    // Phone validation states
+    const [phoneError, setPhoneError] = useState('');
+    const [validationChecking, setValidationChecking] = useState({ phone: false });
+    const [debounceTimers, setDebounceTimers] = useState({});
+
+    // Phone validation functions
+    const checkPhoneExists = async (phone) => {
+        if (!phone || phone.length < 10) return;
+        
+        try {
+            setValidationChecking(prev => ({ ...prev, phone: true }));
+            const response = await request.get(`/public/check-phone-exists?phone=${encodeURIComponent(phone)}`);
+            
+            if (response.exists) {
+                setPhoneError(response.message);
+                return false;
+            } else {
+                // Phone available, but still check format
+                const phoneRegex = /^[0-9]{10,11}$/;
+                if (!phoneRegex.test(phone)) {
+                    setPhoneError('Số điện thoại phải có 10-11 chữ số');
+                    return false;
+                }
+                setPhoneError('');
+                return true;
+            }
+        } catch (error) {
+            console.error('Error checking phone:', error);
+            // Don't show error to user, just continue with format validation
+            const phoneRegex = /^[0-9]{10,11}$/;
+            if (!phoneRegex.test(phone)) {
+                setPhoneError('Số điện thoại phải có 10-11 chữ số');
+                return false;
+            }
+            setPhoneError('');
+            return true;
+        } finally {
+            setValidationChecking(prev => ({ ...prev, phone: false }));
+        }
+    };
+
+    const debouncedCheckPhone = (phone) => {
+        if (debounceTimers.phone) {
+            clearTimeout(debounceTimers.phone);
+        }
+        
+        const timerId = setTimeout(() => {
+            checkPhoneExists(phone);
+        }, 800);
+        
+        setDebounceTimers(prev => ({ ...prev, phone: timerId }));
+    };
+
     useEffect(() => {
         const fetchUserData = async () => {
             try {
@@ -272,11 +325,33 @@ const Account = () => {
     // Handle profile data changes
     const handleProfileChange = (field, value) => {
         setProfileData(prev => ({ ...prev, [field]: value }));
+        
+        // Clear phone error when user starts typing (except for duplicate check errors)
+        if (field === 'customerPhone' && phoneError && !phoneError.includes('đã được sử dụng')) {
+            setPhoneError('');
+        }
+        
+        // Trigger real-time validation for phone field
+        if (field === 'customerPhone' && value && value.length >= 10) {
+            debouncedCheckPhone(value);
+        }
     };
 
     // Handle profile form submission
     const handleProfileSubmit = async (e) => {
         e.preventDefault();
+        
+        // Validate phone before submission
+        if (phoneError) {
+            showSnackbar('Vui lòng sửa lỗi số điện thoại trước khi cập nhật', 'error');
+            return;
+        }
+        
+        // Basic validation
+        if (!profileData.customerPhone || profileData.customerPhone.length < 10) {
+            showSnackbar('Số điện thoại phải có ít nhất 10 chữ số', 'error');
+            return;
+        }
         
         setLoading(true);
         try {
@@ -593,6 +668,11 @@ const Account = () => {
                                             value={profileData.customerPhone}
                                             onChange={(e) => handleProfileChange('customerPhone', e.target.value)}
                                                                 variant="outlined"
+                                                                error={!!phoneError}
+                                                                helperText={phoneError || (validationChecking.phone ? 'Đang kiểm tra số điện thoại...' : '')}
+                                                                InputProps={{
+                                                                    endAdornment: validationChecking.phone ? <CircularProgress size={20} /> : null
+                                                                }}
                                                                 sx={{
                                                                     '& .MuiOutlinedInput-root': {
                                                                         '&:hover fieldset': { borderColor: redTheme.primary },

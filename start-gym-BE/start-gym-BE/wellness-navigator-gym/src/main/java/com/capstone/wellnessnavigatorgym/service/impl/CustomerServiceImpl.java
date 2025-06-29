@@ -247,4 +247,9 @@ public class CustomerServiceImpl implements ICustomerService {
     public void saveCustomer(Customer customer) {
         customerRepository.save(customer);
     }
+
+    @Override
+    public List<Customer> findByCustomerPhone(String phone) {
+        return customerRepository.findByCustomerPhone(phone);
+    }
 } 

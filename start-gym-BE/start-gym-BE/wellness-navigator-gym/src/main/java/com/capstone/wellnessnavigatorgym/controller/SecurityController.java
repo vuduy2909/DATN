@@ -532,14 +532,14 @@ public class SecurityController {
             response.put("phone", phone);
             
             // Check phone exists in customer table
-            Customer existingCustomer = customerRepository.findByCustomerPhone(phone);
-            boolean phoneExists = existingCustomer != null;
+            List<Customer> existingCustomers = customerRepository.findByCustomerPhone(phone);
+            boolean phoneExists = !existingCustomers.isEmpty();
             
             response.put("exists", phoneExists);
             
             if (phoneExists) {
                 response.put("message", "Số điện thoại đã được sử dụng");
-                response.put("customerName", existingCustomer.getCustomerName());
+                // Không trả về customerName để bảo mật thông tin
             } else {
                 response.put("message", "Số điện thoại có thể sử dụng");
             }

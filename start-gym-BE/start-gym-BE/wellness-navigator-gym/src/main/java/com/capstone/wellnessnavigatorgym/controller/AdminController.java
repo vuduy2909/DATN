@@ -1361,16 +1361,33 @@ public class AdminController {
                 .orElseThrow(() -> new RuntimeException("Customer not found with ID: " + customerId));
             
             Map<String, Object> response = new HashMap<>();
-            response.put("customer", customer);
-            response.put("message", "Customer retrieved successfully");
+            response.put("customerId", customer.getCustomerId());
+            response.put("customerName", customer.getCustomerName());
+            response.put("customerEmail", customer.getCustomerEmail());
+            response.put("customerPhone", customer.getCustomerPhone());
+            response.put("customerAddress", customer.getCustomerAddress());
+            response.put("dateOfBirth", customer.getDateOfBirth());
+            response.put("customerImg", customer.getCustomerImg());
+            response.put("isEnable", customer.getIsEnable());
+            response.put("customerCode", customer.getCustomerCode());
+            response.put("customerGender", customer.getCustomerGender());
+            response.put("customerType", customer.getCustomerType());
+            response.put("totalVipSpent", customer.getTotalVipSpent());
             
             return ResponseEntity.ok(response);
-            
         } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Error getting customer: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error retrieving customer: " + e.getMessage());
         }
+    }
+    
+    /**
+     * Alternative endpoint for frontend compatibility - get customer by ID
+     */
+    @GetMapping("/customer/{customerId}")
+    public ResponseEntity<?> getCustomerByIdAlternative(@PathVariable Integer customerId) {
+        // Delegate to the main getCustomerById method
+        return getCustomerById(customerId);
     }
     
     /**
@@ -1411,6 +1428,15 @@ public class AdminController {
             if (existingEmailAccount != null) {
                 return ResponseEntity.badRequest().body("Email already exists: " + customerEmail);
             }
+            
+            // Check trùng phone number
+            if (customerPhone != null && !customerPhone.trim().isEmpty()) {
+                List<Customer> existingPhoneCustomers = customerRepository.findByCustomerPhone(customerPhone);
+                if (!existingPhoneCustomers.isEmpty()) {
+                    return ResponseEntity.badRequest().body("Số điện thoại đã được sử dụng");
+                }
+            }
+            
             // Tạo account
             Account newAccount = new Account();
             newAccount.setUserName(username);
@@ -1499,6 +1525,18 @@ public class AdminController {
             // Update email in both customer and account tables
             if (customerData.containsKey("customerEmail")) {
                 String newEmail = (String) customerData.get("customerEmail");
+                
+                // Check if email already exists in other customers or accounts (excluding current customer)
+                Account existingEmailAccount = accountRepository.findByEmail(newEmail);
+                if (existingEmailAccount != null && !existingEmailAccount.getAccountId().equals(existingCustomer.getAccount().getAccountId())) {
+                    return ResponseEntity.badRequest().body("Email đã được sử dụng bởi tài khoản khác");
+                }
+                
+                Customer existingEmailCustomer = customerRepository.findByCustomerEmail(newEmail);
+                if (existingEmailCustomer != null && !existingEmailCustomer.getCustomerId().equals(customerId)) {
+                    return ResponseEntity.badRequest().body("Email đã được sử dụng bởi khách hàng khác: " + existingEmailCustomer.getCustomerName());
+                }
+                
                 existingCustomer.setCustomerEmail(newEmail);
                 
                 // Also update email in account table if account exists
@@ -1512,8 +1550,23 @@ public class AdminController {
             }
             
             if (customerData.containsKey("customerPhone")) {
-                existingCustomer.setCustomerPhone((String) customerData.get("customerPhone"));
+                String newPhone = (String) customerData.get("customerPhone");
+                
+                // Check if phone already exists in other customers (excluding current customer)
+                if (newPhone != null && !newPhone.trim().isEmpty()) {
+                    List<Customer> existingPhoneCustomers = customerRepository.findByCustomerPhone(newPhone);
+                    Customer existingPhoneCustomer = existingPhoneCustomers.stream()
+                        .filter(customer -> !customer.getCustomerId().equals(customerId))
+                        .findFirst()
+                        .orElse(null);
+                    if (existingPhoneCustomer != null) {
+                        return ResponseEntity.badRequest().body("Số điện thoại đã được sử dụng");
+                    }
+                }
+                
+                existingCustomer.setCustomerPhone(newPhone);
             }
+            
             if (customerData.containsKey("customerAddress")) {
                 existingCustomer.setCustomerAddress((String) customerData.get("customerAddress"));
             }
@@ -1574,6 +1627,37 @@ public class AdminController {
                     // If typeId is null, empty, or 0, set customer type to null (No Type)
                     existingCustomer.setCustomerType(null);
                     logger.info("Set customer type to null (No Type) for customer ID: {}", customerId);
+                }
+            }
+            if (customerData.containsKey("totalVipSpent")) {
+                Object totalVipSpentObj = customerData.get("totalVipSpent");
+                BigDecimal totalVipSpent = null;
+                
+                // Handle different data types from frontend
+                if (totalVipSpentObj instanceof Number) {
+                    totalVipSpent = BigDecimal.valueOf(((Number) totalVipSpentObj).doubleValue());
+                } else if (totalVipSpentObj instanceof String) {
+                    String totalVipSpentStr = (String) totalVipSpentObj;
+                    if (!totalVipSpentStr.isEmpty() && !totalVipSpentStr.equals("null")) {
+                        try {
+                            totalVipSpent = new BigDecimal(totalVipSpentStr);
+                        } catch (NumberFormatException e) {
+                            logger.warn("Invalid totalVipSpent format: {}", totalVipSpentStr);
+                        }
+                    }
+                }
+                
+                if (totalVipSpent != null) {
+                    // Ensure non-negative value
+                    if (totalVipSpent.compareTo(BigDecimal.ZERO) < 0) {
+                        totalVipSpent = BigDecimal.ZERO;
+                    }
+                    existingCustomer.setTotalVipSpent(totalVipSpent);
+                    logger.info("Updated total VIP spent to: {} for customer ID: {}", totalVipSpent, customerId);
+                } else {
+                    // If null or empty, set to 0
+                    existingCustomer.setTotalVipSpent(BigDecimal.ZERO);
+                    logger.info("Set total VIP spent to 0 for customer ID: {}", customerId);
                 }
             }
             
@@ -4340,7 +4424,8 @@ public class AdminController {
      * Check if email already exists in the system
      */
     @GetMapping("/check-email-exists")
-    public ResponseEntity<?> checkEmailExists(@RequestParam String email) {
+    public ResponseEntity<?> checkEmailExists(@RequestParam String email,
+                                             @RequestParam(required = false) Integer excludeCustomerId) {
         try {
             Map<String, Object> response = new HashMap<>();
             response.put("email", email);
@@ -4352,6 +4437,15 @@ public class AdminController {
             // Also check in Customer table for additional verification
             Customer existingCustomer = customerRepository.findByCustomerEmail(email);
             boolean emailExistsInCustomer = existingCustomer != null;
+            
+            // Exclude current customer if editing
+            if (excludeCustomerId != null) {
+                if (existingAccount != null && existingCustomer != null && 
+                    existingCustomer.getCustomerId().equals(excludeCustomerId)) {
+                    emailExists = false;
+                    emailExistsInCustomer = false;
+                }
+            }
             
             response.put("exists", emailExists || emailExistsInCustomer);
             response.put("existsInAccount", emailExists);
@@ -4406,20 +4500,38 @@ public class AdminController {
      * Check if phone number already exists in the system
      */
     @GetMapping("/check-phone-exists")
-    public ResponseEntity<?> checkPhoneExists(@RequestParam String phone) {
+    public ResponseEntity<?> checkPhoneExists(@RequestParam String phone,
+                                             @RequestParam(required = false) Integer excludeCustomerId) {
         try {
             Map<String, Object> response = new HashMap<>();
             response.put("phone", phone);
             
             // Check in Customer table
-            Customer existingCustomer = customerRepository.findByCustomerPhone(phone);
-            boolean phoneExists = existingCustomer != null;
+            List<Customer> existingCustomers = customerRepository.findByCustomerPhone(phone);
+            Customer existingCustomer = null;
+            boolean phoneExists = false;
+            
+            if (!existingCustomers.isEmpty()) {
+                // If excluding a customer ID, filter out that customer
+                if (excludeCustomerId != null) {
+                    existingCustomer = existingCustomers.stream()
+                        .filter(customer -> !customer.getCustomerId().equals(excludeCustomerId))
+                        .findFirst()
+                        .orElse(null);
+                    phoneExists = existingCustomer != null;
+                } else {
+                    existingCustomer = existingCustomers.get(0);
+                    phoneExists = true;
+                }
+            }
             
             response.put("exists", phoneExists);
             
             if (phoneExists) {
                 response.put("message", "Số điện thoại đã được sử dụng");
+                // Admin cần biết thông tin customer để quản lý
                 response.put("customerName", existingCustomer.getCustomerName());
+                response.put("customerId", existingCustomer.getCustomerId());
             } else {
                 response.put("message", "Số điện thoại có thể sử dụng");
             }
@@ -4615,6 +4727,191 @@ public class AdminController {
             errorResponse.put("error", "Failed to get body metrics: " + e.getMessage());
             errorResponse.put("timestamp", LocalDateTime.now());
             
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+    /**
+     * Debug endpoint để kiểm tra tất cả luồng course enrollment và Course In Progress
+     */
+    @GetMapping("/debug/course-enrollment-flows/{customerId}")
+    public ResponseEntity<?> debugCourseEnrollmentFlows(@PathVariable Integer customerId) {
+        try {
+            Map<String, Object> debugResult = new HashMap<>();
+            debugResult.put("customerId", customerId);
+            debugResult.put("timestamp", LocalDateTime.now());
+            
+            // 1. Kiểm tra customer tồn tại
+            Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new RuntimeException("Customer not found"));
+            debugResult.put("customerName", customer.getCustomerName());
+            
+            // 2. Kiểm tra records trong customer_course
+            String customerCourseQuery = "SELECT cc.customer_course_id, cc.customer_id, cc.course_id, " +
+                "cc.recommended_status, c.course_name, c.is_vip, c.price " +
+                "FROM customer_course cc " +
+                "LEFT JOIN course c ON cc.course_id = c.course_id " +
+                "WHERE cc.customer_id = ?";
+            
+            Query ccQuery = entityManager.createNativeQuery(customerCourseQuery);
+            ccQuery.setParameter(1, customerId);
+            @SuppressWarnings("unchecked")
+            List<Object[]> ccResults = ccQuery.getResultList();
+            
+            List<Map<String, Object>> customerCourseRecords = new ArrayList<>();
+            for (Object[] row : ccResults) {
+                Map<String, Object> record = new HashMap<>();
+                record.put("customerCourseId", row[0]);
+                record.put("customerId", row[1]);
+                record.put("courseId", row[2]);
+                record.put("recommendedStatus", row[3]);
+                record.put("courseName", row[4]);
+                record.put("isVip", row[5]);
+                record.put("price", row[6]);
+                customerCourseRecords.add(record);
+            }
+            debugResult.put("customerCourseRecords", customerCourseRecords);
+            debugResult.put("totalCoursesInCustomerCourse", customerCourseRecords.size());
+            
+            // 3. Kiểm tra VIP payments
+            String vipPaymentQuery = "SELECT vp.payment_id, vp.customer_id, vp.course_id, " +
+                "vp.payment_status, vp.amount, c.course_name " +
+                "FROM vip_payment vp " +
+                "LEFT JOIN course c ON vp.course_id = c.course_id " +
+                "WHERE vp.customer_id = ? AND vp.payment_status = 'SUCCESS'";
+            
+            Query vpQuery = entityManager.createNativeQuery(vipPaymentQuery);
+            vpQuery.setParameter(1, customerId);
+            @SuppressWarnings("unchecked")
+            List<Object[]> vpResults = vpQuery.getResultList();
+            
+            List<Map<String, Object>> vipPaymentRecords = new ArrayList<>();
+            for (Object[] row : vpResults) {
+                Map<String, Object> record = new HashMap<>();
+                record.put("paymentId", row[0]);
+                record.put("customerId", row[1]);
+                record.put("courseId", row[2]);
+                record.put("paymentStatus", row[3]);
+                record.put("amount", row[4]);
+                record.put("courseName", row[5]);
+                vipPaymentRecords.add(record);
+            }
+            debugResult.put("vipPaymentRecords", vipPaymentRecords);
+            debugResult.put("totalSuccessfulVipPayments", vipPaymentRecords.size());
+            
+            // 4. Kiểm tra user_data_ai recommendations
+            String userDataQuery = "SELECT uda.user_data_id, uda.customer_id, uda.course_id, " +
+                "c.course_name, uda.created_date " +
+                "FROM user_data_ai uda " +
+                "LEFT JOIN course c ON uda.course_id = c.course_id " +
+                "WHERE uda.customer_id = ? " +
+                "ORDER BY uda.created_date DESC";
+            
+            Query udQuery = entityManager.createNativeQuery(userDataQuery);
+            udQuery.setParameter(1, customerId);
+            @SuppressWarnings("unchecked")
+            List<Object[]> udResults = udQuery.getResultList();
+            
+            List<Map<String, Object>> userDataRecords = new ArrayList<>();
+            for (Object[] row : udResults) {
+                Map<String, Object> record = new HashMap<>();
+                record.put("userDataId", row[0]);
+                record.put("customerId", row[1]);
+                record.put("courseId", row[2]);
+                record.put("courseName", row[3]);
+                record.put("createdDate", row[4]);
+                userDataRecords.add(record);
+            }
+            debugResult.put("userDataAiRecords", userDataRecords);
+            debugResult.put("totalUserDataAiRecords", userDataRecords.size());
+            
+            // 5. Kiểm tra Course In Progress logic
+            Map<String, Object> courseInProgressDebug = new HashMap<>();
+            
+            // Đếm courses theo logic của UserDashboardServiceImpl
+            int coursesInProgressCount = 0;
+            List<Map<String, Object>> courseProgressDetails = new ArrayList<>();
+            
+            for (Map<String, Object> courseRecord : customerCourseRecords) {
+                Integer courseId = (Integer) courseRecord.get("courseId");
+                String courseName = (String) courseRecord.get("courseName");
+                
+                if (courseId != null) {
+                    try {
+                        // Sử dụng logic giống UserDashboardServiceImpl
+                        String totalDaysQuery = "SELECT COUNT(*) FROM course_days WHERE course_id = ? AND status = true";
+                        Query totalQuery = entityManager.createNativeQuery(totalDaysQuery);
+                        totalQuery.setParameter(1, courseId);
+                        Number totalDays = (Number) totalQuery.getSingleResult();
+                        
+                        String completedDaysQuery = "SELECT COUNT(*) FROM customer_day_completion " +
+                            "WHERE customer_id = ? AND course_id = ? AND is_completed = true";
+                        Query completedQuery = entityManager.createNativeQuery(completedDaysQuery);
+                        completedQuery.setParameter(1, customerId);
+                        completedQuery.setParameter(2, courseId);
+                        Number completedDays = (Number) completedQuery.getSingleResult();
+                        
+                        boolean isCompleted = totalDays.intValue() > 0 && 
+                            completedDays.intValue() >= totalDays.intValue();
+                        
+                        if (!isCompleted) {
+                            coursesInProgressCount++;
+                        }
+                        
+                        Map<String, Object> progressDetail = new HashMap<>();
+                        progressDetail.put("courseId", courseId);
+                        progressDetail.put("courseName", courseName);
+                        progressDetail.put("totalDays", totalDays.intValue());
+                        progressDetail.put("completedDays", completedDays.intValue());
+                        progressDetail.put("isCompleted", isCompleted);
+                        progressDetail.put("countedAsInProgress", !isCompleted);
+                        courseProgressDetails.add(progressDetail);
+                        
+                    } catch (Exception e) {
+                        logger.error("Error checking progress for course {}: {}", courseId, e.getMessage());
+                    }
+                }
+            }
+            
+            courseInProgressDebug.put("totalCoursesInProgress", coursesInProgressCount);
+            courseInProgressDebug.put("courseProgressDetails", courseProgressDetails);
+            debugResult.put("courseInProgressDebug", courseInProgressDebug);
+            
+            // 6. Kiểm tra missing enrollments (VIP paid nhưng chưa có trong customer_course)
+            List<Map<String, Object>> missingEnrollments = new ArrayList<>();
+            Set<Integer> enrolledCourseIds = customerCourseRecords.stream()
+                .map(record -> (Integer) record.get("courseId"))
+                .collect(java.util.stream.Collectors.toSet());
+            
+            for (Map<String, Object> vipRecord : vipPaymentRecords) {
+                Integer vipCourseId = (Integer) vipRecord.get("courseId");
+                if (!enrolledCourseIds.contains(vipCourseId)) {
+                    missingEnrollments.add(vipRecord);
+                }
+            }
+            debugResult.put("missingEnrollments", missingEnrollments);
+            debugResult.put("totalMissingEnrollments", missingEnrollments.size());
+            
+            // 7. Recommendations
+            List<String> recommendations = new ArrayList<>();
+            if (!missingEnrollments.isEmpty()) {
+                recommendations.add("Có " + missingEnrollments.size() + " VIP course đã thanh toán nhưng chưa được thêm vào customer_course");
+            }
+            if (courseInProgressDebug.get("totalCoursesInProgress").equals(0) && !customerCourseRecords.isEmpty()) {
+                recommendations.add("Tất cả courses đã completed hoặc có vấn đề với logic tính progress");
+            }
+            if (customerCourseRecords.isEmpty() && !vipPaymentRecords.isEmpty()) {
+                recommendations.add("Customer có VIP payments nhưng không có courses nào trong customer_course");
+            }
+            debugResult.put("recommendations", recommendations);
+            
+            return ResponseEntity.ok(debugResult);
+            
+        } catch (Exception e) {
+            logger.error("Error in debug course enrollment flows", e);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", e.getMessage());
+            errorResponse.put("timestamp", LocalDateTime.now());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }

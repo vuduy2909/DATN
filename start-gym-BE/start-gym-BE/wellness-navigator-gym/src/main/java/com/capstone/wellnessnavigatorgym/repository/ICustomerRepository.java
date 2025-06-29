@@ -124,7 +124,7 @@ public interface ICustomerRepository extends JpaRepository<Customer, Integer> {
 
     @Query(value = "SELECT c.* FROM customer c " +
             "WHERE c.customer_phone = :phone", nativeQuery = true)
-    Customer findByCustomerPhone(@Param("phone") String phone);
+    List<Customer> findByCustomerPhone(@Param("phone") String phone);
 
     @Query(value = "SELECT a.customer_id, a.customer_name, a.customer_phone, a.customer_gender, a.customer_date_of_birth, " +
             "a.customer_address, a.is_delete, a.is_enable, u.user_id, a.create_time, " +

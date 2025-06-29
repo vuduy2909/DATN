@@ -346,6 +346,12 @@ public class CustomerController {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String username = authentication.getName();
             
+            // Get current customer
+            Customer currentCustomer = customerService.findByAccountUserName(username);
+            if (currentCustomer == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Customer not found");
+            }
+            
             // Validate required fields
             String email = profileData.get("customerEmail");
             String phone = profileData.get("customerPhone");
@@ -366,6 +372,18 @@ public class CustomerController {
             // Validate phone format (10-11 digits)
             if (!phone.matches("^\\d{10,11}$")) {
                 return ResponseEntity.badRequest().body("Phone number must be 10-11 digits");
+            }
+            
+            // Check if phone number already exists (excluding current customer)
+            if (!phone.equals(currentCustomer.getCustomerPhone())) {
+                List<Customer> existingPhoneCustomers = customerService.findByCustomerPhone(phone);
+                Customer existingPhoneCustomer = existingPhoneCustomers.stream()
+                    .filter(customer -> !customer.getCustomerId().equals(currentCustomer.getCustomerId()))
+                    .findFirst()
+                    .orElse(null);
+                if (existingPhoneCustomer != null) {
+                    return ResponseEntity.badRequest().body("Số điện thoại đã được sử dụng");
+                }
             }
             
             // Validate date of birth if provided (must be >16 years old)

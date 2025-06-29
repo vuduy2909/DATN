@@ -152,9 +152,14 @@ const NewCustomer = () => {
       const response = await axiosInstance.get(`/admin/check-phone-exists?phone=${encodeURIComponent(phone)}`);
       
       if (response.data.exists) {
+        // Admin pages hiển thị thông tin customer để quản lý
+        const errorMessage = response.data.customerName 
+          ? `Số điện thoại đã được sử dụng bởi khách hàng: ${response.data.customerName}`
+          : response.data.message || 'Số điện thoại đã được sử dụng';
+        
         setErrors(prev => ({
           ...prev,
-          customerPhone: `${response.data.message}${response.data.customerName ? ` (${response.data.customerName})` : ''}`
+          customerPhone: errorMessage
         }));
       } else {
         setErrors(prev => {

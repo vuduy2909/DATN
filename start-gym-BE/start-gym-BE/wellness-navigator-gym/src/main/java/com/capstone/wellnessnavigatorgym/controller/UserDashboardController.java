@@ -1,6 +1,8 @@
 package com.capstone.wellnessnavigatorgym.controller;
 
 import com.capstone.wellnessnavigatorgym.dto.UserDashboardStatsDTO;
+import com.capstone.wellnessnavigatorgym.entity.Customer;
+import com.capstone.wellnessnavigatorgym.repository.ICustomerRepository;
 import com.capstone.wellnessnavigatorgym.service.UserDashboardService;
 import com.capstone.wellnessnavigatorgym.service.CustomerDayCompletionService;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +28,7 @@ public class UserDashboardController {
 
     private final UserDashboardService userDashboardService;
     private final CustomerDayCompletionService completionService;
+    private final ICustomerRepository customerRepository;
 
     /**
      * Lấy toàn bộ thống kê dashboard cho người dùng
@@ -64,8 +67,14 @@ public class UserDashboardController {
         
         // Lấy thông tin courses in progress từ UserDashboardService
         Integer customerId = getCustomerIdFromUsername(username);
-        Integer coursesInProgress = userDashboardService.getCoursesInProgressCount(customerId);
-        response.put("coursesInProgress", coursesInProgress);
+        if (customerId != null) {
+            Integer coursesInProgress = userDashboardService.getCoursesInProgressCount(customerId);
+            response.put("coursesInProgress", coursesInProgress);
+            log.info("✅ Course In Progress for Customer ID {}: {}", customerId, coursesInProgress);
+        } else {
+            log.error("❌ Cannot get courses in progress - Customer ID is null for username: {}", username);
+            response.put("coursesInProgress", 0);
+        }
         
         return ResponseEntity.ok(response);
     }
@@ -172,8 +181,19 @@ public class UserDashboardController {
             // Tìm customer ID thông qua username - cần implement logic này
             // Tạm thời sử dụng customer ID mặc định hoặc lấy từ context khác
             Integer customerId = getCustomerIdFromUsername(username);
+            
+            if (customerId == null) {
+                log.error("❌ Cannot get progress chart - Customer ID is null for username: {}", username);
+                // Return fallback data
+                Map<String, Object> fallback = new HashMap<>();
+                fallback.put("percentage", 0);
+                fallback.put("completed", 0);
+                fallback.put("total", 0);
+                fallback.put("data", new ArrayList<>());
+                return ResponseEntity.ok(fallback);
+            }
         
-        Map<String, Object> chartData = userDashboardService.getProgressChartData(customerId);
+            Map<String, Object> chartData = userDashboardService.getProgressChartData(customerId);
             
             // Đảm bảo format phù hợp với frontend ChartCircle component
             Map<String, Object> response = new HashMap<>();
@@ -200,16 +220,33 @@ public class UserDashboardController {
     
     /**
      * Helper method để lấy customer ID từ username
-     * TODO: Implement proper logic hoặc inject CustomerService
      */
     private Integer getCustomerIdFromUsername(String username) {
-        // Tạm thời return customer ID mặc định
-        // Trong production, cần implement logic thực tế
         try {
-            return Integer.parseInt(username);
-        } catch (NumberFormatException e) {
-            log.warn("Username is not numeric, using default customer ID: {}", username);
-            return 5; // Default customer ID cho testing
+            log.info("=== Getting Customer ID for username: {} ===", username);
+            
+            // Tìm customer bằng username từ account
+            Customer customer = customerRepository.findByAccountUserName(username);
+            
+            if (customer != null) {
+                log.info("✅ Found Customer ID: {} for username: {}", customer.getCustomerId(), username);
+                return customer.getCustomerId();
+            } else {
+                log.error("❌ No customer found for username: {}", username);
+                // Fallback: thử tìm customer active
+                customer = customerRepository.findActiveCustomerByAccountUserName(username);
+                if (customer != null) {
+                    log.info("✅ Found Active Customer ID: {} for username: {}", customer.getCustomerId(), username);
+                    return customer.getCustomerId();
+                } else {
+                    log.error("❌ No active customer found for username: {}", username);
+                    return null; // Không nên return mặc định
+                }
+            }
+            
+        } catch (Exception e) {
+            log.error("❌ Error getting customer ID for username {}: {}", username, e.getMessage());
+            return null;
         }
     }
 } 

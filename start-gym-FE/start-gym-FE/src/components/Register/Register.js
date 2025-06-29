@@ -193,7 +193,7 @@ const Register = () => {
             const response = await axios.get(`http://localhost:8080/api/v1/public/check-phone-exists?phone=${encodeURIComponent(phone)}`);
             
             if (response.data.exists) {
-                setPhoneError(`${response.data.message}${response.data.customerName ? ` (${response.data.customerName})` : ''}`);
+                setPhoneError(response.data.message);
                 return false;
             } else {
                 // Phone available, but still check format

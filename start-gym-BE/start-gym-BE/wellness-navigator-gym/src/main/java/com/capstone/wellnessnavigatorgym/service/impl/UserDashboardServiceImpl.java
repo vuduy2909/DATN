@@ -31,6 +31,9 @@ public class UserDashboardServiceImpl implements UserDashboardService {
     private final CustomerDayCompletionService completionService;
     private final UserDataAiRepository userDataAiRepository;
     private final ICustomerCourseRepository customerCourseRepository;
+    
+    @javax.persistence.PersistenceUnit
+    private javax.persistence.EntityManagerFactory entityManagerFactory;
 
     @Override
     public UserDashboardStatsDTO getUserDashboardStats(Integer customerId) {
@@ -313,35 +316,74 @@ public class UserDashboardServiceImpl implements UserDashboardService {
     public Integer getCoursesInProgressCount(Integer customerId) {
         // Lấy danh sách khóa học của người dùng với status ACTIVE
         List<CustomerCourse> customerCourses = customerCourseRepository.findByCustomer_CustomerId(customerId);
+        log.info("=== DEBUG Course In Progress Count ===");
+        log.info("Customer ID: {}", customerId);
+        log.info("Total courses found: {}", customerCourses.size());
+        
+        // Debug: Log raw database query result
+        log.info("=== Debug Database Direct Query ===");
+        try {
+            javax.persistence.EntityManager em = entityManagerFactory.createEntityManager();
+            javax.persistence.Query rawQuery = em.createNativeQuery(
+                "SELECT cc.customer_course_id, cc.customer_id, cc.course_id, cc.recommended_status, c.course_name " +
+                "FROM customer_course cc LEFT JOIN course c ON cc.course_id = c.course_id " +
+                "WHERE cc.customer_id = ?");
+            rawQuery.setParameter(1, customerId);
+            
+            @SuppressWarnings("unchecked")
+            java.util.List<Object[]> rawResults = rawQuery.getResultList();
+            log.info("Raw database query found {} records for customer {}", rawResults.size(), customerId);
+            
+            for (Object[] row : rawResults) {
+                log.info("Raw record: customer_course_id={}, customer_id={}, course_id={}, recommended_status={}, course_name={}", 
+                    row[0], row[1], row[2], row[3], row[4]);
+            }
+            em.close();
+        } catch (Exception e) {
+            log.error("Error in raw database query: {}", e.getMessage());
+        }
+        
         if (customerCourses.isEmpty()) {
+            log.info("No courses found for customer {}", customerId);
             return 0;
         }
         
-        // Đếm số khóa học đang active và chưa hoàn thành
-        int inProgressCount = 0;
+        // Log chi tiết từng khóa học
+        for (int i = 0; i < customerCourses.size(); i++) {
+            CustomerCourse cc = customerCourses.get(i);
+            log.info("Course {}: ID={}, Name={}, RecommendedStatus={}", 
+                (i + 1), 
+                cc.getCourse() != null ? cc.getCourse().getCourseId() : "NULL_COURSE",
+                cc.getCourse() != null ? cc.getCourse().getCourseName() : "NULL_COURSE_NAME",
+                cc.getRecommendedStatus());
+        }
+        
+        int coursesInProgressCount = 0;
         
         for (CustomerCourse customerCourse : customerCourses) {
-            Integer courseId = customerCourse.getCourse().getCourseId();
+            if (customerCourse.getCourse() == null) {
+                log.warn("CustomerCourse {} has null course - skipping", customerCourse.getCustomerCourseId());
+                continue;
+            }
             
-            try {
-                // Kiểm tra xem khóa học đã hoàn thành chưa
-                CustomerDayCompletionService.CourseProgressDTO progress = 
-                        completionService.getCourseProgress(customerId, courseId);
-                
-                // Chỉ đếm khóa học chưa hoàn thành
-                if (!progress.getIsCompleted()) {
-                    inProgressCount++;
-                }
-            } catch (Exception e) {
-                // Nếu có lỗi khi lấy progress, coi như khóa học đang in progress
-                log.warn("Error getting course progress for customer {} and course {}: {}", 
-                    customerId, courseId, e.getMessage());
-                inProgressCount++;
+            Integer courseId = customerCourse.getCourse().getCourseId();
+            String courseName = customerCourse.getCourse().getCourseName();
+            
+            // Kiểm tra xem khóa học đã hoàn thành chưa
+            CustomerDayCompletionService.CourseProgressDTO progress = completionService.getCourseProgress(customerId, courseId);
+            log.info("Course {}: {}/{} days completed, isCompleted={}", 
+                courseName, progress.getCompletedDays(), progress.getTotalDays(), progress.getIsCompleted());
+            
+            if (!progress.getIsCompleted()) {
+                coursesInProgressCount++;
+                log.info("✓ Course {} counted as IN PROGRESS", courseName);
+            } else {
+                log.info("✗ Course {} is COMPLETED - not counted", courseName);
             }
         }
         
-        log.info("Customer {} has {} courses in progress", customerId, inProgressCount);
-        return inProgressCount;
+        log.info("=== Final Result: Customer {} has {} courses in progress ===", customerId, coursesInProgressCount);
+        return coursesInProgressCount;
     }
     
     /**

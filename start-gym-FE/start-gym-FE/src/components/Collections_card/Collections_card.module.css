@@ -1,6 +1,6 @@
 .collection {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
     gap: 15px;
     padding: 0 20px;
     width: 100%;

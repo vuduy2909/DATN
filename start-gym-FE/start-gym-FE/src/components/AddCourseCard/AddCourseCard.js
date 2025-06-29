@@ -9,7 +9,7 @@ const AddCourseCard = ({ sx = {} }) => {
   const { language } = useLanguage();
 
   const handleAddCourse = () => {
-    navigate('/collections');
+    navigate('/recommend');
   };
 
   return (
