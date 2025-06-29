@@ -1481,31 +1481,111 @@ public class AdminController {
     public ResponseEntity<?> updateCustomer(@PathVariable Integer customerId, 
                                            @RequestBody Map<String, Object> customerData) {
         try {
+            logger.info("=== UPDATING CUSTOMER {} ===", customerId);
+            logger.info("Request data: {}", customerData);
+            
             Customer existingCustomer = customerRepository.findById(customerId)
                 .orElseThrow(() -> new RuntimeException("Customer not found with ID: " + customerId));
+            
+            logger.info("Existing customer - Account ID: {}, Customer Type ID: {}", 
+                existingCustomer.getAccount() != null ? existingCustomer.getAccount().getAccountId() : "NULL",
+                existingCustomer.getCustomerType() != null ? existingCustomer.getCustomerType().getCustomerTypeId() : "NULL");
             
             // Update customer fields
             if (customerData.containsKey("customerName")) {
                 existingCustomer.setCustomerName((String) customerData.get("customerName"));
             }
+            
+            // Update email in both customer and account tables
             if (customerData.containsKey("customerEmail")) {
-                existingCustomer.setCustomerEmail((String) customerData.get("customerEmail"));
+                String newEmail = (String) customerData.get("customerEmail");
+                existingCustomer.setCustomerEmail(newEmail);
+                
+                // Also update email in account table if account exists
+                if (existingCustomer.getAccount() != null) {
+                    existingCustomer.getAccount().setEmail(newEmail);
+                    accountRepository.save(existingCustomer.getAccount());
+                    logger.info("Updated email in both customer and account tables for customer ID: {}", customerId);
+                } else {
+                    logger.warn("No account found for customer ID: {}, only updated customer email", customerId);
+                }
             }
+            
             if (customerData.containsKey("customerPhone")) {
                 existingCustomer.setCustomerPhone((String) customerData.get("customerPhone"));
             }
             if (customerData.containsKey("customerAddress")) {
                 existingCustomer.setCustomerAddress((String) customerData.get("customerAddress"));
             }
+            if (customerData.containsKey("customerGender")) {
+                existingCustomer.setCustomerGender((String) customerData.get("customerGender"));
+            }
+            if (customerData.containsKey("dateOfBirth")) {
+                String dateOfBirth = (String) customerData.get("dateOfBirth");
+                if (dateOfBirth != null && !dateOfBirth.isEmpty()) {
+                    try {
+                        java.sql.Date dob = java.sql.Date.valueOf(dateOfBirth);
+                        existingCustomer.setDateOfBirth(dob);
+                    } catch (Exception e) {
+                        logger.warn("Invalid date format for customer ID {}: {}", customerId, dateOfBirth);
+                    }
+                }
+            }
+            if (customerData.containsKey("customerImg")) {
+                existingCustomer.setCustomerImg((String) customerData.get("customerImg"));
+            }
+            if (customerData.containsKey("isEnable")) {
+                Boolean isEnable = (Boolean) customerData.get("isEnable");
+                existingCustomer.setIsEnable(isEnable);
+                
+                // Also update account status if account exists
+                if (existingCustomer.getAccount() != null) {
+                    existingCustomer.getAccount().setIsEnable(isEnable);
+                    accountRepository.save(existingCustomer.getAccount());
+                }
+            }
             if (customerData.containsKey("customerTypeId")) {
-                Integer typeId = (Integer) customerData.get("customerTypeId");
-                if (typeId != null) {
+                Object typeIdObj = customerData.get("customerTypeId");
+                Integer typeId = null;
+                
+                // Handle different data types from frontend
+                if (typeIdObj instanceof Integer) {
+                    typeId = (Integer) typeIdObj;
+                } else if (typeIdObj instanceof String) {
+                    String typeIdStr = (String) typeIdObj;
+                    if (!typeIdStr.isEmpty() && !typeIdStr.equals("null")) {
+                        try {
+                            typeId = Integer.parseInt(typeIdStr);
+                        } catch (NumberFormatException e) {
+                            logger.warn("Invalid customerTypeId format: {}", typeIdStr);
+                        }
+                    }
+                }
+                
+                if (typeId != null && typeId > 0) {
                     CustomerType customerType = customerTypeRepository.findById(typeId).orElse(null);
-                    existingCustomer.setCustomerType(customerType);
+                    if (customerType != null) {
+                        existingCustomer.setCustomerType(customerType);
+                        logger.info("Updated customer type to: {} for customer ID: {}", customerType.getCustomerTypeName(), customerId);
+                    } else {
+                        logger.warn("CustomerType not found with ID: {}", typeId);
+                    }
+                } else {
+                    // If typeId is null, empty, or 0, set customer type to null (No Type)
+                    existingCustomer.setCustomerType(null);
+                    logger.info("Set customer type to null (No Type) for customer ID: {}", customerId);
                 }
             }
             
+            logger.info("Before save - Account ID: {}, Customer Type ID: {}", 
+                existingCustomer.getAccount() != null ? existingCustomer.getAccount().getAccountId() : "NULL",
+                existingCustomer.getCustomerType() != null ? existingCustomer.getCustomerType().getCustomerTypeId() : "NULL");
+            
             Customer updatedCustomer = customerRepository.save(existingCustomer);
+            
+            logger.info("After save - Account ID: {}, Customer Type ID: {}", 
+                updatedCustomer.getAccount() != null ? updatedCustomer.getAccount().getAccountId() : "NULL",
+                updatedCustomer.getCustomerType() != null ? updatedCustomer.getCustomerType().getCustomerTypeId() : "NULL");
             
             Map<String, Object> response = new HashMap<>();
             response.put("customer", updatedCustomer);
@@ -1520,6 +1600,16 @@ public class AdminController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error updating customer: " + e.getMessage());
         }
+    }
+    
+    /**
+     * Alternative endpoint for frontend compatibility - edit customer
+     */
+    @PutMapping("/customer/{customerId}/edit")
+    public ResponseEntity<?> editCustomer(@PathVariable Integer customerId, 
+                                         @RequestBody Map<String, Object> customerData) {
+        // Delegate to the main updateCustomer method
+        return updateCustomer(customerId, customerData);
     }
     
     /**

@@ -79,10 +79,49 @@ public class CustomerServiceImpl implements ICustomerService {
 
     @Override
     public void updateCustomer(CustomerInfo customerInfo, Integer id) {
-        customerRepository.updateCustomer(id, customerInfo.getCustomerCode(), customerInfo.getCustomerName(),
-                customerInfo.getCustomerEmail(), customerInfo.getCustomerPhone(), customerInfo.getCustomerGender(),
-                customerInfo.getDateOfBirth(), customerInfo.getCustomerAddress(),
-                customerInfo.getCustomerImg(), true, customerInfo.getCustomerType(), customerInfo.getAccount());
+        // Find existing customer to get account information
+        Optional<Customer> existingCustomerOpt = customerRepository.findById(id);
+        if (existingCustomerOpt.isPresent()) {
+            Customer existingCustomer = existingCustomerOpt.get();
+            
+            logger.info("=== CustomerServiceImpl.updateCustomer ===");
+            logger.info("Customer ID: {}, CustomerInfo: {}", id, customerInfo);
+            logger.info("Existing customer - Account ID: {}, Customer Type ID: {}", 
+                existingCustomer.getAccount() != null ? existingCustomer.getAccount().getAccountId() : "NULL",
+                existingCustomer.getCustomerType() != null ? existingCustomer.getCustomerType().getCustomerTypeId() : "NULL");
+            
+            // Use JPA save instead of native query to avoid account_id and customer_type_id being set to null
+            existingCustomer.setCustomerCode(customerInfo.getCustomerCode());
+            existingCustomer.setCustomerName(customerInfo.getCustomerName());
+            existingCustomer.setCustomerEmail(customerInfo.getCustomerEmail());
+            existingCustomer.setCustomerPhone(customerInfo.getCustomerPhone());
+            existingCustomer.setCustomerGender(customerInfo.getCustomerGender());
+            existingCustomer.setDateOfBirth(customerInfo.getDateOfBirth());
+            existingCustomer.setCustomerAddress(customerInfo.getCustomerAddress());
+            existingCustomer.setCustomerImg(customerInfo.getCustomerImg());
+            existingCustomer.setIsEnable(true);
+            
+            // Only update customer type if provided
+            if (customerInfo.getCustomerType() != null) {
+                existingCustomer.setCustomerType(customerInfo.getCustomerType());
+            }
+            
+            // Save using JPA (preserves account_id and other relationships)
+            customerRepository.save(existingCustomer);
+            
+            // Also update email in account table if account exists and email has changed
+            if (existingCustomer.getAccount() != null && 
+                !customerInfo.getCustomerEmail().equals(existingCustomer.getCustomerEmail())) {
+                
+                existingCustomer.getAccount().setEmail(customerInfo.getCustomerEmail());
+                accountRepository.save(existingCustomer.getAccount());
+                logger.info("Updated email in both customer and account tables for customer ID: {}", id);
+            }
+            
+            logger.info("Customer updated successfully using JPA save");
+        } else {
+            logger.warn("Customer not found with ID: {}", id);
+        }
     }
 
     @Override
