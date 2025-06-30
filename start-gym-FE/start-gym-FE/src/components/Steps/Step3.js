@@ -42,46 +42,46 @@ const Step3 = ({ formData, handleChange, handleNext, handlePrevious }) => {
 
     const training_goals = [
         { 
-            value: 'Giảm cân tổng thể',
-            icon: '🏃‍♀️',
-            description: 'Giảm cân an toàn và hiệu quả',
-            color: '#e74c3c'
-        },
-        { 
-            value: 'Giảm mỡ, giữ cơ',
-            icon: '💪',
-            description: 'Cải thiện thành phần cơ thể',
-            color: '#f39c12'
-        },
-        { 
-            value: 'Tăng cơ bắp',
-            icon: '🏋️‍♂️',
-            description: 'Xây dựng khối lượng cơ bắp',
-            color: '#27ae60'
-        },
-        { 
             value: 'Tăng sức mạnh',
             icon: '💥',
             description: 'Nâng cao sức mạnh tổng thể',
             color: '#8e44ad'
         },
         { 
-            value: 'Cải thiện sức chịu đựng',
-            icon: '⚡',
-            description: 'Tăng cường thể lực và sức bền',
-            color: '#3498db'
+            value: 'Cải thiện tim mạch',
+            icon: '❤️',
+            description: 'Tăng cường sức khỏe tim mạch',
+            color: '#e74c3c'
         },
         { 
             value: 'Tăng tính linh hoạt',
             icon: '🤸‍♀️',
-            description: 'Cải thiện độ dẻo dai cơ thể',
+            description: 'Cải thiện độ dẻo dai và cân bằng',
             color: '#1abc9c'
+        },
+        { 
+            value: 'Sức mạnh & sức bền',
+            icon: '⚡',
+            description: 'Kết hợp sức mạnh và sức chịu đựng',
+            color: '#3498db'
         },
         { 
             value: 'Duy trì vóc dáng',
             icon: '✨',
             description: 'Giữ gìn thể hình hiện tại',
             color: '#95a5a6'
+        },
+        { 
+            value: 'Giảm mỡ giữ cơ',
+            icon: '💪',
+            description: 'Cải thiện thành phần cơ thể',
+            color: '#f39c12'
+        },
+        { 
+            value: 'Giảm cân tổng thể',
+            icon: '🏃‍♀️',
+            description: 'Giảm cân an toàn và hiệu quả',
+            color: '#27ae60'
         },
     ];
 
@@ -186,17 +186,12 @@ const Step3 = ({ formData, handleChange, handleNext, handlePrevious }) => {
                                 xs={12} 
                                 sm={6} 
                                 key={goal.value}
-                                sx={index === training_goals.length - 1 ? {
-                                    display: 'flex',
-                                    justifyContent: 'center'
-                                } : {}}
                             >
                                 <Card 
                                     elevation={selectedGoal === goal.value ? 8 : 2}
                                     sx={{ 
                                         height: '100%',
-                                        width: index === training_goals.length - 1 ? { xs: '100%', sm: '70%' } : '100%',
-                                        maxWidth: index === training_goals.length - 1 ? '350px' : 'none',
+                                        width: '100%',
                                         border: selectedGoal === goal.value ? '3px solid #CF4044' : '1px solid #e0e0e0',
                                         backgroundColor: selectedGoal === goal.value ? 'linear-gradient(135deg, #ffebee 0%, #fce4ec 100%)' : '#ffffff',
                                         transform: selectedGoal === goal.value ? 'scale(1.02)' : 'scale(1)',
