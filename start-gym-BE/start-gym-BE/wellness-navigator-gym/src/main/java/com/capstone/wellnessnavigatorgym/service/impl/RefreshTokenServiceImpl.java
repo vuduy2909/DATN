@@ -16,8 +16,8 @@ import java.util.UUID;
 @Service
 public class RefreshTokenServiceImpl implements RefreshTokenService {
 
-    // Refresh token expires after 2 hours
-    private static final int REFRESH_TOKEN_DURATION_HOURS = 2;
+    // Refresh token expires after 7 days
+    private static final int REFRESH_TOKEN_DURATION_HOURS = 7 * 24; // 7 days = 168 hours
 
     @Autowired
     private IAccountRepository accountRepository;

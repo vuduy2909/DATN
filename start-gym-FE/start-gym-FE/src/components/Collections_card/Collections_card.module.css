@@ -91,9 +91,9 @@
 
 .course_actions {
     display: flex !important;
-    gap: 10px !important;
+    gap: 20px !important;
     align-items: stretch !important;
-    justify-content: space-between !important;
+    justify-content: center !important;
     width: 100% !important;
     min-height: 48px !important;
 }

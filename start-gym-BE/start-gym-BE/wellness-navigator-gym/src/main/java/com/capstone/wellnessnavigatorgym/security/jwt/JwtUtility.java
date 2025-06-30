@@ -14,14 +14,15 @@ import java.util.Date;
 public class JwtUtility implements Serializable {
     private static final Logger logger = LoggerFactory.getLogger(JwtUtility.class);
     private static final String jwtSecret = "secretkey.capstone";
-    private static final int jwtExpiration = 60 * 60 * 24;
+    // Access token expires after 10 minutes
+    private static final int jwtExpiration = 60 * 10; // 10 minutes in seconds
 
     public String generateJwtToken(Authentication authentication) {
         UserPrinciple userPrinciple = (UserPrinciple) authentication.getPrincipal();
         return Jwts.builder()
                 .setSubject(userPrinciple.getUsername())
                 .setIssuedAt(new Date())
-                .setExpiration(new Date((new Date()).getTime() + jwtExpiration * 100))
+                .setExpiration(new Date(System.currentTimeMillis() + jwtExpiration * 1000L)) // Fixed: *1000 instead of *100
                 .signWith(SignatureAlgorithm.HS512, jwtSecret)
                 .compact();
     }
