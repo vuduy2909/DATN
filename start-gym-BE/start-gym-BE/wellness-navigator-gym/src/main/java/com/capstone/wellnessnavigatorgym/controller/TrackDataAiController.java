@@ -83,7 +83,7 @@ public class TrackDataAiController {
     @Autowired
     private RestTemplate restTemplate;
 
-    @Value("${claude.api.key:sk-ant-api03-G47aLO10DvYoxHuaEnCRL4y_gGTevFEQPLvkHU81DYujJ81lKUMuX28cyJIiD5_z1KpuDpiLzg1QLppX17F9Q-TMiqkgAA}")
+    @Value("${claude.api.key}")
     private String claudeApiKey;
 
     @Value("${claude.api.url:https://api.anthropic.com/v1/messages}")
@@ -1492,8 +1492,6 @@ public class TrackDataAiController {
         headers.set("x-api-key", claudeApiKey);
         headers.set("anthropic-version", claudeApiVersion);
         headers.setContentType(MediaType.APPLICATION_JSON);
-
-        logger.info("Using Claude API key: {}", claudeApiKey.substring(0, 10) + "...");
         logger.info("Using Claude API URL: {}", claudeApiUrl);
         logger.info("Using Claude model: {}", claudeModel);
 

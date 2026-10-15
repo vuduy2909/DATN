@@ -1,6 +1,6 @@
 claude:
   api:
-    key: "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"
+    key: "YOUR_CLAUDE_API_KEY"
     url: "https://api.anthropic.com/v1/messages"
     version: "2023-06-01"
     model: "claude-3-5-sonnet-20241022"

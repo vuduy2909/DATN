@@ -1,13 +1,13 @@
 {
   "type": "service_account",
-  "project_id": "capstone-project-2909",
-  "private_key_id": "185049bf014120988d955004a4bd863e1dcc2fc4",
-  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCoioVzZWaQ1ChT\n17s0uq4h35QodrB/1XAXo7q+pMgFnZyoAGSZLeALXiYRhT4VrXTGlhA7Ew0sjqcy\nPFwNtm9YqheG4HhWqdimlEUCZ/GxFgLc/zsqhRKgTvTeDrph2K7Xi8XU3edAHvgA\ntUERp035AHhtK7cFCHZbNUd3FKxitkQXZVye4N4OrXNsnpjtGjeLudcTcBAD2Jld\nXKoSU8bS6ClS2SFkQLGEVY66kGsvDrqIi3vs7x/MxgKy3uK/XeUOwWV80uU/92Kb\nHnP66K9SBBBD34jaX82aLQYb24jkx48aHjeWHrsghrOqkRZTuTM+3ao5LCOlKpzk\nLKc1tjpVAgMBAAECggEAIygwEcP9aukil2i5L5TgZYb8ohsuEqBsfzXjasi3Q7qe\ntsnMMkrIQT7MrJtxebai1Rjw/k2pUhnYxSkjn6WmYOWsPjGdUKCh5Y+ovIl/uGup\nwb1I84PqQH/v4tFKLkZzpFlO9WorhqvfGlC059CROoePV2CGzzk2bSy2QWAR3I4n\nQyME8xFprYLyxKWd8Bc1yaL3Xs6owXusxNwdLzrXKOe7bspePHDDoc3pWyUi5R/M\n2pd1ZFAgb2q+WXLYQFuwsbxT0V2Mq9vnwlcc0bhd+Ok6iEozDYH1CRc01xgus9yk\n4UF2KD2g2vDLJRlhr2X3bcGsdW1EsVkqXrPsg6AMWQKBgQDg9nButD6EE0o67ajG\niaCy8k/55GnCwQXGZgLYvmk8uNML1ryTnOESdJ+3dknZKNfrxZod2Acflm+oQGLB\nLR4r43CjjWAikuAEqdiM8T4hTCdFW8/RCFBzPgzYHGP5SSGW+RZ82pSwBbwDkPSs\nIvPmYZZcBytcjjtNIvWLfPZ5PQKBgQC/y02MkAHO1GSMuDLhpEwKCPlp314sQ1D+\n9AURMQKeXkj2IadzF86Nr9rvLv5baf9I/4tHGYICU9ZC/561uBhxvpiOoa0x0Txl\nSH878yPRGWw9iIoy+nKEK3FRCJTgNYOokrD5FQHbHiGu4VMRk/b6q9lbEVEpdwya\nvcJtLxxm+QKBgDMFsdpp5wPtnBhhbrYY4Om1K45xz8rsHHMzD9I43YV4JeW5fmu8\nWQ/mg5MIsRcfvFktKBc8t+DiLdDrSXqm0QEDRLjTh8pPpZ9pJkRRMtY6f22rtSaj\nzBtXJ3KcfdA8VfH37LHEoZSKuGnWpqekBc1qtL+KoLsNR0Xnd+l7HivBAoGAb1y3\ngYdYVWTDoWWOva+tKyJ813mH78GCdRbxHkNL1vK+AJQX618GYwSZ5clujVuljBg9\nIaJw97MANNTBrZfgMaNOZ3r+2m84V0LaBdAumsndLHlsbR84gP/MgxWtg+XutWG/\nelE1S6paOnXAyvMUNAa2ZQdQDfh/DBZknwr8vdkCgYEA3YRLFXiNZFce+v8pq1yF\n3V4i0El4wCZboHMdNBq2heM5xfZKZouXUqD4KAkkGukLmsMlqjfn1zYfbnnElWo5\nXi94296AWASgh28OEYny0tdWM0WoIozI8c0DuPyQPdFogXRBYl2D8JzAhxnvT/z5\nzDeNDj4C1X36h8VdwJdd3LM=\n-----END PRIVATE KEY-----\n",
-  "client_email": "firebase-adminsdk-fbsvc@capstone-project-2909.iam.gserviceaccount.com",
-  "client_id": "101205198065409096792",
+  "project_id": "YOUR_FIREBASE_PROJECT_ID",
+  "private_key_id": "YOUR_FIREBASE_PRIVATE_KEY_ID",
+  "private_key": "YOUR_FIREBASE_PRIVATE_KEY_NOT_VALID",
+  "client_email": "YOUR_FIREBASE_SERVICE_ACCOUNT_EMAIL",
+  "client_id": "YOUR_FIREBASE_CLIENT_ID",
   "auth_uri": "https://accounts.google.com/o/oauth2/auth",
   "token_uri": "https://oauth2.googleapis.com/token",
   "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40capstone-project-2909.iam.gserviceaccount.com",
+  "client_x509_cert_url": "YOUR_FIREBASE_CLIENT_CERT_URL",
   "universe_domain": "googleapis.com"
-} 
+}

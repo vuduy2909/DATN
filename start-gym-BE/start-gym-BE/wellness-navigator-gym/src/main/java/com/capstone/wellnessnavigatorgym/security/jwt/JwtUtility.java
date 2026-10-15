@@ -13,7 +13,7 @@ import java.util.Date;
 @Component
 public class JwtUtility implements Serializable {
     private static final Logger logger = LoggerFactory.getLogger(JwtUtility.class);
-    private static final String jwtSecret = "secretkey.capstone";
+    private static final String jwtSecret = "YOUR_JWT_SECRET";
     private static final int jwtExpiration = 60 * 60 * 24;
 
     public String generateJwtToken(Authentication authentication) {

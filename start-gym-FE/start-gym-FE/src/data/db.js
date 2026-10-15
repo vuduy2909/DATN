@@ -2,8 +2,8 @@ const mysql = require('mysql');
 
 const con = mysql.createConnection({
     host: "localhost",
-    user: "root",
-    password: "root",
+    user: "YOUR_MYSQL_USERNAME",
+    password: "YOUR_MYSQL_PASSWORD",
     database: 'wellness_navigator_gym'
 });
 
